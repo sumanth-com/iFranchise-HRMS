@@ -62,12 +62,16 @@ export function SalaryStructureTable({
   employees,
   employmentTypes = [],
   canEdit = false,
+  canDelete,
 }: {
   records: SalaryStructureItem[];
   employees: LookupOption[];
   employmentTypes?: LookupOption[];
   canEdit?: boolean;
+  /** Defaults to canEdit. Set false to keep Edit/Add but hide Delete. */
+  canDelete?: boolean;
 }) {
+  const allowDelete = canDelete ?? canEdit;
   const router = useRouter();
   const { setHeaderActions } = useTeamPayrollHeaderActions();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -239,7 +243,7 @@ export function SalaryStructureTable({
                     {isUnset ? <Plus className="size-3.5" /> : <Pencil className="size-3.5" />}
                     {isUnset ? "Set Structure" : "Edit"}
                   </Button>
-                  {!isUnset ? (
+                  {!isUnset && allowDelete ? (
                     <Button
                       type="button"
                       variant="outline"

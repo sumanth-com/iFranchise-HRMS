@@ -37,6 +37,16 @@ export function isHrReimbursementActor(profile: UserProfile): boolean {
 }
 
 /**
+ * CEO (or founder / co-founder) is the only role that may approve, reject,
+ * or soft-delete org reimbursement claims. HR and Accountant are view-only.
+ */
+export function assertCeoOnlyReimbursementDecision(profile: UserProfile): void {
+  if (!isCeoReimbursementApprover(profile)) {
+    throw new Error("Only the CEO can approve or reject reimbursement claims.");
+  }
+}
+
+/**
  * Active org employees whose claims belong in the CEO reimbursement queue
  * (HR Admin / HR Executive / Super Admin claimants, including IT Team).
  */

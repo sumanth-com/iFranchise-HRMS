@@ -11,7 +11,6 @@ import {
   canApproveBonus,
   canApproveReimbursement,
   canCreateBonus,
-  canCreateReimbursement,
   canEditBankAccounts,
   canEditSalary,
   canRunPayroll,
@@ -196,6 +195,12 @@ export async function TeamPayrollSection({
         employees={lookups.employees}
         employmentTypes={lookups.employmentTypes}
         canEdit={canEditSalary(profile.permissionCodes)}
+        canDelete={
+          // Accountant portal: edit/add only — no delete on salary structures.
+          teamBasePath?.startsWith("/accountant")
+            ? false
+            : canEditSalary(profile.permissionCodes)
+        }
       />
     );
   }
@@ -250,14 +255,18 @@ export async function TeamPayrollSection({
       category: firstString(rawSearchParams.category),
     });
     const isCeoPortal = Boolean(teamBasePath?.startsWith("/ceo"));
+    // Shared org list for HR / Accountant / CEO — no workforce/executive split.
     const [result, lookups] = await Promise.all([
       listReimbursements(supabase, profile, {
         ...params,
-        // HR Team Payroll: workforce only. CEO Team Payroll: HR claimants only.
-        approvalQueue: isCeoPortal ? "executive" : "workforce",
       }),
       getPayrollLookups(supabase, profile.employee.organizationId),
     ]);
+
+    const canDecide =
+      isCeoPortal &&
+      (canApproveReimbursementOverride ??
+        canApproveReimbursement(profile.permissionCodes));
 
     return (
       <ReimbursementTable
@@ -266,19 +275,9 @@ export async function TeamPayrollSection({
         page={result.page}
         pageSize={result.pageSize}
         employees={lookups.employees}
-        canApprove={
-          canApproveReimbursementOverride ??
-          canApproveReimbursement(profile.permissionCodes)
-        }
-        canDelete={
-          canApproveReimbursementOverride ??
-          canApproveReimbursement(profile.permissionCodes)
-        }
-        canCreate={
-          isCeoPortal
-            ? false
-            : canCreateReimbursement(profile.permissionCodes)
-        }
+        canApprove={canDecide}
+        canDelete={false}
+        canCreate={false}
       />
     );
   }

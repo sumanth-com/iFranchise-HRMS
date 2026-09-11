@@ -13,9 +13,7 @@ import {
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
 import {
-  isCeoReimbursementApprover,
-  isHrReimbursementActor,
-  listHrReimbursementApplicantEmployeeIds,
+  assertCeoOnlyReimbursementDecision,
 } from "@/lib/payroll/reimbursement-approval-routing";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
@@ -1458,8 +1456,7 @@ export async function deleteReimbursement(
     throw new Error("Paid reimbursements cannot be deleted.");
   }
 
-  // Same CEO/HR queue rules as approve/reject (portal access ≠ employee visibility).
-  await assertReimbursementDecisionAccess(profile, existing.employee_id);
+  await assertReimbursementDecisionAccess(profile);
 
   if (existing.payroll_id) {
     const { data: payroll, error: payrollError } = await admin
@@ -3756,7 +3753,7 @@ export async function approveReimbursement(
     throw new Error("This reimbursement is already linked to a payroll run.");
   }
 
-  await assertReimbursementDecisionAccess(profile, existing.employee_id);
+  await assertReimbursementDecisionAccess(profile);
 
   const { error } = await admin
     .schema("hrms")
@@ -3812,7 +3809,7 @@ export async function rejectReimbursement(
     throw new Error("This reimbursement is already linked to a payroll run.");
   }
 
-  await assertReimbursementDecisionAccess(profile, existing.employee_id);
+  await assertReimbursementDecisionAccess(profile);
 
   const trimmed = remarks?.trim() || null;
   const { error } = await admin
@@ -3844,25 +3841,8 @@ export async function rejectReimbursement(
 
 async function assertReimbursementDecisionAccess(
   profile: UserProfile,
-  claimantEmployeeId: string,
 ): Promise<void> {
-  const hrApplicantIds = await listHrReimbursementApplicantEmployeeIds(
-    profile.employee.organizationId,
-  );
-  const isExecutiveClaim = hrApplicantIds.includes(claimantEmployeeId);
-  const ceoApprover = isCeoReimbursementApprover(profile);
-  const hrActor = isHrReimbursementActor(profile);
-
-  if (isExecutiveClaim) {
-    if (!ceoApprover) {
-      throw new Error("HR reimbursement claims must be approved by the CEO.");
-    }
-    return;
-  }
-
-  if (ceoApprover && !hrActor) {
-    throw new Error("Workforce reimbursement claims are reviewed in HR Team Payroll.");
-  }
+  assertCeoOnlyReimbursementDecision(profile);
 }
 
 export async function updatePendingReimbursement(

@@ -2,10 +2,9 @@ import { EmployeeDirectoryScreen } from "@/components/employee/directory/employe
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 
-/** HR Self-Service employee directory (read-only directory UX, not Admin Employees). */
-export default async function HrSelfServiceDirectoryPage() {
+export default async function AccountantEmployeeDirectoryPage() {
   const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.hr,
+    PORTAL_PERMISSIONS.accountant,
     "employee.directory.view",
   ]);
 

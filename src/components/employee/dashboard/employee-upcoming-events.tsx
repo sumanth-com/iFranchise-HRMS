@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { Cake, CalendarDays, Newspaper, Pencil, Settings2, Sparkles } from "lucide-react";
+import { Cake, CalendarDays, Megaphone, Newspaper, Pencil, Settings2, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/common/button";
+import { EmployeeAnnouncementsModal } from "@/components/employee/announcements/employee-announcements-modal";
 import {
   AnnouncementIcon,
   BirthdayCelebrationBurst,
@@ -23,7 +24,15 @@ import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
 import { birthdayCardMessage } from "@/lib/employee/birthday-utils";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { getSignedUrlAction } from "@/lib/employees/actions";
+import { listEmployeeAnnouncementsAction } from "@/lib/organization/actions/company-announcement-actions";
+import {
+  announcementViewStorageKey,
+  countUnreadAnnouncements,
+  readLocalAnnouncementViews,
+  rememberLocalAnnouncementView,
+} from "@/lib/organization/announcement-view-storage";
 import { cn } from "@/lib/utils";
+import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 import type { EmployeeUpcomingEvent } from "@/types/employee-dashboard";
 
 function countdownLabel(date: string, referenceDate: string): string {
@@ -518,10 +527,44 @@ export function EmployeeUpcomingEvents({
   const { index, goTo, setPaused } = useCelebrationsCarousel(slideCount);
   const [manageOpen, setManageOpen] = useState(false);
   const [panel, setPanel] = useState<"celebrations" | "notices">("celebrations");
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [companyAnnouncements, setCompanyAnnouncements] = useState<
+    CompanyAnnouncementEmployeeView[]
+  >([]);
+  const [viewedKeys, setViewedKeys] = useState<Set<string>>(new Set());
   const multi = slideCount > 1;
   const showDashboardManage = canManageAnnouncements && !showImportantNotices;
   const noticesActive = showImportantNotices && panel === "notices";
   const canEditTeamUpdates = showImportantNotices && canManageAnnouncements;
+
+  useEffect(() => {
+    if (!showImportantNotices) return;
+    setViewedKeys(readLocalAnnouncementViews());
+    let cancelled = false;
+    void listEmployeeAnnouncementsAction().then((result) => {
+      if (cancelled || !result.success) return;
+      setCompanyAnnouncements(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showImportantNotices]);
+
+  const handleViewAnnouncement = useCallback((item: CompanyAnnouncementEmployeeView) => {
+    rememberLocalAnnouncementView(item.id, item.versionId);
+    setViewedKeys((prev) => {
+      const key = announcementViewStorageKey(item.id, item.versionId);
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  const unreadAnnouncementCount = useMemo(
+    () => countUnreadAnnouncements(companyAnnouncements, viewedKeys),
+    [companyAnnouncements, viewedKeys],
+  );
 
   useEffect(() => {
     if (noticesActive) setPaused(true);
@@ -625,12 +668,13 @@ export function EmployeeUpcomingEvents({
             <Button
               type="button"
               size="xs"
-              variant={panel === "celebrations" ? "default" : "outline"}
+              variant={panel === "celebrations" && !announcementsOpen ? "default" : "outline"}
               className="gap-1"
-              aria-pressed={panel === "celebrations"}
+              aria-pressed={panel === "celebrations" && !announcementsOpen}
               onClick={() => {
                 setPanel("celebrations");
                 setManageOpen(false);
+                setAnnouncementsOpen(false);
               }}
             >
               <Sparkles className="size-3.5" />
@@ -639,16 +683,36 @@ export function EmployeeUpcomingEvents({
             <Button
               type="button"
               size="xs"
-              variant={panel === "notices" ? "default" : "outline"}
+              variant={panel === "notices" && !announcementsOpen ? "default" : "outline"}
               className="gap-1"
-              aria-pressed={panel === "notices"}
-              onClick={() => setPanel("notices")}
+              aria-pressed={panel === "notices" && !announcementsOpen}
+              onClick={() => {
+                setPanel("notices");
+                setAnnouncementsOpen(false);
+              }}
             >
               <Newspaper className="size-3.5" />
               Team Updates
             </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant={announcementsOpen ? "default" : "outline"}
+              className="gap-1"
+              aria-pressed={announcementsOpen}
+              aria-haspopup="dialog"
+              onClick={() => setAnnouncementsOpen(true)}
+            >
+              <Megaphone className="size-3.5" />
+              Announcements
+              {unreadAnnouncementCount > 0 ? (
+                <span className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums">
+                  {unreadAnnouncementCount > 99 ? "99+" : unreadAnnouncementCount}
+                </span>
+              ) : null}
+            </Button>
           </div>
-          {panel === "notices" && canEditTeamUpdates ? (
+          {panel === "notices" && canEditTeamUpdates && !announcementsOpen ? (
             <Button
               type="button"
               size="xs"
@@ -662,9 +726,11 @@ export function EmployeeUpcomingEvents({
           ) : null}
         </div>
         <p className="mb-3 text-xs text-muted-foreground">
-          {panel === "notices"
-            ? "Quick notes from HR and leadership."
-            : "Highlights for today and this week."}
+          {announcementsOpen
+            ? "Company notices shared with you."
+            : panel === "notices"
+              ? "Quick notes from HR and leadership."
+              : "Highlights for today and this week."}
         </p>
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div
@@ -689,6 +755,13 @@ export function EmployeeUpcomingEvents({
             }}
           />
         ) : null}
+        <EmployeeAnnouncementsModal
+          open={announcementsOpen}
+          onOpenChange={setAnnouncementsOpen}
+          announcements={companyAnnouncements}
+          viewedKeys={viewedKeys}
+          onViewAnnouncement={handleViewAnnouncement}
+        />
       </section>
     );
   }

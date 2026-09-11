@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { FileText, ImageIcon } from "lucide-react";
 
+import { DocumentPreviewDialog } from "@/components/employee/documents/document-preview-dialog";
 import { cn } from "@/lib/utils";
 import type { CompanyAnnouncementAttachment } from "@/types/company-announcement";
 
@@ -32,6 +34,13 @@ export function AnnouncementDocumentPreview({
   size?: PreviewSize;
   className?: string;
 }) {
+  const [previewTarget, setPreviewTarget] = useState<{
+    url: string;
+    fileName: string;
+    mimeType: string;
+    title?: string;
+  } | null>(null);
+
   if (!attachments?.length) return null;
 
   const pdfHeight = size === "large" ? "h-[min(58vh,34rem)]" : "h-[22rem]";
@@ -53,7 +62,23 @@ export function AnnouncementDocumentPreview({
               ) : (
                 <FileText className="size-4 shrink-0 text-muted-foreground" />
               )}
-              <p className="min-w-0 truncate text-sm font-medium">{file.fileName}</p>
+              <p className="min-w-0 flex-1 truncate text-sm font-medium">{file.fileName}</p>
+              {canPreview && file.url ? (
+                <button
+                  type="button"
+                  className="shrink-0 text-xs font-medium text-violet-700 hover:underline"
+                  onClick={() =>
+                    setPreviewTarget({
+                      url: file.url!,
+                      fileName: file.fileName,
+                      mimeType: file.mimeType ?? (pdf ? "application/pdf" : "image/*"),
+                      title: file.fileName,
+                    })
+                  }
+                >
+                  Open viewer
+                </button>
+              ) : null}
             </div>
 
             {canPreview && pdf && file.url ? (
@@ -87,6 +112,13 @@ export function AnnouncementDocumentPreview({
           </div>
         );
       })}
+
+      <DocumentPreviewDialog
+        target={previewTarget}
+        onOpenChange={(next) => {
+          if (!next) setPreviewTarget(null);
+        }}
+      />
     </div>
   );
 }

@@ -1080,6 +1080,8 @@ export async function listReimbursements(
   if (employeeId) query = query.eq("employee_id", employeeId);
 
   // Self-service (employeeId scoped) must never apply queue filters.
+  // Org portals (HR / Accountant / CEO) list the full organization by default.
+  // Optional approvalQueue remains for legacy callers only.
   if (!employeeId && approvalQueue) {
     const hrApplicantIds = await listHrReimbursementApplicantEmployeeIds(organizationId);
     if (approvalQueue === "workforce") {

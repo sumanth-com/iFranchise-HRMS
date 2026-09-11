@@ -1,6 +1,7 @@
 export const ACCOUNTANT_ROUTES = {
   home: "/accountant",
   profile: "/accountant/profile",
+  directory: "/accountant/directory",
   leave: "/accountant/leave",
   leavePolicy: "/accountant/leave/policy",
   attendance: "/accountant/attendance",
@@ -10,8 +11,13 @@ export const ACCOUNTANT_ROUTES = {
   documents: "/accountant/documents",
   assets: "/accountant/assets",
   goals: "/accountant/goals",
+  announcements: "/accountant/announcements",
   notifications: "/accountant/notifications",
   settings: "/accountant/settings",
+  /** Personal payslips / self-service payroll (not Team Payroll). */
+  myPayroll: "/accountant/my-payroll",
+  /** Personal reimbursement claims (not org Team Payroll reimbursements). */
+  myReimbursements: "/accountant/reimbursements",
   /** Org finance overview (Administration → Finance Dashboard). */
   financeDashboard: "/accountant/finance",
   /** Team payroll base path (section routes hang under this). */

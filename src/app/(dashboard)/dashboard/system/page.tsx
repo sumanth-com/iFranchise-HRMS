@@ -11,7 +11,16 @@ async function SuperAdminSelfServiceHomeContent() {
   const supabase = await createClient();
   const data = await getEmployeeDashboardData(supabase, profile);
 
-  return <EmployeeDashboardView {...data} subtitle="Super Admin Portal" />;
+  return (
+    <EmployeeDashboardView
+      {...data}
+      subtitle="Super Admin Portal"
+      pairHolidayBirthday
+      showImportantNotices
+      // Team Updates editing is CEO/HR only — Super Admin can view, not edit.
+      canManageAnnouncements={false}
+    />
+  );
 }
 
 export default function SuperAdminPortalPage() {

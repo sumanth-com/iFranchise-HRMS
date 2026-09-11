@@ -1,93 +1,23 @@
-import {
-  Bell,
-  CalendarCheck,
-  CalendarDays,
-  Megaphone,
-  FileText,
-  LaptopMinimal,
-  LayoutDashboard,
-  Receipt,
-  Settings,
-  Target,
-  UserRound,
-  Users,
-  Wallet,
-} from "lucide-react";
-
 import type { NavigationItem } from "@/lib/auth/navigation";
+import { buildSelfServiceNavItems } from "@/config/self-service-navigation";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 
-export const employeeNavItems: NavigationItem[] = [
-  {
-    title: "Dashboard",
-    href: EMPLOYEE_ROUTES.home,
-    icon: LayoutDashboard,
-  },
-  {
-    title: "My Profile",
-    href: EMPLOYEE_ROUTES.profile,
-    icon: UserRound,
-    permissions: ["employee_profile.view"],
-  },
-  {
-    title: "Employee Directory",
-    href: EMPLOYEE_ROUTES.directory,
-    icon: Users,
-  },
-  {
-    title: "Attendance",
-    href: EMPLOYEE_ROUTES.attendance,
-    icon: CalendarCheck,
-    permissions: ["attendance.view"],
-  },
-  {
-    title: "Payroll",
-    href: EMPLOYEE_ROUTES.payroll,
-    icon: Wallet,
-    permissions: ["payslip.view"],
-  },
-  {
-    title: "Reimbursements",
-    href: EMPLOYEE_ROUTES.reimbursements,
-    icon: Receipt,
-    permissions: ["reimbursement.view", "reimbursement.create"],
-  },
-  {
-    title: "Documents",
-    href: EMPLOYEE_ROUTES.documents,
-    icon: FileText,
-    permissions: ["documents.view"],
-  },
-  {
-    title: "Leave",
-    href: EMPLOYEE_ROUTES.leave,
-    icon: CalendarDays,
-    permissions: ["leave.view"],
-  },
-  {
-    title: "My Goals",
-    href: EMPLOYEE_ROUTES.goals,
-    icon: Target,
-  },
-  {
-    title: "Assets",
-    href: EMPLOYEE_ROUTES.assets,
-    icon: LaptopMinimal,
-  },
-  {
-    title: "My Announcements",
-    href: EMPLOYEE_ROUTES.announcements,
-    icon: Megaphone,
-  },
-  {
-    title: "Notifications",
-    href: EMPLOYEE_ROUTES.notifications,
-    icon: Bell,
-    permissions: ["notification.view"],
-  },
-  {
-    title: "Settings",
-    href: EMPLOYEE_ROUTES.settings,
-    icon: Settings,
-  },
-];
+/**
+ * Employee portal sidebar — Self-Service modules only (no Administration block).
+ * Section labels match Manager / HR / Accountant for a consistent shell.
+ */
+export const employeeNavItems: NavigationItem[] = buildSelfServiceNavItems({
+  home: EMPLOYEE_ROUTES.home,
+  profile: EMPLOYEE_ROUTES.profile,
+  directory: EMPLOYEE_ROUTES.directory,
+  attendance: EMPLOYEE_ROUTES.attendance,
+  payroll: EMPLOYEE_ROUTES.payroll,
+  reimbursements: EMPLOYEE_ROUTES.reimbursements,
+  documents: EMPLOYEE_ROUTES.documents,
+  leave: EMPLOYEE_ROUTES.leave,
+  goals: EMPLOYEE_ROUTES.goals,
+  assets: EMPLOYEE_ROUTES.assets,
+  announcements: EMPLOYEE_ROUTES.announcements,
+  notifications: EMPLOYEE_ROUTES.notifications,
+  settings: EMPLOYEE_ROUTES.settings,
+});

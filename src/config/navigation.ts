@@ -1,20 +1,13 @@
 import {
-  Banknote,
   BarChart3,
-  Bell,
   BriefcaseBusiness,
   Building2,
   CalendarCheck,
   CalendarDays,
-  FileText,
-  LaptopMinimal,
   LayoutDashboard,
-  Package,
-  Receipt,
-  Settings,
+  LaptopMinimal,
   Shield,
   Target,
-  UserRound,
   UserRoundPlus,
   Users,
   Wallet,
@@ -22,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type { NavigationItem } from "@/lib/auth/navigation";
+import { buildSelfServiceNavItems } from "@/config/self-service-navigation";
 import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
@@ -42,82 +36,21 @@ export type NavItem = {
  * Administration (org-wide HR) follows — Employees sits directly after HR Overview.
  */
 export const mainNavItems: NavigationItem[] = [
-  // ── Self-service (personal workspace) ────────────────────────────
-  {
-    title: "Dashboard",
-    href: HR_PORTAL_HOME,
-    icon: LayoutDashboard,
-    section: "Self-service",
-  },
-  {
-    title: "My Profile",
-    href: SELF_PROFILE_ROUTES.profile,
-    icon: UserRound,
-    section: "Self-service",
-    permissions: ["employee_profile.view"],
-  },
-  {
-    title: "Attendance",
-    href: HR_HUB_ROUTES.myAttendance,
-    icon: CalendarCheck,
-    section: "Self-service",
-    permissions: ["attendance.view"],
-  },
-  {
-    title: "Payroll",
-    href: HR_HUB_ROUTES.myPayroll,
-    icon: Wallet,
-    section: "Self-service",
-    permissions: ["payroll.view", "payslip.view"],
-  },
-  {
-    title: "Reimbursements",
-    href: HR_HUB_ROUTES.myReimbursements,
-    icon: Receipt,
-    section: "Self-service",
-    permissions: ["reimbursement.view", "reimbursement.create"],
-  },
-  {
-    title: "Documents",
-    href: HR_HUB_ROUTES.myDocuments,
-    icon: FileText,
-    section: "Self-service",
-    permissions: ["documents.view"],
-  },
-  {
-    title: "Leave",
-    href: HR_HUB_ROUTES.myLeave,
-    icon: CalendarDays,
-    section: "Self-service",
-    permissions: ["leave.view"],
-  },
-  {
-    title: "My Goals",
-    href: HR_HUB_ROUTES.myGoals,
-    icon: Target,
-    section: "Self-service",
-    permissions: ["performance.view"],
-  },
-  {
-    title: "Assets",
-    href: HR_HUB_ROUTES.myAssets,
-    icon: LaptopMinimal,
-    section: "Self-service",
-    permissions: ["asset.view"],
-  },
-  {
-    title: "Notifications",
-    href: "/dashboard/notifications",
-    icon: Bell,
-    section: "Self-service",
-    permissions: ["notifications.view", "notification.view"],
-  },
-  {
-    title: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
-    section: "Self-service",
-  },
+  ...buildSelfServiceNavItems({
+    home: HR_PORTAL_HOME,
+    profile: SELF_PROFILE_ROUTES.profile,
+    directory: HR_HUB_ROUTES.directory,
+    attendance: HR_HUB_ROUTES.myAttendance,
+    payroll: HR_HUB_ROUTES.myPayroll,
+    reimbursements: HR_HUB_ROUTES.myReimbursements,
+    documents: HR_HUB_ROUTES.myDocuments,
+    leave: HR_HUB_ROUTES.myLeave,
+    goals: HR_HUB_ROUTES.myGoals,
+    assets: HR_HUB_ROUTES.myAssets,
+    announcements: HR_HUB_ROUTES.myAnnouncements,
+    notifications: "/dashboard/notifications",
+    settings: "/dashboard/settings",
+  }),
 
   // ── Administration (org-wide) ───────────────────────────────────────────
   {

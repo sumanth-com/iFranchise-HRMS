@@ -91,6 +91,21 @@ export function resolveActiveNavHref(
 
   const navItems = items.filter((item) => typeof item?.href === "string" && item.href.length > 0);
 
+  // Dedicated Accountant Self-Service / Reimbursements routes must win over Team Payroll remap.
+  const accountantExactWins = [
+    "/accountant/payroll/reimbursements",
+    "/accountant/reimbursements",
+    "/accountant/my-payroll",
+    "/accountant/directory",
+    "/accountant/announcements",
+  ];
+  for (const exact of accountantExactWins) {
+    if (pathname === exact || pathname.startsWith(`${exact}/`)) {
+      const match = navItems.find((item) => navItemPath(item.href) === exact);
+      if (match) return match.href;
+    }
+  }
+
   const prefixMatch = resolvePrefixNavHref(pathname, MODULE_PREFIX_MAPPINGS, navItems);
   if (prefixMatch) return prefixMatch;
 

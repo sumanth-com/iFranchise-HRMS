@@ -22,7 +22,7 @@ type Props = {
 
 /**
  * Entry-gate acknowledgement: title + short description + checkbox only.
- * Full content and attachments stay on My Announcements.
+ * Full content and attachments stay on the dashboard Announcements modal.
  */
 export function MandatoryAnnouncementDialog({ announcement, onAccepted }: Props) {
   const [checked, setChecked] = useState(false);
@@ -96,7 +96,7 @@ export function MandatoryAnnouncementDialog({ announcement, onAccepted }: Props)
             Acknowledge &amp; Close
           </Button>
           <p className="text-center text-[11px] text-muted-foreground">
-            You can open the full notice anytime from My Announcements.
+            You can open the full notice anytime from Announcements on your dashboard.
           </p>
         </DialogFooter>
       </DialogContent>

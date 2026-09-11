@@ -1,21 +1,15 @@
 import {
   BarChart3,
-  Bell,
   BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
-  FileText,
-  LaptopMinimal,
   LayoutDashboard,
-  Receipt,
-  Wallet,
-  Settings,
   Target,
-  UserRound,
   Users,
 } from "lucide-react";
 
 import type { NavigationItem } from "@/lib/auth/navigation";
+import { buildSelfServiceNavItems } from "@/config/self-service-navigation";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 
 /**
@@ -24,88 +18,21 @@ import { MANAGER_ROUTES } from "@/lib/manager/constants";
  * Administration (team management) follows — same pattern as the HR portal.
  */
 export const managerNavItems: NavigationItem[] = [
-  // ── Self-service (personal workspace) ────────────────────────────
-  {
-    title: "Dashboard",
-    href: MANAGER_ROUTES.home,
-    icon: LayoutDashboard,
-    section: "Self-service",
-  },
-  {
-    title: "My Profile",
-    href: MANAGER_ROUTES.profile,
-    icon: UserRound,
-    section: "Self-service",
-    permissions: ["employee_profile.view"],
-  },
-  {
-    title: "Employee Directory",
-    href: MANAGER_ROUTES.directory,
-    icon: Users,
-    section: "Self-service",
-  },
-  {
-    title: "Attendance",
-    href: MANAGER_ROUTES.attendance,
-    icon: CalendarCheck,
-    section: "Self-service",
-    permissions: ["attendance.view"],
-  },
-  {
-    title: "Payroll",
-    href: MANAGER_ROUTES.payroll,
-    icon: Wallet,
-    section: "Self-service",
-    permissions: ["payroll.view", "payslip.view"],
-  },
-  {
-    title: "Reimbursements",
-    href: MANAGER_ROUTES.reimbursements,
-    icon: Receipt,
-    section: "Self-service",
-    permissions: ["reimbursement.view", "reimbursement.create"],
-  },
-  {
-    title: "Documents",
-    href: MANAGER_ROUTES.documents,
-    icon: FileText,
-    section: "Self-service",
-    permissions: ["documents.view"],
-  },
-  {
-    title: "Leave",
-    href: MANAGER_ROUTES.leave,
-    icon: CalendarDays,
-    section: "Self-service",
-    permissions: ["leave.view"],
-  },
-  {
-    title: "My Goals",
-    href: MANAGER_ROUTES.goals,
-    icon: Target,
-    section: "Self-service",
-    permissions: ["performance.view"],
-  },
-  {
-    title: "Assets",
-    href: MANAGER_ROUTES.assets,
-    icon: LaptopMinimal,
-    section: "Self-service",
-    permissions: ["asset.view"],
-  },
-  {
-    title: "Notifications",
-    href: MANAGER_ROUTES.notificationsCenter,
-    icon: Bell,
-    section: "Self-service",
-    permissions: ["notifications.view", "notification.view"],
-  },
-  {
-    title: "Settings",
-    href: MANAGER_ROUTES.settings,
-    icon: Settings,
-    section: "Self-service",
-  },
+  ...buildSelfServiceNavItems({
+    home: MANAGER_ROUTES.home,
+    profile: MANAGER_ROUTES.profile,
+    directory: MANAGER_ROUTES.directory,
+    attendance: MANAGER_ROUTES.attendance,
+    payroll: MANAGER_ROUTES.payroll,
+    reimbursements: MANAGER_ROUTES.reimbursements,
+    documents: MANAGER_ROUTES.documents,
+    leave: MANAGER_ROUTES.leave,
+    goals: MANAGER_ROUTES.goals,
+    assets: MANAGER_ROUTES.assets,
+    announcements: MANAGER_ROUTES.announcements,
+    notifications: MANAGER_ROUTES.notificationsCenter,
+    settings: MANAGER_ROUTES.settings,
+  }),
 
   // ── Administration (team) ────────────────────────────────────────
   {

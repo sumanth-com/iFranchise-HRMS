@@ -634,10 +634,10 @@ export async function approveReimbursementAction(
   input: unknown,
 ): Promise<PayrollActionResult> {
   try {
+    // Entry gate is broad; assertCeoOnlyReimbursementDecision enforces CEO-only.
     const profile = await requireServerAnyPermission([
-      "reimbursement.approve",
       PORTAL_PERMISSIONS.ceo,
-      PORTAL_PERMISSIONS.hr,
+      "reimbursement.approve",
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed =
@@ -666,9 +666,8 @@ export async function rejectReimbursementAction(
 ): Promise<PayrollActionResult> {
   try {
     const profile = await requireServerAnyPermission([
-      "reimbursement.approve",
       PORTAL_PERMISSIONS.ceo,
-      PORTAL_PERMISSIONS.hr,
+      "reimbursement.approve",
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = reimbursementDecisionSchema.parse(input);
@@ -694,9 +693,8 @@ export async function deleteReimbursementAction(
 ): Promise<PayrollActionResult> {
   try {
     const profile = await requireServerAnyPermission([
-      "reimbursement.approve",
       PORTAL_PERMISSIONS.ceo,
-      PORTAL_PERMISSIONS.hr,
+      "reimbursement.approve",
     ]);
     const supabase = await getAuthenticatedSupabase();
     const id = String(reimbursementId ?? "").trim();

@@ -346,8 +346,8 @@ const REIMBURSEMENT_VIEW = [
 ];
 /** Org claim create for others — dedicated reimbursement.create only (not payroll.create). */
 const REIMBURSEMENT_CREATE = ["reimbursement.create"];
-/** Claim approval is HR/CEO — not unlocked by payroll.approve (finance payroll step). */
-const REIMBURSEMENT_APPROVE = ["reimbursement.approve", PORTAL_PERMISSIONS.ceo];
+/** CEO portal only — HR/Accountant review claims as view-only. */
+const REIMBURSEMENT_APPROVE = [PORTAL_PERMISSIONS.ceo];
 
 export function canViewPayroll(codes: string[]) {
   return hasAnyPermission(codes, PAYROLL_VIEW);
@@ -405,13 +405,9 @@ export function canApproveReimbursement(codes: string[]) {
   return hasAnyPermission(codes, REIMBURSEMENT_APPROVE);
 }
 
-/** HR/CEO reviewers may soft-delete claims that are not locked in paid payroll. */
+/** Soft-delete of org claims is CEO-only (employees cancel their own pending claims). */
 export function canDeleteReimbursement(codes: string[]) {
-  return hasAnyPermission(codes, [
-    ...REIMBURSEMENT_APPROVE,
-    PORTAL_PERMISSIONS.ceo,
-    PORTAL_PERMISSIONS.hr,
-  ]);
+  return hasAnyPermission(codes, REIMBURSEMENT_APPROVE);
 }
 
 const BANK_ACCOUNT_VIEW = ["bank_account.view", "payroll.view"];
@@ -432,7 +428,7 @@ export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, strin
   bonuses:
     "Record one-time bonuses and track HR → Finance approval before they are included in the monthly run.",
   reimbursements:
-    "Review employee expense claims and approve payouts to be settled through payroll.",
+    "Review employee expense claims. CEO approves or rejects; HR and Accountant review as view-only before payroll settlement.",
   payslips:
     "Access published payslips — preview, download PDFs, and email copies to employees.",
   "employee-accounts":

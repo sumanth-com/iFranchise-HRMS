@@ -60,6 +60,7 @@ export const MANAGER_ROUTES = {
   directory: "/manager/directory",
   assets: "/manager/assets",
   goals: "/manager/goals",
+  announcements: "/manager/announcements",
   settings: "/manager/settings",
 } as const;
 
