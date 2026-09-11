@@ -167,7 +167,8 @@ export async function loadUpcomingCelebrations(
       events.push({
         id: `holiday-${holiday.id}`,
         type: "holiday",
-        title: holiday.name,
+        // Correct known DB typo so celebrations always show "Vinayaka".
+        title: holiday.name.replace(/\bVinavaka\b/gi, "Vinayaka"),
         subtitle,
         date: holiday.holiday_date,
       });

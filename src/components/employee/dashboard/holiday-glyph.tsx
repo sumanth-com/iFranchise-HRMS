@@ -80,7 +80,7 @@ export function HolidayGlyph({
   name: string;
   className?: string;
 }) {
-  if (matchesHoliday(name, "ganesh", "vinayaka", "chavithi", "ganapati")) {
+  if (matchesHoliday(name, "ganesh", "vinayaka", "vinavaka", "chavithi", "ganapati")) {
     return <BalaGaneshImage className={className} />;
   }
 

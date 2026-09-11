@@ -11,7 +11,7 @@ export const employeeSectionClass =
   "dashboard-surface flex flex-col overflow-hidden rounded-xl border-0 bg-card p-4 dark:shadow-none";
 
 export const employeeStatCardClass =
-  "dashboard-surface relative flex h-full min-h-[7.25rem] min-w-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-4 text-left dark:shadow-none";
+  "dashboard-surface relative flex h-full min-h-[6.75rem] min-w-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-3.5 text-left md:p-4 dark:shadow-none";
 
 export const employeeEventRowClass =
   "dashboard-surface flex items-center gap-3 rounded-lg border-0 bg-card px-3 py-2.5 transition-[box-shadow,background-color] dark:shadow-none";

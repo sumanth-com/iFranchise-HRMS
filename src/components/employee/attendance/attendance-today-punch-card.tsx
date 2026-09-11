@@ -55,7 +55,7 @@ type DialogState =
 const PUNCH_MESSAGE_DISMISS_MS = 3500;
 
 const PUNCH_BUTTON_CLASS =
-  "h-11 min-w-[11.5rem] gap-2.5 rounded-lg px-6 text-sm font-semibold transition-all active:scale-[0.98]";
+  "h-11 w-full min-w-0 gap-2.5 rounded-lg px-6 text-sm font-semibold transition-all active:scale-[0.98] sm:w-auto sm:min-w-[11.5rem]";
 
 function punchRank(today: ManagerTodayAttendance) {
   if (today.checkOutAt) return 2;
@@ -360,14 +360,14 @@ export function AttendanceTodayPunchCard({
 
   return (
     <>
-      <section className="dashboard-surface card-surface-static attendance-wave-surface max-xl:min-h-0 rounded-2xl border-0 bg-card p-5 dark:border">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 space-y-3">
+      <section className="dashboard-surface card-surface-static attendance-wave-surface max-xl:min-h-0 w-full min-w-0 rounded-2xl border-0 bg-card p-4 md:p-5 dark:border">
+        <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+          <div className="min-w-0 flex-1 space-y-2.5">
             <div>
               <h2 className="text-base font-semibold tracking-tight">
                 Mark attendance for today ({dateLabel})
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm leading-snug text-muted-foreground">
                 Today&apos;s working hours:{" "}
                 <span className="font-medium text-foreground">
                   {workingHoursLabel}
@@ -395,7 +395,7 @@ export function AttendanceTodayPunchCard({
             </div>
           </div>
 
-          <div className="flex shrink-0 justify-end">
+          <div className="flex w-full min-w-0 shrink-0 flex-wrap justify-stretch gap-2 sm:justify-end lg:w-auto">
             {punchState === "not_checked_in" ? (
               <PunchActionButton onClick={handleCheckIn} disabled={isPending}>
                 {isPending ? (

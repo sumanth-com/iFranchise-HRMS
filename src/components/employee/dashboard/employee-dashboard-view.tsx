@@ -28,19 +28,23 @@ export function EmployeeDashboardView({
   const allowCheckoutUpdate = true;
   return (
     <SelfAttendanceLiveProvider today={today}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 max-xl:overflow-x-visible xl:overflow-hidden">
-        <div className="mx-auto flex w-full min-w-0 max-w-[88rem] flex-col gap-3 max-xl:min-h-0 xl:h-full xl:min-h-0">
-          <div className="shrink-0">
+      {/*
+        Fill the main pane at desktop, but keep overflow-y-auto (never overflow-hidden)
+        so higher browser zoom can scroll instead of clipping sections.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+        <div className="mx-auto flex w-full min-w-0 max-w-[88rem] flex-1 flex-col gap-3 xl:min-h-0">
+          <div className="w-full min-w-0 shrink-0">
             <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
           </div>
 
-          <div className="shrink-0">
+          <div className="w-full min-w-0 shrink-0">
             <EmployeeDashboardKpiCards kpis={kpis} today={today} />
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-3 max-xl:flex-none xl:grid-cols-[3fr_2fr] xl:items-stretch">
-            <div className="flex min-h-0 flex-col gap-3">
-              <div className="shrink-0">
+          <div className="grid w-full min-w-0 flex-1 gap-3 max-xl:flex-none xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:items-stretch">
+            <div className="flex min-h-0 min-w-0 flex-col gap-3 xl:h-full">
+              <div className="w-full min-w-0 shrink-0">
                 <SelfAttendanceTodayCard
                   firstName={greeting.firstName}
                   today={today}
@@ -52,7 +56,7 @@ export function EmployeeDashboardView({
                 lastName={greeting.lastName}
                 personKey={greeting.employeeId}
                 referenceDate={referenceDate}
-                className="min-h-[11.5rem] flex-[1.15] max-xl:min-h-0 max-xl:flex-none"
+                className="min-h-[11.5rem] w-full min-w-0 max-xl:min-h-0 xl:h-full xl:min-h-0 xl:flex-1"
               />
             </div>
             <EmployeeUpcomingEvents
@@ -61,7 +65,7 @@ export function EmployeeDashboardView({
               canManageAnnouncements={canManageAnnouncements}
               pairHolidayBirthday={pairHolidayBirthday}
               showImportantNotices={showImportantNotices}
-              className="min-h-0 h-full max-xl:h-auto max-xl:min-h-[16rem]"
+              className="min-h-[16rem] w-full min-w-0 max-xl:h-auto xl:h-full xl:min-h-0"
             />
           </div>
         </div>

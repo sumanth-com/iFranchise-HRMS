@@ -662,14 +662,14 @@ export function EmployeeUpcomingEvents({
 
   if (showImportantNotices) {
     return (
-      <section className={cn(employeeSectionClass, "flex h-full min-h-0 flex-col overflow-hidden", className)}>
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <section className={cn(employeeSectionClass, "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden", className)}>
+        <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto pb-0.5">
             <Button
               type="button"
               size="xs"
               variant={panel === "celebrations" && !announcementsOpen ? "default" : "outline"}
-              className="gap-1"
+              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
               aria-pressed={panel === "celebrations" && !announcementsOpen}
               onClick={() => {
                 setPanel("celebrations");
@@ -677,33 +677,33 @@ export function EmployeeUpcomingEvents({
                 setAnnouncementsOpen(false);
               }}
             >
-              <Sparkles className="size-3.5" />
-              Celebrations & This Week
+              <Sparkles className="size-3 shrink-0" />
+              Celebrations
             </Button>
             <Button
               type="button"
               size="xs"
               variant={panel === "notices" && !announcementsOpen ? "default" : "outline"}
-              className="gap-1"
+              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
               aria-pressed={panel === "notices" && !announcementsOpen}
               onClick={() => {
                 setPanel("notices");
                 setAnnouncementsOpen(false);
               }}
             >
-              <Newspaper className="size-3.5" />
+              <Newspaper className="size-3 shrink-0" />
               Team Updates
             </Button>
             <Button
               type="button"
               size="xs"
               variant={announcementsOpen ? "default" : "outline"}
-              className="gap-1"
+              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
               aria-pressed={announcementsOpen}
               aria-haspopup="dialog"
               onClick={() => setAnnouncementsOpen(true)}
             >
-              <Megaphone className="size-3.5" />
+              <Megaphone className="size-3 shrink-0" />
               Announcements
               {unreadAnnouncementCount > 0 ? (
                 <span className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums">
@@ -717,10 +717,10 @@ export function EmployeeUpcomingEvents({
               type="button"
               size="xs"
               variant="outline"
-              className="shrink-0 gap-1"
+              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
               onClick={() => setManageOpen(true)}
             >
-              <Pencil className="size-3" />
+              <Pencil className="size-3 shrink-0" />
               Edit
             </Button>
           ) : null}
