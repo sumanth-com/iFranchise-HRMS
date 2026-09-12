@@ -66,7 +66,13 @@ export function HrDashboard({ data, error }: Props) {
   const onboardingTask = focusById.get("onboarding-review");
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Soft clean wash behind cards — scoped to HR Overview only */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/85 via-[#faf9fc]/90 to-[#f6f5fa]/80"
+      />
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4">
       <div className="mx-auto flex w-full min-w-0 max-w-[88rem] flex-1 min-h-0 flex-col gap-3">
         <EmployeeSectionCard
           compact
@@ -123,15 +129,15 @@ export function HrDashboard({ data, error }: Props) {
           </div>
         </EmployeeSectionCard>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-2 xl:items-stretch">
           <EmployeeSectionCard
             compact
             title="Focus Today"
             description="Payroll, interviews, leave, and onboarding priorities"
-            className="flex min-h-0 flex-1 flex-col p-3.5 md:p-4"
+            className="flex min-h-0 min-w-0 flex-1 flex-col p-3.5 md:p-4"
             bodyClassName="flex min-h-0 flex-1 flex-col"
           >
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4 xl:items-stretch">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2 sm:items-stretch">
               <EmployeeStatCard
                 tall
                 showWave={false}
@@ -187,10 +193,10 @@ export function HrDashboard({ data, error }: Props) {
             compact
             title="People Focus"
             description="Headcount, assets, exits, and upcoming celebrations"
-            className="flex min-h-0 flex-1 flex-col p-3.5 md:p-4"
+            className="flex min-h-0 min-w-0 flex-1 flex-col p-3.5 md:p-4"
             bodyClassName="flex min-h-0 flex-1 flex-col"
           >
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4 xl:items-stretch">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2 sm:items-stretch">
               <EmployeeStatCard
                 tall
                 showWave={false}
@@ -242,6 +248,7 @@ export function HrDashboard({ data, error }: Props) {
             </div>
           </EmployeeSectionCard>
         </div>
+      </div>
       </div>
     </div>
   );

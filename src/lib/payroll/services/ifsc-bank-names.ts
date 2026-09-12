@@ -52,8 +52,16 @@ export function resolveEmployeeBankName(
   ifscCode: string | null | undefined,
 ): string {
   const stored = (bankName ?? "").trim();
-  if (stored && !/^pending-/i.test(stored) && stored.toLowerCase() !== "bank") {
+  const isImportedPlaceholder = stored.toLowerCase() === "imported";
+  const isPlaceholder =
+    !stored ||
+    isImportedPlaceholder ||
+    /^pending-/i.test(stored) ||
+    stored.toLowerCase() === "bank";
+
+  if (!isPlaceholder) {
     return stored;
   }
-  return resolveBankNameFromIfsc(ifscCode) ?? stored ?? "—";
+
+  return resolveBankNameFromIfsc(ifscCode) ?? (isImportedPlaceholder || !stored ? "—" : stored);
 }
