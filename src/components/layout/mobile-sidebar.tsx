@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { OrganizationBrandTitle } from "@/components/layout/sidebar-brand";
+import { SidebarBrand } from "@/components/layout/sidebar-brand";
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -59,7 +59,11 @@ export function MobileSidebar() {
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
       <SheetContent side="left" className="app-shell-sidebar flex w-64 flex-col bg-background p-0 text-sidebar-foreground">
         <SheetHeader className="shrink-0 border-b px-4 py-4 dark:border-white/15">
-          <SheetTitle className="dark:text-white"><OrganizationBrandTitle /></SheetTitle>
+          <SheetTitle className="sr-only">iFranchise</SheetTitle>
+          <SidebarBrand
+            href={portalHome}
+            onNavigate={() => setMobileOpen(false)}
+          />
         </SheetHeader>
         <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
           {navigation.map((item, index) => {

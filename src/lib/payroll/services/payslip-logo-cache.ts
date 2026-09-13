@@ -26,7 +26,7 @@ export async function loadLogoBytesCached(logoUrl: string | null): Promise<Uint8
     }
 
     if (!bytes) {
-      const fallbackPath = resolvePathWithinBase(publicDir, "assets/Logo.png");
+      const fallbackPath = resolvePathWithinBase(publicDir, "images/logo.png");
       try {
         if (fallbackPath) {
           bytes = await readFile(fallbackPath);

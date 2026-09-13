@@ -1,10 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, Monitor } from "lucide-react";
 
-import brandLogo from "@/assets/Logo.png";
+import { BrandLockup } from "@/components/brand/brand-logo";
 
 const RESET_DELAY_MS = 2600;
 
@@ -48,16 +47,7 @@ export function DesktopOnlyNotice() {
 
       <div className="desktop-notice-card">
         <div className="desktop-notice-brand">
-          <span className="desktop-notice-brand-mark">
-            <Image
-              src={brandLogo}
-              alt=""
-              width={32}
-              height={32}
-              className="size-8 object-contain"
-            />
-          </span>
-          <span className="desktop-notice-brand-text">iFranchise</span>
+          <BrandLockup markSize={36} />
         </div>
 
         <DesktopPreview />

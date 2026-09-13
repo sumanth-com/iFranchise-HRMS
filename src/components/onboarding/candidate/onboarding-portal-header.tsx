@@ -1,13 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
+import { BrandLockup } from "@/components/brand/brand-logo";
 import { Button } from "@/components/common/button";
 import { useOnboardingPortalProgress } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
-import brandLogo from "@/assets/Logo.png";
 import { cn } from "@/lib/utils";
 
 export function OnboardingPortalHeader() {
@@ -27,24 +26,7 @@ export function OnboardingPortalHeader() {
     <header className="sticky top-0 z-30 h-14 w-full max-w-[100vw] border-b border-border/60 bg-background/95 backdrop-blur-xl">
       <div className="mx-auto grid h-full w-full min-w-0 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4">
         <div className="flex min-w-0 items-center gap-3 justify-self-start">
-          <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-border/60">
-            <Image
-              src={brandLogo}
-              alt="iFranchise"
-              width={36}
-              height={36}
-              priority
-              className="size-full object-contain p-0.5"
-            />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-none tracking-tight text-foreground">
-              iFranchise
-            </p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-              Pre-joining onboarding
-            </p>
-          </div>
+          <BrandLockup markSize={36} priority />
         </div>
 
         {completionPercent !== null ? (

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -14,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 
-import brandLogo from "@/assets/Logo.png";
+import { BrandLockup } from "@/components/brand/brand-logo";
 import { LandingPeopleBento } from "@/components/landing/landing-people-bento";
 import { LandingSectionHeading } from "@/components/landing/landing-section-heading";
 import { useLandingCta } from "@/components/landing/landing-cta-provider";
@@ -255,16 +254,7 @@ export function LandingFooter() {
     <footer className="landing-footer">
       <div className="landing-footer-inner">
         <Link href={PUBLIC_LANDING_ROUTE} className="landing-footer-brand">
-          <span className="landing-footer-brand-mark">
-            <Image
-              src={brandLogo}
-              alt=""
-              width={36}
-              height={36}
-              className="size-9 rounded-lg object-contain"
-            />
-          </span>
-          <span className="landing-footer-brand-inline">iFranchise</span>
+          <BrandLockup markSize={36} />
         </Link>
 
         <p className="landing-footer-copy">

@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useContext, useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
-import brandLogo from "@/assets/Logo.png";
+import { BrandMarkTile } from "@/components/brand/brand-logo";
 import { LandingCtaContext } from "@/components/landing/landing-cta-provider";
 import { PUBLIC_LANDING_ROUTE, WHATS_NEW_ROUTE } from "@/lib/auth/constants";
 import { navigateToLogin } from "@/lib/landing/navigate-to-login";
@@ -82,16 +81,7 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
     <header className={cn("landing-nav", scrolled && "landing-nav--scrolled")}>
       <div className="landing-nav-inner">
         <Link href={PUBLIC_LANDING_ROUTE} className="landing-nav-brand">
-          <span className="landing-brand-mark relative flex size-11 shrink-0 overflow-hidden rounded-xl">
-            <Image
-              src={brandLogo}
-              alt="iFranchise"
-              width={44}
-              height={44}
-              className="size-full object-contain"
-              priority={!compact}
-            />
-          </span>
+          <BrandMarkTile size={44} priority={!compact} />
           <span className="landing-nav-brand-text">iFranchise</span>
         </Link>
 

@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { User } from "lucide-react";
 
-import brandLogo from "@/assets/Logo.png";
+import { BrandLockup } from "@/components/brand/brand-logo";
 import { AuthThemeToggle } from "@/components/auth/auth-theme-toggle";
 import { PUBLIC_LANDING_ROUTE } from "@/lib/auth/constants";
 import { consumeLandingToLoginTransition } from "@/lib/landing/navigate-to-login";
@@ -40,17 +39,13 @@ function AuthGlassOrb() {
         className="auth-glass-brand rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         aria-label="Go to HRMS home"
       >
-        <div className="auth-logo-shine auth-glass-brand-mark">
-          <Image
-            src={brandLogo}
-            alt=""
-            width={52}
-            height={52}
-            priority
-            className="relative z-0 size-full object-contain"
-          />
-        </div>
-        <p className="auth-glass-brand-name">iFranchise</p>
+        <BrandLockup
+          markSize={52}
+          shine
+          priority
+          onDarkSurface
+          className="auth-glass-brand-lockup"
+        />
       </Link>
 
       <div className="auth-glass-aurora auth-glass-aurora-a" aria-hidden />

@@ -3,16 +3,21 @@
 import Image from "next/image";
 import { useLayoutEffect, useState } from "react";
 
-import brandLogo from "@/assets/Logo.png";
+import brandLogo from "@/assets/brand/if-mark.png";
+import { BRAND_NAME } from "@/lib/brand/constants";
 import { cn } from "@/lib/utils";
 
 /** Session-scoped: splash once per browser tab/session, including return from login. */
-export const LANDING_SPLASH_SESSION_KEY = "ifranchise.landing.splash.v2";
+export const LANDING_SPLASH_SESSION_KEY = "ifranchise.landing.splash.v3";
 
-const FULL_EXIT_MS = 2850;
-const FULL_GONE_MS = 3450;
-const REDUCED_EXIT_MS = 260;
-const REDUCED_GONE_MS = 480;
+/** Full experience is exactly 5s including the exit fade. */
+const FULL_EXIT_MS = 4450;
+const FULL_GONE_MS = 5000;
+const REDUCED_EXIT_MS = 280;
+const REDUCED_GONE_MS = 520;
+
+/** Splash-only tagline order for the brand sequence. */
+const SPLASH_TAGLINE = "CONNECT. GROW. EXPAND.";
 
 type SplashPhase = "boot" | "play" | "exit" | "gone";
 
@@ -35,6 +40,41 @@ function markSplashShown(): void {
   } catch {
     // ignore — private mode / blocked storage
   }
+}
+
+function ConceptIconConnect() {
+  return (
+    <svg viewBox="0 0 48 48" className="landing-splash-concept-icon" aria-hidden>
+      <circle cx="12" cy="24" r="3.5" />
+      <circle cx="36" cy="13" r="3.5" />
+      <circle cx="36" cy="35" r="3.5" />
+      <path d="M15.4 22.4 32.6 14.6M15.4 25.6 32.6 33.4" />
+      <circle cx="24" cy="24" r="2.25" />
+    </svg>
+  );
+}
+
+function ConceptIconGrow() {
+  return (
+    <svg viewBox="0 0 48 48" className="landing-splash-concept-icon" aria-hidden>
+      <path d="M10 34h28" />
+      <path d="M14 34V26M22 34V20M30 34V15M36 34V10" />
+      <path d="M32 12h6v6" />
+      <path d="M22 18 36 10" />
+    </svg>
+  );
+}
+
+function ConceptIconExpand() {
+  return (
+    <svg viewBox="0 0 48 48" className="landing-splash-concept-icon" aria-hidden>
+      <rect x="18" y="18" width="12" height="12" rx="2.5" />
+      <path d="M12 12h7M12 12v7M12 12l7 7" />
+      <path d="M36 12h-7M36 12v7M36 12l-7 7" />
+      <path d="M12 36h7M12 36v-7M12 36l7-7" />
+      <path d="M36 36h-7M36 36v-7M36 36l-7-7" />
+    </svg>
+  );
 }
 
 /**
@@ -116,25 +156,49 @@ export function LandingSplash() {
       <div className="landing-splash-orb landing-splash-orb--c" />
 
       <div className="landing-splash-content">
-        <div className="landing-splash-brand">
-          <span className="landing-splash-mark">
-            <span className="landing-splash-ripple" aria-hidden />
-            <svg className="landing-splash-ring" viewBox="0 0 88 88" aria-hidden>
-              <rect x="5" y="5" width="78" height="78" rx="20" ry="20" />
-            </svg>
-            <Image
-              src={brandLogo}
-              alt=""
-              width={112}
-              height={112}
-              priority
-              className="landing-splash-logo"
-            />
-          </span>
-          <span className="landing-splash-wordmark">iFranchise</span>
-        </div>
+        <div className="landing-splash-stage">
+          <div className="landing-splash-concepts" aria-hidden>
+            <div className="landing-splash-concept landing-splash-concept--connect">
+              <span className="landing-splash-concept-glyph">
+                <ConceptIconConnect />
+              </span>
+              <span className="landing-splash-concept-label">CONNECT</span>
+            </div>
+            <div className="landing-splash-concept landing-splash-concept--grow">
+              <span className="landing-splash-concept-glyph">
+                <ConceptIconGrow />
+              </span>
+              <span className="landing-splash-concept-label">GROW</span>
+            </div>
+            <div className="landing-splash-concept landing-splash-concept--expand">
+              <span className="landing-splash-concept-glyph">
+                <ConceptIconExpand />
+              </span>
+              <span className="landing-splash-concept-label">EXPAND</span>
+            </div>
+          </div>
 
-        <p className="landing-splash-tagline">Empowering People. Simplifying Work.</p>
+          <div className="landing-splash-brand">
+            <span className="landing-splash-mark">
+              <span className="landing-splash-ripple" aria-hidden />
+              <svg className="landing-splash-ring" viewBox="0 0 88 88" aria-hidden>
+                <rect x="5" y="5" width="78" height="78" rx="20" ry="20" />
+              </svg>
+              <Image
+                src={brandLogo}
+                alt=""
+                width={112}
+                height={112}
+                priority
+                className="landing-splash-logo size-[92%] object-contain"
+              />
+            </span>
+            <span className="landing-splash-wordmark-lockup">
+              <span className="landing-splash-wordmark">{BRAND_NAME}</span>
+              <span className="landing-splash-tagline">{SPLASH_TAGLINE}</span>
+            </span>
+          </div>
+        </div>
         <span className="landing-splash-rule" aria-hidden />
       </div>
     </div>

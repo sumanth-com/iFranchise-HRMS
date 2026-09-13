@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
+import { BrandLockup } from "@/components/brand/brand-logo";
 import { Button } from "@/components/common/button";
 import {
   Dialog,
@@ -10,7 +11,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import brandLogo from "@/assets/Logo.png";
 import desktopExperienceIllustration from "@/assets/get.png";
 
 type LandingDesktopExperienceProps = {
@@ -31,19 +31,8 @@ export function LandingDesktopExperience({
         <div className="landing-desktop-experience-aurora" aria-hidden />
 
         <div className="landing-desktop-experience-body relative flex min-h-0 flex-col px-4 pb-4 pt-3 sm:px-6 sm:pb-7 sm:pt-6">
-          <div className="flex shrink-0 items-center justify-center gap-2.5">
-            <span className="landing-desktop-experience-brand-mark">
-              <Image
-                src={brandLogo}
-                alt=""
-                width={32}
-                height={32}
-                className="size-8 object-contain"
-              />
-            </span>
-            <span className="text-sm font-semibold tracking-tight text-slate-900">
-              iFranchise
-            </span>
+          <div className="flex shrink-0 items-center justify-center">
+            <BrandLockup markSize={36} />
           </div>
 
           <div className="landing-desktop-experience-illustration">

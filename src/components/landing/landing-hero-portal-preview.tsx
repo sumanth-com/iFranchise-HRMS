@@ -17,7 +17,7 @@ import {
   Settings,
 } from "lucide-react";
 
-import brandLogo from "@/assets/Logo.png";
+import brandLogo from "@/assets/brand/if-mark-rounded.png";
 
 function wishForHour(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -218,7 +218,7 @@ export function LandingHeroPortalPreview() {
               alt=""
               width={28}
               height={28}
-              className="landing-hero-preview-brand-logo"
+              className="landing-hero-preview-brand-logo object-contain"
             />
           </div>
           <ul className="landing-hero-preview-nav">
@@ -251,7 +251,7 @@ export function LandingHeroPortalPreview() {
                   alt=""
                   width={22}
                   height={22}
-                  className="landing-hero-preview-avatar-logo"
+                  className="landing-hero-preview-avatar-logo object-contain"
                 />
               </span>
             </div>

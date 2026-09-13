@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-import brandLogo from "@/assets/Logo.png";
+import brandLogo from "@/assets/brand/if-mark-rounded.png";
 import { cn } from "@/lib/utils";
 
 const TOUR_INTERVAL_MS = 4200;
@@ -251,7 +251,7 @@ export function LandingLaptopMockup() {
           <header className="flex shrink-0 items-center justify-between border-b border-slate-200/80 pb-2">
             <div className="flex items-center gap-1.5">
               <div className="flex size-5.5 items-center justify-center rounded-md bg-gradient-to-tr from-[#5f55ee] to-[#8b5cf6] p-0.5 text-white shadow-2xs">
-                <Image src={brandLogo} alt="" width={15} height={15} className="rounded-xs" />
+                <Image src={brandLogo} alt="" width={15} height={15} className="rounded-xs object-contain" />
               </div>
               <span className="text-[11px] font-extrabold tracking-tight text-slate-900">
                 iFranchise
