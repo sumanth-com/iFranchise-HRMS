@@ -476,6 +476,24 @@ html:not(.dark) .dashboard-surface:hover {
   color: #171717;
 }
 
+/* Official payslip — print/PDF-safe: avoid clipping decorative waves & keep A4 width */
+@media print {
+  #payslip-print,
+  .payslip-doc {
+    max-width: none !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    break-inside: avoid;
+  }
+
+  .payslip-doc-header,
+  .payslip-doc-footer {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html:not(.dark) .rounded-xl.bg-card,
   html:not(.dark) .rounded-2xl.bg-card,

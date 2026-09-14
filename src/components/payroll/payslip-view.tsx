@@ -3,6 +3,11 @@
 import { Download, Mail, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/common/button";
+/**
+ * Official payslip document shell for every portal (employee / HR / admin).
+ * Always renders `PayslipTemplate` — the single standard payslip design.
+ * PDF download/email use `generatePayslipPdfBytes`, which mirrors the same design.
+ */
 import { PayslipTemplate } from "@/components/payroll/payslip-template";
 import { usePayslipActions } from "@/lib/payroll/hooks/use-payslip-actions";
 import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-publication";
@@ -60,3 +65,4 @@ export function PayslipView({
 }
 
 export { usePayslipActions };
+export { PayslipTemplate };
