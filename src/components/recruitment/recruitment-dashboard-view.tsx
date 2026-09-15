@@ -70,7 +70,7 @@ export function RecruitmentDashboardView({
   const offerStage = summary.pendingOfferCount;
 
   return (
-    <div className="flex h-[calc(100dvh-11.75rem)] min-h-0 flex-col gap-2 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="shrink-0">
         <SectionHelpButton
           title={HIRING_SECTION_HELP.dashboard.title}

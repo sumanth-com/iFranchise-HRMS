@@ -129,7 +129,7 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className={cn("overflow-x-auto rounded-lg border border-input bg-white dark:bg-input", className)}>
+    <div className={cn("min-w-0 max-w-full overflow-x-auto rounded-lg border border-input bg-white dark:bg-input", className)}>
       <Table>
         <TableHeader>
           <TableRow className={TABLE_HEADER_ROW_CLASS}>

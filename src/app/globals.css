@@ -277,9 +277,7 @@ html:not(.dark) .dashboard-surface:hover {
   background-color: transparent !important;
   background-image: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%) !important;
   color: #ffffff !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 10px 28px -12px rgba(79, 70, 229, 0.65) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
 }
 
 .dark .sidebar-nav-item:not(.sidebar-nav-active) {
@@ -7138,15 +7136,18 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   }
 }
 
-/* Tablet layout (iPad Mini 1024px included). Desktop ≥1280px is unchanged. */
+/* Mid-width / zoomed-desktop reflow (iPad Mini 1024px included).
+   Desktop ≥1280px at 100% zoom is unchanged visually; zoom-in often lands here. */
 @media (min-width: 768px) and (max-width: 1279.98px) {
   .app-shell-canvas,
   .app-shell-main {
     min-width: 0;
+    min-height: 0;
   }
 
+  /* Let content reflow/scroll — never clip tables or toolbars horizontally. */
   .app-shell-main {
-    overflow-x: hidden;
+    overflow-x: auto;
   }
 
   .app-shell-main > * {
@@ -7154,9 +7155,10 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
     max-width: 100%;
   }
 
-  .app-shell-main [data-slot="table-container"],
-  .app-shell-main table {
+  /* Keep intentional horizontal scroll on data tables; do not squash columns. */
+  .app-shell-main [data-slot="table-container"] {
     max-width: 100%;
+    overflow-x: auto;
   }
 
   .app-shell-main .grid-cols-4,
@@ -7176,7 +7178,8 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .app-shell-main .lg\:grid-cols-\[3fr_2fr\] {
+  .app-shell-main .lg\:grid-cols-\[3fr_2fr\],
+  .app-shell-main .lg\:grid-cols-\[minmax\(0\,3fr\)_minmax\(0\,2fr\)\] {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -7187,6 +7190,15 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   [data-slot="dialog-content"] {
     max-height: min(90dvh, 880px);
     overflow-y: auto;
+  }
+}
+
+/* Large monitors: keep portal content from stretching edge-to-edge. */
+@media (min-width: 1600px) {
+  .app-shell-main .page-content-max,
+  .app-shell-main [data-page-content] {
+    max-width: 100rem;
+    margin-inline: auto;
   }
 }
 

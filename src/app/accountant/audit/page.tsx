@@ -12,7 +12,7 @@ export default async function AccountantAuditDashboardPage() {
   const stats = await getAuditDashboardStats(supabase, profile);
 
   return (
-    <div className="flex min-h-[calc(100dvh-13.5rem)] flex-col gap-3 overflow-hidden lg:min-h-[calc(100dvh-12.5rem)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <header className="shrink-0">
         <h1 className="text-lg font-semibold tracking-tight">Payroll Audit</h1>
         <p className="text-xs text-muted-foreground">

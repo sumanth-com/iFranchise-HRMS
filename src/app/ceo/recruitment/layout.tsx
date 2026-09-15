@@ -10,6 +10,7 @@ export default function CeoRecruitmentLayout({
   return (
     <ModuleShell
       header={<HiringSubNav basePath={CEO_ROUTES.recruitment} />}
+      fillContent
       contentClassName="pt-3 pb-3 [&>div]:gap-3 [&>div]:min-h-0"
     >
       {children}

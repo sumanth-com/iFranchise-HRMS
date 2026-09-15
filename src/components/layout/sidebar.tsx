@@ -65,14 +65,14 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "app-shell-sidebar hidden h-full shrink-0 flex-col border-r bg-transparent text-sidebar-foreground transition-[width] duration-200 xl:flex",
+        "app-shell-sidebar hidden h-full min-w-0 shrink-0 flex-col overflow-x-hidden border-r bg-transparent text-sidebar-foreground transition-[width] duration-200 xl:flex",
         isCollapsed ? "w-16" : "w-64",
       )}
     >
       <div
         className={cn(
-          "flex min-h-14 shrink-0 items-center border-b px-4 py-2",
-          isCollapsed && "justify-center px-2",
+          "flex min-h-14 min-w-0 shrink-0 items-center overflow-hidden border-b px-3 py-2",
+          isCollapsed ? "justify-center px-2" : "w-full",
         )}
       >
         <SidebarBrand
@@ -84,7 +84,7 @@ export function Sidebar() {
         />
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-2 py-2">
         {navigation.map((item, index) => {
           if (typeof item.href !== "string" || item.href.length === 0) return null;
           const isActive = activeHref === item.href;

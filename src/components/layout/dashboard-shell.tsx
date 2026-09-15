@@ -25,20 +25,20 @@ export function DashboardShell({ children }: DashboardShellProps) {
         <DashboardUrlCleaner />
         <InstantNavPrefetch />
         <ServerActionStaleRecovery />
-        <div className="app-shell-canvas flex h-screen overflow-hidden bg-background">
+        <div className="app-shell-canvas flex h-dvh min-h-0 overflow-hidden bg-background">
             <Suspense fallback={<div className="hidden w-16 shrink-0 xl:block xl:w-[4.5rem]" aria-hidden />}>
             <Sidebar />
           </Suspense>
           <Suspense fallback={null}>
             <MobileSidebar />
           </Suspense>
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <TopNav />
             {/*
             Overflow is owned by ModuleShell / PageScroll children so
             sticky module headers never fight page content.
           */}
-            <main className="app-shell-main relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
+            <main className="app-shell-main relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
               <NavigationProgress />
               {children}
             </main>

@@ -525,7 +525,7 @@ export function HierarchyManagement({
     <div
       className={cn(
         "flex min-h-0 flex-col gap-4",
-        embedded ? "min-h-[32rem] flex-1" : "h-[calc(100dvh-12.5rem)]",
+        embedded ? "min-h-[32rem] flex-1" : "min-h-0 flex-1",
       )}
     >
       <div className="shrink-0 space-y-3">

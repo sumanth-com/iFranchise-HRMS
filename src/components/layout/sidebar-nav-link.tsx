@@ -48,7 +48,7 @@ export function SidebarNavLink({
         "group/nav sidebar-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium leading-snug transition-[color,background-color,opacity] duration-150",
         indented && !collapsed && "ml-2",
         active
-          ? "sidebar-nav-active bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_10px_28px_-12px_rgba(79,70,229,0.65)] dark:from-blue-600 dark:to-violet-600"
+          ? "sidebar-nav-active bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] dark:from-blue-600 dark:to-violet-600"
           : "text-sidebar-foreground/80 hover:bg-muted hover:text-foreground dark:hover:bg-white/[0.06] dark:hover:text-white/90",
         disabled && "pointer-events-none opacity-50",
         collapsed && "justify-center px-2",

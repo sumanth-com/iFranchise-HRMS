@@ -63,7 +63,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
             <CeoDashboardKpis kpis={data.kpis} />
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[3fr_2fr] lg:items-stretch">
+          <div className="grid min-h-0 min-w-0 flex-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-stretch">
             <div className="flex min-h-0 flex-col gap-3">
               <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
                 <CeoDashboardToday attendance={data.attendance} />

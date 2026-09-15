@@ -23,13 +23,17 @@ export function SidebarBrand({
       href={href}
       prefetch
       onClick={onNavigate}
-      className={cn("group/brand flex min-w-0 items-center", className)}
+      className={cn(
+        "group/brand flex min-w-0 items-center",
+        !collapsed && "w-full",
+        className,
+      )}
       aria-label="iFranchise"
     >
       {collapsed ? (
         <BrandMarkTile size={36} priority />
       ) : (
-        <BrandLockup markSize={46} priority className="max-w-full" />
+        <BrandLockup markSize={36} priority className="w-full max-w-full" />
       )}
     </Link>
   );

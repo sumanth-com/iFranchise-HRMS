@@ -13,6 +13,7 @@ export default async function AccountantAuditLayout({
 
   return (
     <ModuleShell
+      fillContent
       header={
         <AuditSubNav
           profile={profile}

@@ -158,7 +158,7 @@ export function BrandLockup({
   compact?: boolean;
   onDarkSurface?: boolean;
 }) {
-  // Trimmed lockup art — match IF tile height for a clean equal-height pair.
+  // Trimmed lockup art — match IF tile height; wordmark may shrink to fit parent.
   const wordmarkHeight = compact
     ? Math.round(markSize * 0.72)
     : markSize;
@@ -170,16 +170,20 @@ export function BrandLockup({
     : "bg-[#3016B0] dark:bg-white";
 
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>
-      <BrandMarkTile size={markSize} shine={shine} priority={priority} />
+    <span className={cn("inline-flex min-w-0 max-w-full items-center gap-2", className)}>
+      <span className="shrink-0">
+        <BrandMarkTile size={markSize} shine={shine} priority={priority} />
+      </span>
       {/* logoif lockup is white-on-transparent — mask so fill follows brand color */}
       <span
         role="img"
         aria-label={`${BRAND_NAME}. ${BRAND_TAGLINE}`}
-        className={cn("block shrink-0", fillClass)}
+        className={cn("block min-w-0 shrink", fillClass)}
         style={{
-          width: `${wordmarkWidth}px`,
           height: `${wordmarkHeight}px`,
+          width: `${wordmarkWidth}px`,
+          maxWidth: "100%",
+          flex: "1 1 auto",
           WebkitMaskImage: `url(${logoIfWordmark.src})`,
           maskImage: `url(${logoIfWordmark.src})`,
           WebkitMaskSize: "contain",

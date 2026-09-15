@@ -28,17 +28,17 @@ export function ManagerDashboardHeader() {
         <p className="text-xs font-medium tracking-wide text-primary uppercase">
           Team Overview
         </p>
-        <div className="mt-1 flex items-center justify-between gap-4">
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <h1 className="min-w-0 text-2xl font-semibold tracking-tight lg:text-3xl">
             {now ? greetingForHour(now.getHours()) : "Welcome"}, {profile.employee.firstName}
           </h1>
-          <div className="shrink-0 text-right" suppressHydrationWarning>
+          <div className="shrink-0 text-left sm:text-right" suppressHydrationWarning>
             {now ? (
               <>
-                <p className="whitespace-nowrap text-sm font-medium">
+                <p className="text-sm font-medium sm:whitespace-nowrap">
                   {format(now, "EEEE, d MMMM yyyy")}
                 </p>
-                <p className="whitespace-nowrap text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground sm:whitespace-nowrap">
                   {format(now, "hh:mm a")}
                 </p>
               </>
