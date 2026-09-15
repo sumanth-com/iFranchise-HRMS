@@ -8,6 +8,7 @@ import {
 } from "@/lib/user-provisioning/provisionable-roles";
 import {
   compareProvisioningPeopleByName,
+  isExcludedFromProvisioningManagerLookup,
   isExcludedFromUserProvisioningDirectory,
   isHrPortalProvisioningRole,
   isProvisioningDirectoryRoleCode,
@@ -161,7 +162,11 @@ function buildProvisioningContactLookups(
   users: NormalizedExecutiveUser[],
 ): { managers: LookupOption[]; hrApprovers: LookupOption[] } {
   const managers = users
-    .filter((user) => isProvisioningManagerRole(user.roleCode))
+    .filter(
+      (user) =>
+        isProvisioningManagerRole(user.roleCode) &&
+        !isExcludedFromProvisioningManagerLookup(user),
+    )
     .sort(compareProvisioningPeopleByName)
     .map((user) => ({ id: user.employeeId, label: buildContactLookupLabel(user) }));
 
@@ -189,6 +194,15 @@ function buildProvisioningUserRow(
   const assignedHr = unwrapRelation<LooseRow>(employee.assigned_hr);
   const employeeProfile = unwrapRelation<LooseRow>(employee.employee_profiles);
 
+  const managerIsExcluded =
+    !!manager &&
+    isExcludedFromProvisioningManagerLookup({
+      email: manager.email ? String(manager.email) : null,
+      firstName: manager.first_name ? String(manager.first_name) : null,
+      lastName: manager.last_name ? String(manager.last_name) : null,
+      employeeCode: manager.employee_code ? String(manager.employee_code) : null,
+    });
+
   return {
     employeeId: employee.id,
     userId: employee.user_id ?? null,
@@ -207,12 +221,14 @@ function buildProvisioningUserRow(
     employmentTypeId: employee.employment_type_id
       ? String(employee.employment_type_id)
       : null,
-    reportingManagerId: employee.reporting_manager_id
-      ? String(employee.reporting_manager_id)
-      : null,
-    reportingManagerName: manager
-      ? fullName(manager.first_name, manager.last_name) || null
-      : null,
+    reportingManagerId:
+      employee.reporting_manager_id && !managerIsExcluded
+        ? String(employee.reporting_manager_id)
+        : null,
+    reportingManagerName:
+      manager && !managerIsExcluded
+        ? fullName(manager.first_name, manager.last_name) || null
+        : null,
     assignedHrEmployeeId: employee.assigned_hr_employee_id
       ? String(employee.assigned_hr_employee_id)
       : null,
@@ -246,7 +262,7 @@ const EMPLOYEE_SELECT_FIELDS = `
   branches:branch_id ( name ),
   designations:designation_id ( title ),
   employment_types:employment_type_id ( name ),
-  manager:reporting_manager_id ( first_name, last_name ),
+  manager:reporting_manager_id ( first_name, last_name, email, employee_code ),
   assigned_hr:assigned_hr_employee_id ( first_name, last_name ),
   employee_profiles ( profile_image_storage_path )
 `;
@@ -400,7 +416,7 @@ async function loadProvisionedPortalUsers(
         branches:branch_id ( name ),
         designations:designation_id ( title ),
         employment_types:employment_type_id ( name ),
-        manager:reporting_manager_id ( first_name, last_name ),
+        manager:reporting_manager_id ( first_name, last_name, email, employee_code ),
         assigned_hr:assigned_hr_employee_id ( first_name, last_name ),
         employee_profiles ( profile_image_storage_path )
       )

@@ -4,6 +4,7 @@ import {
   DIRECTORY_INCLUDED_EMPLOYEE_EMAILS,
 } from "@/lib/employee/directory-listing";
 import {
+  isAppHiddenEmployeeEmail,
   isEmployeeAppVisible,
   normalizeEmployeeEmail,
 } from "@/lib/employees/app-hidden";
@@ -97,6 +98,52 @@ export function isSuperAdminProvisioningRole(roleCode: string | null | undefined
 
 export function isProvisioningManagerRole(roleCode: string | null | undefined) {
   return String(roleCode ?? "").toLowerCase() === MANAGER_ROLE;
+}
+
+/** System / shell accounts that must never appear as selectable reporting managers. */
+const MANAGER_LOOKUP_EXCLUDED_EMAILS = new Set([
+  "it@ifranchise.in",
+  "hr@ifranchise.in",
+  "ifranchisehr@gmail.com",
+  "ifranchiseemployee@gmail.com",
+]);
+
+/**
+ * True when this person must be hidden from the User Provisioning Manager dropdown
+ * and must not be shown as someone’s Manager on provisioning cards.
+ * Does not change roles, HR-contact lookups, or Manager Portal team logic.
+ */
+export function isExcludedFromProvisioningManagerLookup(person: {
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  employeeCode?: string | null;
+}): boolean {
+  if (isItSystemProvisioningAccount(person.email)) return true;
+  if (isAppHiddenEmployeeEmail(person.email)) return true;
+
+  const email = normalizeEmployeeEmail(person.email);
+  if (email && MANAGER_LOOKUP_EXCLUDED_EMAILS.has(email)) return true;
+
+  const fullName = `${person.firstName ?? ""} ${person.lastName ?? ""}`
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  const compactName = fullName.replace(/\s+/g, "");
+  if (
+    fullName === "it team" ||
+    compactName === "itteam" ||
+    fullName === "ifranchise hr" ||
+    fullName === "ifranchisehr" ||
+    fullName === "ifranchisehr employee" ||
+    compactName === "ifranchisehremployee" ||
+    fullName.includes("ifranchise hr") ||
+    compactName.includes("ifranchisehr")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function isProvisioningHrRole(roleCode: string | null | undefined) {

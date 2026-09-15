@@ -105,10 +105,12 @@ export function CeoPendingEditDialog({
     : { showReportingManager: false, showAssignedHr: false };
 
   const managerItems = useMemo(
-    () =>
-      lookups.managers
+    () => [
+      { value: "__none__", label: "No manager" },
+      ...lookups.managers
         .filter((item) => item.id !== user?.employeeId)
         .map((item) => ({ value: item.id, label: item.label })),
+    ],
     [lookups.managers, user?.employeeId],
   );
 
@@ -125,8 +127,9 @@ export function CeoPendingEditDialog({
     startTransition(async () => {
       const payload: UpdatePendingProvisioningUserInput = {
         ...data,
-        reportingManagerId: showManagerField ? data.reportingManagerId ?? null : null,
-        assignedHrEmployeeId: showHrField ? data.assignedHrEmployeeId ?? null : null,
+        // Only touch manager / HR when that field is shown — never wipe the other.
+        reportingManagerId: showManagerField ? data.reportingManagerId ?? null : undefined,
+        assignedHrEmployeeId: showHrField ? data.assignedHrEmployeeId ?? null : undefined,
       };
       const result = await updatePendingProvisioningUserAction(payload);
       if (!result.success) {
@@ -201,13 +204,15 @@ export function CeoPendingEditDialog({
                 <div className="space-y-2">
                   <Label>Manager</Label>
                   <LabeledSelect
-                    value={form.watch("reportingManagerId") ?? ""}
+                    value={form.watch("reportingManagerId") ?? "__none__"}
                     placeholder="Select manager"
                     items={managerItems}
                     onValueChange={(value) =>
-                      form.setValue("reportingManagerId", value || null, {
-                        shouldValidate: true,
-                      })
+                      form.setValue(
+                        "reportingManagerId",
+                        !value || value === "__none__" ? null : value,
+                        { shouldValidate: true },
+                      )
                     }
                   />
                 </div>
@@ -366,10 +371,12 @@ export function CeoProvisioningReportingContactsDialog({
   }, [open, user, form]);
 
   const managerItems = useMemo(
-    () =>
-      lookups.managers
+    () => [
+      { value: "__none__", label: "No manager" },
+      ...lookups.managers
         .filter((item) => item.id !== user?.employeeId)
         .map((item) => ({ value: item.id, label: item.label })),
+    ],
     [lookups.managers, user?.employeeId],
   );
 
@@ -386,8 +393,13 @@ export function CeoProvisioningReportingContactsDialog({
     startTransition(async () => {
       const payload: UpdateProvisioningReportingContactsInput = {
         employeeId: data.employeeId,
-        reportingManagerId: showReportingManager ? data.reportingManagerId ?? null : null,
-        assignedHrEmployeeId: showAssignedHr ? data.assignedHrEmployeeId ?? null : null,
+        // Only persist fields that are visible — avoid clearing the other contact.
+        reportingManagerId: showReportingManager
+          ? data.reportingManagerId ?? null
+          : undefined,
+        assignedHrEmployeeId: showAssignedHr
+          ? data.assignedHrEmployeeId ?? null
+          : undefined,
       };
       const result = await updateProvisioningReportingContactsAction(payload);
       if (!result.success) {
@@ -399,14 +411,25 @@ export function CeoProvisioningReportingContactsDialog({
     });
   });
 
+  const dialogTitle =
+    showReportingManager && showAssignedHr
+      ? "Update manager & HR contact"
+      : showReportingManager
+        ? "Update manager"
+        : "Update HR contact";
+  const dialogDescription =
+    showReportingManager && showAssignedHr
+      ? `Assign a manager and HR contact for ${user?.fullName ?? "this user"}.`
+      : showReportingManager
+        ? `Assign a manager for ${user?.fullName ?? "this user"}. Leave as “No manager” to keep them unassigned.`
+        : `Set the HR contact for ${user?.fullName ?? "this user"}.`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Update HR contact</DialogTitle>
-          <DialogDescription>
-            Set the HR contact for {user?.fullName ?? "this user"}.
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           {submitError ? (
@@ -424,15 +447,17 @@ export function CeoProvisioningReportingContactsDialog({
             >
               {showReportingManager ? (
                 <div className="space-y-2">
-                  <Label>Reporting manager</Label>
+                  <Label>Manager</Label>
                   <LabeledSelect
-                    value={form.watch("reportingManagerId") ?? ""}
-                    placeholder="Select reporting manager"
+                    value={form.watch("reportingManagerId") ?? "__none__"}
+                    placeholder="Select manager"
                     items={managerItems}
                     onValueChange={(value) =>
-                      form.setValue("reportingManagerId", value || null, {
-                        shouldValidate: true,
-                      })
+                      form.setValue(
+                        "reportingManagerId",
+                        !value || value === "__none__" ? null : value,
+                        { shouldValidate: true },
+                      )
                     }
                   />
                 </div>

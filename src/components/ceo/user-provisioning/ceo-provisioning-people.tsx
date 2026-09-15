@@ -170,7 +170,13 @@ function PersonCard({
     ? fmtInviteDate(user.invitationSentAt)
     : "Not invited";
 
-  const { showAssignedHr } = provisioningContactFieldVisibility(user);
+  const { showAssignedHr, showReportingManager } = provisioningContactFieldVisibility(user);
+  const reportingContactsLabel =
+    showReportingManager && showAssignedHr
+      ? "Update manager & HR"
+      : showReportingManager
+        ? "Update manager"
+        : "Update HR contact";
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -215,7 +221,7 @@ function PersonCard({
             {showReportingContacts ? (
               <DropdownMenuItem onClick={() => onAction("changeReportingContacts", user)}>
                 <UserCheck className="mr-2 size-4" />
-                <span className="whitespace-nowrap">Update HR contact</span>
+                <span className="whitespace-nowrap">{reportingContactsLabel}</span>
               </DropdownMenuItem>
             ) : null}
             {showSend ? (
@@ -303,6 +309,13 @@ function PersonCard({
           label="Department"
           value={user.departmentName ?? "—"}
         />
+        {showReportingManager ? (
+          <MetaRow
+            icon={<Users className="size-3.5" />}
+            label="Manager"
+            value={user.reportingManagerName ?? "—"}
+          />
+        ) : null}
         {showAssignedHr ? (
           <MetaRow
             icon={<UserCheck className="size-3.5" />}

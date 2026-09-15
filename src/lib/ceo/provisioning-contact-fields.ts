@@ -9,8 +9,11 @@ export function provisioningContactFieldVisibility(user: CeoProvisioningUser) {
     roleCode === "ceo" || roleCode === "co_founder" || roleCode === "founder";
 
   return {
-    /** Hidden until reporting managers are used org-wide. */
-    showReportingManager: false,
+    /**
+     * Manager assignment uses employees.reporting_manager_id.
+     * HR roles do not need a manager in User Provisioning.
+     */
+    showReportingManager: !isExecutiveRole && !isHrContactAssignee,
     /** Super Admins are employees with HR portal access and still get an HR contact. */
     showAssignedHr: !isHrContactAssignee && !isExecutiveRole,
   };
