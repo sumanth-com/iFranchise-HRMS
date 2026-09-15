@@ -29,7 +29,7 @@ export function SidebarBrand({
       {collapsed ? (
         <BrandMarkTile size={36} priority />
       ) : (
-        <BrandLockup markSize={40} priority className="max-w-full" />
+        <BrandLockup markSize={46} priority className="max-w-full" />
       )}
     </Link>
   );

@@ -2749,9 +2749,12 @@ html[data-landing-light="true"] .landing-page--light-locked .landing-nav-brand-t
   align-items: center;
   gap: 1rem;
   height: 4.75rem;
-  max-width: 72rem;
+  /* Match features / card sections: max-w-7xl + px-5 sm:px-8 lg:px-10 */
+  max-width: 80rem;
   margin-inline: auto;
   padding-inline: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
@@ -2770,7 +2773,7 @@ html[data-landing-light="true"] .landing-page--light-locked .landing-nav-brand-t
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0;
   border-radius: 0.5rem;
   justify-self: start;
 }
@@ -5289,7 +5292,7 @@ html[data-landing-light="true"] .landing-page--light-locked .landing-nav-brand-t
   }
 
   .landing-nav-inner {
-    padding-inline: 1rem;
+    padding-inline: 1.25rem;
   }
 
   .landing-security-item {
@@ -5364,7 +5367,7 @@ html[data-landing-light="true"] .landing-page--light-locked .landing-nav-brand-t
   .landing-nav-inner {
     height: 3.6rem;
     gap: 0.55rem;
-    padding-inline: 1.1rem;
+    padding-inline: 2rem;
   }
 
   .landing-nav-brand {

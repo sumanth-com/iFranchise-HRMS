@@ -11,7 +11,8 @@ import ifWordmarkTagline from "@/assets/brand/if-wordmark-tagline.png";
 import ifWordmarkTaglineLight from "@/assets/brand/if-wordmark-tagline-light.png";
 import ifWordmark from "@/assets/brand/if-wordmark.png";
 import ifWordmarkLight from "@/assets/brand/if-wordmark-light.png";
-import { BRAND_NAME, BRAND_PURPLE, BRAND_TAGLINE } from "@/lib/brand/constants";
+import logoIfWordmark from "@/assets/brand/logoif-lockup.png";
+import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand/constants";
 import { cn } from "@/lib/utils";
 
 export type BrandLogoVariant =
@@ -138,8 +139,8 @@ export function BrandMarkTile({
 }
 
 /**
- * Reference lockup: free IF mark + bold aligned wordmark/tagline.
- * Purple text in light mode; white text in dark mode.
+ * Reference lockup: IF mark tile + logoif wordmark/tagline artwork.
+ * Purple on light surfaces; white on dark / auth surfaces.
  */
 export function BrandLockup({
   markSize = 40,
@@ -157,44 +158,38 @@ export function BrandLockup({
   compact?: boolean;
   onDarkSurface?: boolean;
 }) {
-  const nameClass = onDarkSurface
-    ? "text-white"
-    : "text-[#3016B0] dark:text-white";
-  const tagClass = onDarkSurface
-    ? "text-white/80"
-    : "text-[#3016B0]/80 dark:text-white/75";
+  // Trimmed lockup art — match IF tile height for a clean equal-height pair.
+  const wordmarkHeight = compact
+    ? Math.round(markSize * 0.72)
+    : markSize;
+  const wordmarkWidth = Math.round(
+    (wordmarkHeight * logoIfWordmark.width) / logoIfWordmark.height,
+  );
+  const fillClass = onDarkSurface
+    ? "bg-white"
+    : "bg-[#3016B0] dark:bg-white";
 
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-2.5", className)}>
+    <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>
       <BrandMarkTile size={markSize} shine={shine} priority={priority} />
-      <span className="min-w-0 leading-none">
-        <span
-          className={cn(
-            "block truncate font-black tracking-[-0.03em]",
-            nameClass,
-            markSize >= 52
-              ? "text-[1.55rem]"
-              : markSize >= 48
-                ? "text-[1.4rem]"
-                : markSize >= 40
-                  ? "text-[1.125rem]"
-                  : "text-[1rem]",
-          )}
-        >
-          {BRAND_NAME}
-        </span>
-        {!compact ? (
-          <span
-            className={cn(
-              "mt-1.5 block truncate font-bold uppercase tracking-[0.2em]",
-              tagClass,
-              markSize >= 52 ? "text-[0.68rem]" : markSize >= 48 ? "text-[0.64rem]" : "text-[0.58rem]",
-            )}
-          >
-            {BRAND_TAGLINE}
-          </span>
-        ) : null}
-      </span>
+      {/* logoif lockup is white-on-transparent — mask so fill follows brand color */}
+      <span
+        role="img"
+        aria-label={`${BRAND_NAME}. ${BRAND_TAGLINE}`}
+        className={cn("block shrink-0", fillClass)}
+        style={{
+          width: `${wordmarkWidth}px`,
+          height: `${wordmarkHeight}px`,
+          WebkitMaskImage: `url(${logoIfWordmark.src})`,
+          maskImage: `url(${logoIfWordmark.src})`,
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskPosition: "left center",
+          maskPosition: "left center",
+        }}
+      />
     </span>
   );
 }
