@@ -9,7 +9,6 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
 import {
   PAYSLIP_DESIGN,
-  PAYSLIP_WAVE_PATHS,
   payslipHexToRgb,
 } from "@/lib/payroll/services/payslip-design";
 import {
@@ -20,6 +19,10 @@ import {
   getPayslipNotes,
   getPayslipPaymentDetails,
 } from "@/lib/payroll/services/payslip-document-helpers";
+import {
+  loadPayslipEdgeWavePng,
+  loadPayslipWaveDecorPng,
+} from "@/lib/payroll/services/payslip-pdf-decor";
 import { loadPayslipBrandLogoBytes } from "@/lib/payroll/services/payslip-logo-cache";
 import { resolvePayslipDisplayTotals } from "@/lib/payroll/services/payroll-utils";
 import type { PayslipDetail } from "@/types/payroll";
@@ -169,32 +172,53 @@ function sectionTitle(ctx: Ctx, title: string, y: number): number {
   return y - 16;
 }
 
-function drawRightSideWaves(
+async function drawBandDecor(
   ctx: Ctx,
   bandBottom: number,
   bandHeight: number,
-  mirror = false,
+  options: { mirror?: boolean; edge: "header-bottom" | "footer-top" },
 ) {
-  const waveWidth = PAGE_WIDTH * 0.48;
-  const scale = waveWidth / 360;
-  const originX = PAGE_WIDTH - waveWidth;
+  const waveWidth = Math.round(PAGE_WIDTH * 0.48);
+  const waveHeight = Math.round(bandHeight);
+  const edgeHeight = options.edge === "header-bottom" ? 28 : 24;
 
-  PAYSLIP_WAVE_PATHS.forEach((wave) => {
-    try {
-      ctx.page.drawSvgPath(wave.d, {
-        x: originX,
-        y: mirror ? bandBottom + bandHeight : bandBottom,
-        scale,
-        color: WHITE,
-        opacity: wave.opacity,
-        borderWidth: 0,
-        // pdf-lib SVG y grows downward from origin; mirror by flipping via negative scaleY isn't supported —
-        // for footer we draw the same paths which still read as soft right-side ribbons.
-      });
-    } catch {
-      // Decorative only — never fail PDF generation
-    }
-  });
+  try {
+    const waveBytes = await loadPayslipWaveDecorPng({
+      width: waveWidth * 2,
+      height: waveHeight * 2,
+      mirror: options.mirror,
+    });
+    const waveImage = await ctx.pdf.embedPng(waveBytes);
+    ctx.page.drawImage(waveImage, {
+      x: PAGE_WIDTH - waveWidth,
+      y: bandBottom,
+      width: waveWidth,
+      height: waveHeight,
+    });
+  } catch {
+    // Decorative only — never fail PDF generation
+  }
+
+  try {
+    const edgeBytes = await loadPayslipEdgeWavePng({
+      width: Math.round(PAGE_WIDTH * 2),
+      height: edgeHeight * 2,
+      variant: options.edge,
+    });
+    const edgeImage = await ctx.pdf.embedPng(edgeBytes);
+    const edgeY =
+      options.edge === "header-bottom"
+        ? bandBottom
+        : bandBottom + bandHeight - edgeHeight;
+    ctx.page.drawImage(edgeImage, {
+      x: 0,
+      y: edgeY,
+      width: PAGE_WIDTH,
+      height: edgeHeight,
+    });
+  } catch {
+    // Decorative only — never fail PDF generation
+  }
 }
 
 export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<Uint8Array> {
@@ -222,7 +246,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     });
 
   // ── Header (matches PayslipTemplate) ────────────────────────────────
-  const headerH = 102;
+  const headerH = 112;
   const headerBottom = PAGE_HEIGHT - headerH;
   ctx.page.drawRectangle({
     x: 0,
@@ -239,7 +263,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     color: BRAND,
     opacity: 0.45,
   });
-  drawRightSideWaves(ctx, headerBottom, headerH);
+  await drawBandDecor(ctx, headerBottom, headerH, { edge: "header-bottom" });
 
   const logoBytes = await loadPayslipBrandLogoBytes();
   let textLeft = MARGIN;
@@ -284,7 +308,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     ctx,
     `Payslip no. ${payslip.payslipNumber}  /  Payment date ${paymentDate}`,
     MARGIN,
-    PAGE_HEIGHT - 78,
+    PAGE_HEIGHT - 72,
     { size: 8, color: rgb(0.9, 0.88, 1) },
   );
 
@@ -299,7 +323,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     color: WHITE,
   });
 
-  let y = headerBottom - 18;
+  let y = headerBottom - 10;
 
   // ── Employee information ────────────────────────────────────────────
   y = sectionTitle(ctx, "Employee information", y);
@@ -488,22 +512,38 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
   // ── Net pay formula ─────────────────────────────────────────────────
   const netFormula = `Rs. ${formatAmountIndian(grossEarnings)} (Gross Earnings) - Rs. ${formatAmountIndian(totalDeductions)} (Deductions) = Rs. ${formatAmountIndian(netPay)} (Net Pay)`;
-  const netLines = wrapText(ctx, netFormula, CONTENT_WIDTH - 28, 9, true);
-  const netH = Math.max(40, 16 + netLines.length * 13);
+  const netSize = 9;
+  const netLineH = 12;
+  const netPadY = 14;
+  const netLines = wrapText(ctx, netFormula, CONTENT_WIDTH - 28, netSize, true);
+  const netH = Math.max(42, netPadY * 2 + netLines.length * netLineH);
+  const netBandBottom = y - netH;
   ctx.page.drawRectangle({
     x: MARGIN,
-    y: y - netH,
+    y: netBandBottom,
     width: CONTENT_WIDTH,
     height: netH,
     color: BRAND,
   });
+  // Vertically center the text block in the bar (pdf-lib baseline ≈ mid-glyph + 0.32em)
+  const netFirstBaseline =
+    netBandBottom +
+    netH / 2 +
+    ((netLines.length - 1) * netLineH) / 2 -
+    netSize * 0.32;
   netLines.forEach((line, index) => {
-    const lineWidth = measure(ctx, line, 9, true);
-    drawText(ctx, line, MARGIN + (CONTENT_WIDTH - lineWidth) / 2, y - 16 - index * 13, {
-      size: 9,
-      bold: true,
-      color: WHITE,
-    });
+    const lineWidth = measure(ctx, line, netSize, true);
+    drawText(
+      ctx,
+      line,
+      MARGIN + (CONTENT_WIDTH - lineWidth) / 2,
+      netFirstBaseline - index * netLineH,
+      {
+        size: netSize,
+        bold: true,
+        color: WHITE,
+      },
+    );
   });
   y = y - netH - 14;
 
@@ -559,7 +599,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   });
 
   // ── Footer ──────────────────────────────────────────────────────────
-  const footerH = 84;
+  const footerH = 92;
   ctx.page.drawRectangle({
     x: 0,
     y: 0,
@@ -575,20 +615,20 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     color: BRAND,
     opacity: 0.45,
   });
-  drawRightSideWaves(ctx, 0, footerH, true);
+  await drawBandDecor(ctx, 0, footerH, { mirror: true, edge: "footer-top" });
 
-  drawText(ctx, footer.companyName, MARGIN, footerH - 16, {
+  drawText(ctx, footer.companyName, MARGIN, footerH - 28, {
     size: 9,
     bold: true,
     color: WHITE,
   });
-  drawRight(ctx, "PRIVATE - CONFIDENTIAL", PAGE_WIDTH - MARGIN, footerH - 16, {
+  drawRight(ctx, PAYSLIP_DESIGN.confidentialLabel, PAGE_WIDTH - MARGIN, footerH - 28, {
     size: 7.5,
     bold: true,
     color: rgb(0.9, 0.88, 1),
   });
 
-  let footerY = footerH - 30;
+  let footerY = footerH - 42;
   footer.addressLines.forEach((line) => {
     drawText(ctx, line, MARGIN, footerY, {
       size: 7.5,
