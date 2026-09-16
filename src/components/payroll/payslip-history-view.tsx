@@ -290,7 +290,7 @@ function PayslipTable({
             <th className={payrollStickyEmployeeHeaderClass("min-w-[14rem]")}>Employee</th>
             <th className={payrollStickyHeaderCellClass()}>Department</th>
             <th className={payrollStickyHeaderCellClass()}>Monthly salary</th>
-            <th className={payrollStickyHeaderCellClass()}>Attendance earnings</th>
+            <th className={payrollStickyHeaderCellClass()}>Gross Earning</th>
             <th className={payrollStickyHeaderCellClass()}>Deductions</th>
             <th className={payrollStickyHeaderCellClass()}>Net salary</th>
             <th className={payrollStickyHeaderCellClass()}>Reimb.</th>

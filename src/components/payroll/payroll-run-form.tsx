@@ -705,7 +705,7 @@ function PayrollTotals({
       </div>
       <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Attendance earnings
+          Gross Earning
         </p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums">
           {formatCurrency(totalGross)}
@@ -785,7 +785,7 @@ function EmployeePayrollTable({
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">EL</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Monthly salary</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Attendance earnings</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross Earning</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">PT / Deductions</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Reimbursement</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Final payable</th>

@@ -6,10 +6,13 @@
 /** Compact IF mark (favicon, collapsed sidebar, small tiles). */
 export const BRAND_MARK_PATH = "/images/logo-mark.png";
 
-/** Default / email mark. */
+/** Default / email mark — public copy of src/assets/iF-Logo.png. */
 export const DEFAULT_BRAND_LOGO_PATH = "/images/logo.png";
 
-/** Email-sized mark. */
+/**
+ * Email-optimized IF mark (same art as iF-Logo.png, sized for clients).
+ * Always reference via absolute `${origin}${EMAIL_BRAND_LOGO_PATH}` in HTML emails.
+ */
 export const EMAIL_BRAND_LOGO_PATH = "/images/email-logo.png";
 
 /** Full horizontal lockup: IF mark + iFranchise + CONNECT. EXPAND. GROW. */

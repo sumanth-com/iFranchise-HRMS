@@ -138,7 +138,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
           <table role="presentation" class="email-shell" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;overflow:hidden;border-radius:20px;background:#ffffff;border:1px solid ${COLORS.border};box-shadow:0 12px 36px rgba(15,23,42,0.07);">
             <tr>
               <td class="email-header" align="center" style="background:linear-gradient(135deg,${COLORS.headerFrom},${COLORS.headerTo});padding:32px 28px 28px;color:#ffffff;text-align:center;">
-                <img src="${logoUrl}" width="48" height="48" alt="iFranchise" style="display:block;width:48px;height:48px;border:0;border-radius:12px;margin:0 auto 16px;" />
+                <img src="${logoUrl}" width="48" alt="iFranchise" style="display:block;width:48px;height:auto;max-width:48px;border:0;border-radius:12px;margin:0 auto 16px;" />
                 <h1 class="email-heading" style="margin:0;font-size:24px;line-height:1.3;font-weight:700;">${options.heading}</h1>
                 ${
                   options.subheading

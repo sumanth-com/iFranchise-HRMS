@@ -310,7 +310,7 @@ export const PAYROLL_SUMMARY_LABELS = {
   totalPayroll: "Total Payroll (YTD)",
   employeesProcessed: "Employees Processed",
   pendingPayroll: "Pending Payroll",
-  grossPayroll: "Attendance Earnings",
+  grossPayroll: "Gross Earning",
   totalDeductions: "Total Deductions",
   netPayroll: "Net Payroll",
 } as const;

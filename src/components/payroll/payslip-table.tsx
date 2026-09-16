@@ -54,7 +54,7 @@ export function PayslipTable({
 
   const columns = useMemo<ColumnDef<PayslipListItem>[]>(
     () => [
-      { accessorKey: "payslipNumber", header: "Payslip #" },
+      { accessorKey: "payslipNumber", header: "Payslip ID" },
       {
         accessorKey: "employeeName",
         header: "Employee",

@@ -178,7 +178,7 @@ export function PayrollEmployeeBreakdownDialog({
                   <span className="text-muted-foreground">Monthly Salary</span>
                   <span>{formatCurrency(amounts.monthlySalary)}</span>
                   <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Attendance Earnings</span>
+                  <span className="text-muted-foreground">Gross Earning</span>
                   <span>{formatCurrency(amounts.attendanceEarnings)}</span>
                   <span className="text-muted-foreground">→</span>
                   <span className="text-muted-foreground">Deductions</span>

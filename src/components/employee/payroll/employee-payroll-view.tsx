@@ -72,10 +72,6 @@ function fmtMonth(value: string): string {
   return formatPayrollMonthLabel(value);
 }
 
-function fmtSentDate(row: PayslipListItem): string {
-  return fmtDate(row.emailSentAt ?? row.issuedAt);
-}
-
 function AwaitingHrPanel({
   title = "Awaiting HR",
   description,
@@ -240,7 +236,7 @@ export function EmployeePayrollView({
           iconBg="bg-emerald-500/10"
         />
         <EmployeeStatCard
-          label="Attendance Earnings"
+          label="Gross Earning"
           value={
             hasPublishedPayroll && data.kpis.currentGrossSalary != null
               ? money(data.kpis.currentGrossSalary)
@@ -309,7 +305,7 @@ export function EmployeePayrollView({
               <div className="mt-auto rounded-xl border bg-white px-4 py-3 dark:bg-input">
                 <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums">
                   <span className="uppercase tracking-wide text-muted-foreground">
-                    Attendance earnings
+                    Gross Earning
                   </span>
                   <span>{money(gross)}</span>
                   <span className="font-semibold text-muted-foreground">−</span>
@@ -431,16 +427,13 @@ export function EmployeePayrollView({
                   Month
                 </th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Payslip #
+                  Payslip ID
                 </th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Attendance earnings
+                  Gross Earning
                 </th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
                   Net salary
-                </th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Sent date
                 </th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
                   Status
@@ -457,7 +450,6 @@ export function EmployeePayrollView({
                   <td className="py-2.5 pr-3 text-muted-foreground">{row.payslipNumber}</td>
                   <td className="py-2.5 pr-3 tabular-nums">{money(row.grossSalary)}</td>
                   <td className="py-2.5 pr-3 tabular-nums font-medium">{money(row.netSalary)}</td>
-                  <td className="py-2.5 pr-3 text-muted-foreground">{fmtSentDate(row)}</td>
                   <td className="py-2.5 pr-3">
                     <EmployeePayslipStatusPill row={row} />
                   </td>

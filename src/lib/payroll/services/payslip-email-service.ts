@@ -7,6 +7,25 @@ import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { siteConfig } from "@/config/site";
 import type { PayslipDetail } from "@/types/payroll";
 
+/** Email clients reject relative img URLs — always emit an absolute https URL. */
+function resolveEmailLogoUrl(
+  logoUrl: string | null | undefined,
+  appOrigin: string,
+): string {
+  const fallback = `${appOrigin}${EMAIL_BRAND_LOGO_PATH}`;
+  const value = logoUrl?.trim();
+  if (!value) return fallback;
+  if (
+    value.startsWith("https://") ||
+    value.startsWith("http://") ||
+    value.startsWith("data:")
+  ) {
+    return value;
+  }
+  if (value.startsWith("/")) return `${appOrigin}${value}`;
+  return fallback;
+}
+
 function payslipEmailHtml(payslip: PayslipDetail, downloadUrl: string, logoUrl: string): string {
   const month = formatPayrollMonthLabel(payslip.payrollMonth);
   return `<!DOCTYPE html>
@@ -16,8 +35,8 @@ function payslipEmailHtml(payslip: PayslipDetail, downloadUrl: string, logoUrl: 
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;">
-        <tr><td align="center" style="padding:28px 36px 20px;border-bottom:1px solid #f0f0f2;">
-          <img src="${logoUrl}" width="64" height="64" alt="${payslip.organization.name}" style="display:block;width:64px;height:64px;border:0;border-radius:14px;margin:0 auto 14px;" />
+        <tr><td align="center" style="padding:28px 36px 20px;border-bottom:1px solid #f0f0f2;text-align:center;">
+          <img src="${logoUrl}" width="64" alt="${payslip.organization.name}" style="display:block;width:64px;height:auto;max-width:64px;border:0;border-radius:14px;margin:0 auto 14px;" />
           <p style="margin:0;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">${payslip.organization.name}</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:600;color:#18181b;">Your Payslip for ${month} is Ready</h1>
         </td></tr>
@@ -29,9 +48,15 @@ function payslipEmailHtml(payslip: PayslipDetail, downloadUrl: string, logoUrl: 
             Your official salary statement for <strong>${month}</strong> has been published and is now available for download.
             Payslip reference: <strong>${payslip.payslipNumber}</strong>.
           </p>
-          <a href="${downloadUrl}" style="display:inline-block;background:#5B21B6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;">
-            Download Payslip
-          </a>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
+            <tr>
+              <td align="center" style="text-align:center;">
+                <a href="${downloadUrl}" style="display:inline-block;background:#5B21B6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;">
+                  Download Payslip
+                </a>
+              </td>
+            </tr>
+          </table>
         </td></tr>
         <tr><td style="padding:20px 36px 28px;background:#fafafa;border-top:1px solid #f0f0f2;">
           <p style="margin:0;font-size:11px;line-height:1.5;color:#a1a1aa;">
@@ -52,8 +77,7 @@ export async function sendPayslipReadyEmail(
   const month = formatPayrollMonthLabel(payslip.payrollMonth);
   const pdfBytes = await generatePayslipPdfBytes(payslip);
   const downloadUrl = `${appOrigin}${PAYROLL_ROUTES.payslipDetail(payslip.id)}`;
-  const logoUrl =
-    payslip.organization.logoUrl ?? `${appOrigin}${EMAIL_BRAND_LOGO_PATH}`;
+  const logoUrl = resolveEmailLogoUrl(payslip.organization.logoUrl, appOrigin);
 
   const result = await sendEmail({
     to: payslip.employee.email,
