@@ -348,7 +348,7 @@ async function listHrPayslipsFromPayrollRun(
           employee.employment_types as { name: string } | { name: string }[] | null,
         )
       : null;
-    let payslip = payslipByItemId.get(row.id) ?? null;
+    const payslip = payslipByItemId.get(row.id) ?? null;
 
     // Soft-deleted rows are restored in a single batch above. Do not create
     // missing payslips during list load — View/Send handle that on demand.

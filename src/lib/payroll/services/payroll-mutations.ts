@@ -3049,7 +3049,7 @@ export async function ensureUnpublishedPayslipForPayrollItem(
       .select("id")
       .single();
 
-  let { data: created, error: insertError } = await attemptInsert(payslipNumber);
+  const { data: created, error: insertError } = await attemptInsert(payslipNumber);
 
   if (insertError) {
     const isDuplicate =
