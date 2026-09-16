@@ -2800,6 +2800,176 @@ export async function updatePayrollItemAdjustments(
   });
 }
 
+async function findPayslipIdForPayrollItem(
+  payrollItemId: string,
+  options?: { restoreIfSoftDeleted?: boolean; actorId?: string | null },
+): Promise<string | null> {
+  // Service role: RLS hides soft-deleted payslips while UNIQUE still blocks inserts.
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("payslips")
+    .select("id, deleted_at")
+    .eq("payroll_item_id", payrollItemId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data?.id) return null;
+
+  if (data.deleted_at) {
+    if (!options?.restoreIfSoftDeleted) return null;
+    const { error: restoreError } = await admin
+      .schema("hrms")
+      .from("payslips")
+      .update({
+        deleted_at: null,
+        is_current: true,
+        archived_at: null,
+        updated_by: options.actorId ?? null,
+      })
+      .eq("id", data.id);
+    if (restoreError) throw new Error(restoreError.message);
+  }
+
+  return data.id;
+}
+
+async function restorePayslipRow(
+  payslipId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .schema("hrms")
+    .from("payslips")
+    .update(patch)
+    .eq("id", payslipId);
+  if (error) throw new Error(error.message);
+}
+
+async function findPayslipIdForEmployeePayroll(
+  employeeId: string,
+  payrollId: string,
+  options?: {
+    restoreIfSoftDeleted?: boolean;
+    actorId?: string | null;
+    payrollItemId?: string;
+  },
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("payslips")
+    .select("id, deleted_at, payroll_item_id, payroll_id, employee_id")
+    .eq("employee_id", employeeId)
+    .eq("payroll_id", payrollId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data?.id) return null;
+
+  const needsRestore = Boolean(data.deleted_at && options?.restoreIfSoftDeleted);
+  const needsRelink = Boolean(
+    options?.payrollItemId && data.payroll_item_id !== options.payrollItemId,
+  );
+
+  if (needsRestore || needsRelink) {
+    await restorePayslipRow(data.id, {
+      updated_by: options?.actorId ?? null,
+      ...(needsRestore
+        ? { deleted_at: null, is_current: true, archived_at: null }
+        : {}),
+      ...(needsRelink
+        ? {
+            payroll_item_id: options!.payrollItemId,
+            payroll_id: payrollId,
+          }
+        : {}),
+    });
+  }
+
+  if (data.deleted_at && !options?.restoreIfSoftDeleted) return null;
+  return data.id;
+}
+
+async function findPayslipIdByNumberForEmployee(
+  payslipNumber: string,
+  employeeId: string,
+  payrollId: string,
+  options?: { restoreIfSoftDeleted?: boolean; actorId?: string | null; payrollItemId?: string },
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("payslips")
+    .select("id, deleted_at, payroll_id, payroll_item_id, employee_id")
+    .eq("payslip_number", payslipNumber)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data?.id) return null;
+
+  // Number belongs to a different employee — caller must mint a new number.
+  if (data.employee_id !== employeeId) return null;
+
+  const needsRestore = Boolean(data.deleted_at && options?.restoreIfSoftDeleted);
+  const needsRelink = Boolean(
+    options?.payrollItemId &&
+      (data.payroll_item_id !== options.payrollItemId || data.payroll_id !== payrollId),
+  );
+
+  if (needsRestore || needsRelink) {
+    await restorePayslipRow(data.id, {
+      updated_by: options?.actorId ?? null,
+      ...(needsRestore
+        ? { deleted_at: null, is_current: true, archived_at: null }
+        : {}),
+      ...(needsRelink
+        ? {
+            payroll_item_id: options!.payrollItemId,
+            payroll_id: payrollId,
+            employee_id: employeeId,
+          }
+        : {}),
+    });
+  }
+
+  if (data.deleted_at && !options?.restoreIfSoftDeleted) return null;
+  return data.id;
+}
+
+async function recoverPayslipIdForPayrollItem(input: {
+  payrollItemId: string;
+  employeeId: string;
+  payrollId: string;
+  payslipNumber: string;
+  actorId: string | null;
+}): Promise<string | null> {
+  return (
+    (await findPayslipIdForPayrollItem(input.payrollItemId, {
+      restoreIfSoftDeleted: true,
+      actorId: input.actorId,
+    })) ??
+    (await findPayslipIdForEmployeePayroll(input.employeeId, input.payrollId, {
+      restoreIfSoftDeleted: true,
+      actorId: input.actorId,
+      payrollItemId: input.payrollItemId,
+    })) ??
+    (await findPayslipIdByNumberForEmployee(
+      input.payslipNumber,
+      input.employeeId,
+      input.payrollId,
+      {
+        restoreIfSoftDeleted: true,
+        actorId: input.actorId,
+        payrollItemId: input.payrollItemId,
+      },
+    ))
+  );
+}
+
 export async function ensureUnpublishedPayslipForPayrollItem(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -2813,8 +2983,7 @@ export async function ensureUnpublishedPayslipForPayrollItem(
         id,
         employee_id,
         payrolls!inner (id, organization_id, payroll_month),
-        employees (employee_code),
-        payslips (id)
+        employees (employee_code)
       `,
     )
     .eq("id", payrollItemId)
@@ -2834,45 +3003,92 @@ export async function ensureUnpublishedPayslipForPayrollItem(
     throw new Error("Payroll line not found.");
   }
 
-  const existingPayslip = unwrapRelation(
-    item.payslips as { id: string } | { id: string }[] | null,
-  );
-  if (existingPayslip?.id) return existingPayslip.id;
-
+  const actorId = actorUserId(profile);
   const employee = unwrapRelation(
     item.employees as { employee_code: string } | { employee_code: string }[] | null,
   );
-  const actorId = actorUserId(profile);
+  const payslipNumber = generatePayslipNumber(
+    employee?.employee_code ?? "EMP",
+    payroll.payroll_month,
+  );
+
+  const recovered = await recoverPayslipIdForPayrollItem({
+    payrollItemId: item.id,
+    employeeId: item.employee_id as string,
+    payrollId: payroll.id,
+    payslipNumber,
+    actorId,
+  });
+  if (recovered) return recovered;
+
   const nowIso = new Date().toISOString();
   const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
   const schedule = computePayslipSchedule(payroll.payroll_month, {
     salaryCreditDay: payrollSettings.settings.salaryCreditDate,
     publishDay: payrollSettings.settings.payslipAvailableDay,
   });
-  const payslipNumber = generatePayslipNumber(
-    employee?.employee_code ?? "EMP",
-    payroll.payroll_month,
-  );
-  const { data: created, error: insertError } = await supabase
-    .schema("hrms")
-    .from("payslips")
-    .insert({
-      payroll_id: payroll.id,
-      payroll_item_id: item.id,
-      employee_id: item.employee_id,
-      payslip_number: payslipNumber,
-      salary_credit_date: schedule.salaryCreditDate,
-      published_at: null,
-      payroll_generated_at: nowIso,
-      payment_mode: "Bank Transfer",
-      payslip_version: PAYSLIP_VERSION,
-      created_by: actorId,
-      updated_by: actorId,
-    })
-    .select("id")
-    .single();
 
-  if (insertError) throw new Error(insertError.message);
+  const admin = createAdminClient();
+  const attemptInsert = async (number: string) =>
+    admin
+      .schema("hrms")
+      .from("payslips")
+      .insert({
+        payroll_id: payroll.id,
+        payroll_item_id: item.id,
+        employee_id: item.employee_id,
+        payslip_number: number,
+        salary_credit_date: schedule.salaryCreditDate,
+        published_at: null,
+        payroll_generated_at: nowIso,
+        payment_mode: "Bank Transfer",
+        payslip_version: PAYSLIP_VERSION,
+        created_by: actorId,
+        updated_by: actorId,
+      })
+      .select("id")
+      .single();
+
+  let { data: created, error: insertError } = await attemptInsert(payslipNumber);
+
+  if (insertError) {
+    const isDuplicate =
+      insertError.code === "23505" ||
+      /duplicate key|unique constraint/i.test(insertError.message);
+    if (isDuplicate) {
+      const again = await recoverPayslipIdForPayrollItem({
+        payrollItemId: item.id,
+        employeeId: item.employee_id as string,
+        payrollId: payroll.id,
+        payslipNumber,
+        actorId,
+      });
+      if (again) return again;
+
+      // Number taken by another row we couldn't claim — mint a unique number.
+      const uniqueNumber = `${payslipNumber}-${item.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+      const retry = await attemptInsert(uniqueNumber);
+      if (!retry.error && retry.data?.id) return retry.data.id;
+
+      if (retry.error) {
+        const retryRecovered = await recoverPayslipIdForPayrollItem({
+          payrollItemId: item.id,
+          employeeId: item.employee_id as string,
+          payrollId: payroll.id,
+          payslipNumber: uniqueNumber,
+          actorId,
+        });
+        if (retryRecovered) return retryRecovered;
+        throw new Error(retry.error.message);
+      }
+    } else {
+      throw new Error(insertError.message);
+    }
+  }
+
+  if (!created?.id) {
+    throw new Error("Payslip could not be created.");
+  }
   return created.id;
 }
 
@@ -2934,8 +3150,7 @@ export async function releaseEmployeePayslip(
         breakdown,
         payroll_id,
         payrolls!inner (id, organization_id, payroll_month),
-        employees (employee_code),
-        payslips (id, email_sent_at, published_at)
+        employees (employee_code)
       `,
     )
     .eq("id", payrollItemId)
@@ -2955,72 +3170,151 @@ export async function releaseEmployeePayslip(
     throw new Error("Payroll line not found.");
   }
 
-  const existingPayslip = unwrapRelation(
-    item.payslips as
-      | { id: string; email_sent_at: string | null; published_at?: string | null }
-      | { id: string; email_sent_at: string | null; published_at?: string | null }[]
-      | null,
-  );
-  if (
-    Boolean(existingPayslip?.email_sent_at)
-  ) {
+  const actorId = actorUserId(profile);
+  const admin = createAdminClient();
+  const { data: existingPayslipRow, error: existingPayslipError } = await admin
+    .schema("hrms")
+    .from("payslips")
+    .select("id, email_sent_at, published_at, payslip_number, deleted_at")
+    .eq("payroll_item_id", item.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existingPayslipError) throw new Error(existingPayslipError.message);
+
+  if (existingPayslipRow?.email_sent_at && !existingPayslipRow.deleted_at) {
     throw new Error("Payslip already sent for this employee and period.");
   }
 
   const employee = unwrapRelation(
     item.employees as { employee_code: string } | { employee_code: string }[] | null,
   );
-  const actorId = actorUserId(profile);
   const nowIso = new Date().toISOString();
   const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
   const schedule = computePayslipSchedule(payroll.payroll_month, {
     salaryCreditDay: payrollSettings.settings.salaryCreditDate,
     publishDay: payrollSettings.settings.payslipAvailableDay,
   });
-  let payslipId = existingPayslip?.id ?? null;
-  let payslipNumber = "";
+  let payslipId = existingPayslipRow?.id ?? null;
+  let payslipNumber = String(existingPayslipRow?.payslip_number ?? "");
 
   if (!payslipId) {
     payslipNumber = generatePayslipNumber(
       employee?.employee_code ?? "EMP",
       payroll.payroll_month,
     );
-    const { data: created, error: insertError } = await supabase
-      .schema("hrms")
-      .from("payslips")
-      .insert({
-        payroll_id: payroll.id,
-        payroll_item_id: item.id,
-        employee_id: item.employee_id,
-        payslip_number: payslipNumber,
-        salary_credit_date: schedule.salaryCreditDate,
-        published_at: nowIso,
-        email_sent_at: nowIso,
-        payroll_generated_at: nowIso,
-        payment_mode: "Bank Transfer",
-        payslip_version: PAYSLIP_VERSION,
-        created_by: actorId,
-        updated_by: actorId,
-      })
-      .select("id")
-      .single();
-    if (insertError) throw new Error(insertError.message);
-    payslipId = created.id;
+    const byNumber = await findPayslipIdByNumberForEmployee(
+      payslipNumber,
+      item.employee_id as string,
+      payroll.id,
+      {
+        restoreIfSoftDeleted: true,
+        actorId,
+        payrollItemId: item.id,
+      },
+    );
+    if (byNumber) {
+      payslipId = byNumber;
+      const { data: recoveredRow } = await admin
+        .schema("hrms")
+        .from("payslips")
+        .select("payslip_number, email_sent_at")
+        .eq("id", byNumber)
+        .maybeSingle();
+      if (recoveredRow?.email_sent_at) {
+        throw new Error("Payslip already sent for this employee and period.");
+      }
+      payslipNumber = String(recoveredRow?.payslip_number ?? payslipNumber);
+      await admin
+        .schema("hrms")
+        .from("payslips")
+        .update({
+          published_at: nowIso,
+          email_sent_at: nowIso,
+          salary_credit_date: schedule.salaryCreditDate,
+          deleted_at: null,
+          updated_by: actorId,
+        })
+        .eq("id", payslipId);
+    } else {
+      const { data: created, error: insertError } = await admin
+        .schema("hrms")
+        .from("payslips")
+        .insert({
+          payroll_id: payroll.id,
+          payroll_item_id: item.id,
+          employee_id: item.employee_id,
+          payslip_number: payslipNumber,
+          salary_credit_date: schedule.salaryCreditDate,
+          published_at: nowIso,
+          email_sent_at: nowIso,
+          payroll_generated_at: nowIso,
+          payment_mode: "Bank Transfer",
+          payslip_version: PAYSLIP_VERSION,
+          created_by: actorId,
+          updated_by: actorId,
+        })
+        .select("id")
+        .single();
+      if (insertError) {
+        const isDuplicate =
+          insertError.code === "23505" ||
+          /duplicate key|unique constraint/i.test(insertError.message);
+        if (isDuplicate) {
+          const recovered =
+            (await findPayslipIdForPayrollItem(item.id, {
+              restoreIfSoftDeleted: true,
+              actorId,
+            })) ??
+            (await findPayslipIdByNumberForEmployee(
+              payslipNumber,
+              item.employee_id as string,
+              payroll.id,
+              {
+                restoreIfSoftDeleted: true,
+                actorId,
+                payrollItemId: item.id,
+              },
+            ));
+          if (!recovered) throw new Error(insertError.message);
+          payslipId = recovered;
+          const { data: recoveredRow } = await admin
+            .schema("hrms")
+            .from("payslips")
+            .select("payslip_number, email_sent_at")
+            .eq("id", recovered)
+            .maybeSingle();
+          if (recoveredRow?.email_sent_at) {
+            throw new Error("Payslip already sent for this employee and period.");
+          }
+          payslipNumber = String(recoveredRow?.payslip_number ?? payslipNumber);
+          await admin
+            .schema("hrms")
+            .from("payslips")
+            .update({
+              published_at: nowIso,
+              email_sent_at: nowIso,
+              salary_credit_date: schedule.salaryCreditDate,
+              deleted_at: null,
+              updated_by: actorId,
+            })
+            .eq("id", payslipId);
+        } else {
+          throw new Error(insertError.message);
+        }
+      } else {
+        payslipId = created.id;
+      }
+    }
   } else {
-    const { data: existingRow } = await supabase
-      .schema("hrms")
-      .from("payslips")
-      .select("payslip_number")
-      .eq("id", payslipId)
-      .maybeSingle();
-    payslipNumber = String(existingRow?.payslip_number ?? "");
-    await supabase
+    await admin
       .schema("hrms")
       .from("payslips")
       .update({
         published_at: nowIso,
         email_sent_at: nowIso,
         salary_credit_date: schedule.salaryCreditDate,
+        deleted_at: null,
         updated_by: actorId,
       })
       .eq("id", payslipId);

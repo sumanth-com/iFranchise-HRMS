@@ -8,7 +8,7 @@ import {
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
 import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
-import { syncActiveEmployeesIntoPayrollRun, ensureCompanyPayrollRun, generatePayslips } from "@/lib/payroll/services/payroll-mutations";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -173,24 +173,18 @@ async function listHrPayslipsFromPayrollRun(
 ): Promise<PayslipHistoryResult> {
   const payrollMonth = getPayrollMonthDate(input.month, input.year);
 
-  let payroll: { id: string; payroll_month: string; payroll_status: string } | null = null;
-  try {
-    const payrollId = await ensureCompanyPayrollRun(supabase, profile, {
-      month: input.month,
-      year: input.year,
-    });
-    const { data, error: payrollError } = await supabase
-      .schema("hrms")
-      .from("payrolls")
-      .select("id, payroll_month, payroll_status")
-      .eq("id", payrollId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (payrollError) throw new Error(payrollError.message);
-    payroll = data;
-  } catch {
-    payroll = null;
-  }
+  // Read-only: open the existing payroll run for this month. Do not generate
+  // or recalculate payroll when HR is only browsing / viewing / sending payslips.
+  const { data: payroll, error: payrollError } = await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .select("id, payroll_month, payroll_status")
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("payroll_month", payrollMonth)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (payrollError) throw new Error(payrollError.message);
 
   if (!payroll) {
     return {
@@ -202,9 +196,6 @@ async function listHrPayslipsFromPayrollRun(
       pageSize: input.pageSize,
     };
   }
-
-  await syncActiveEmployeesIntoPayrollRun(supabase, profile, payroll.id);
-  await generatePayslips(supabase, profile, payroll.id);
 
   let itemsQuery = supabase
     .schema("hrms")
@@ -227,8 +218,7 @@ async function listHrPayslipsFromPayrollRun(
           departments:department_id (name),
           designations:designation_id (title),
           employment_types:employment_type_id (name)
-        ),
-        payslips (id, payslip_number, issued_at, salary_credit_date, published_at, email_sent_at, archived_at, payslip_version)
+        )
       `,
     )
     .eq("payroll_id", payroll.id)
@@ -241,7 +231,74 @@ async function listHrPayslipsFromPayrollRun(
   const { data: items, error: itemsError } = await itemsQuery;
   if (itemsError) throw new Error(itemsError.message);
 
-  const now = new Date();
+  // Bypass RLS so soft-deleted / hidden payslips still resolve for HR status + View.
+  const itemIds = (items ?? []).map((row) => row.id);
+  const payslipByItemId = new Map<
+    string,
+    {
+      id: string;
+      payslip_number: string;
+      issued_at: string;
+      salary_credit_date: string | null;
+      published_at: string | null;
+      email_sent_at: string | null;
+      archived_at: string | null;
+      payslip_version: string | null;
+      deleted_at: string | null;
+    }
+  >();
+
+  if (itemIds.length > 0) {
+    const admin = createAdminClient();
+    const { data: payslipRows, error: payslipError } = await admin
+      .schema("hrms")
+      .from("payslips")
+      .select(
+        "id, payroll_item_id, payslip_number, issued_at, salary_credit_date, published_at, email_sent_at, archived_at, payslip_version, deleted_at",
+      )
+      .in("payroll_item_id", itemIds);
+
+    if (payslipError) throw new Error(payslipError.message);
+
+    const softDeletedIds: string[] = [];
+    for (const entry of payslipRows ?? []) {
+      const itemId = String(entry.payroll_item_id);
+      const current = payslipByItemId.get(itemId);
+      if (!current || (current.deleted_at && !entry.deleted_at)) {
+        payslipByItemId.set(itemId, {
+          id: entry.id,
+          payslip_number: entry.payslip_number,
+          issued_at: entry.issued_at,
+          salary_credit_date: entry.salary_credit_date,
+          published_at: entry.published_at,
+          email_sent_at: entry.email_sent_at,
+          archived_at: entry.archived_at,
+          payslip_version: entry.payslip_version,
+          deleted_at: entry.deleted_at,
+        });
+      }
+      if (entry.deleted_at) softDeletedIds.push(entry.id);
+    }
+
+    if (softDeletedIds.length > 0) {
+      await admin
+        .schema("hrms")
+        .from("payslips")
+        .update({
+          deleted_at: null,
+          is_current: true,
+          archived_at: null,
+        })
+        .in("id", softDeletedIds);
+
+      for (const [itemId, entry] of payslipByItemId) {
+        if (entry.deleted_at && softDeletedIds.includes(entry.id)) {
+          payslipByItemId.set(itemId, { ...entry, deleted_at: null, archived_at: null });
+        }
+      }
+    }
+  }
+
   let rows: PayslipListItem[] = [];
   for (const row of items ?? []) {
     const employee = unwrapRelation(row.employees) as
@@ -291,36 +348,16 @@ async function listHrPayslipsFromPayrollRun(
           employee.employment_types as { name: string } | { name: string }[] | null,
         )
       : null;
-    const payslip = unwrapRelation(
-      row.payslips as
-        | {
-            id: string;
-            payslip_number: string;
-            issued_at: string;
-            salary_credit_date: string | null;
-            published_at: string | null;
-            email_sent_at: string | null;
-            archived_at: string | null;
-            payslip_version: string | null;
-          }
-        | {
-            id: string;
-            payslip_number: string;
-            issued_at: string;
-            salary_credit_date: string | null;
-            published_at: string | null;
-            email_sent_at: string | null;
-            archived_at: string | null;
-            payslip_version: string | null;
-          }[]
-        | null,
-    );
+    let payslip = payslipByItemId.get(row.id) ?? null;
+
+    // Soft-deleted rows are restored in a single batch above. Do not create
+    // missing payslips during list load — View/Send handle that on demand.
     const sent = isPayslipHrSent({ emailSentAt: payslip?.email_sent_at ?? null });
-    const payslipReady = Boolean(payslip?.id);
+    const payslipReady = Boolean(payslip?.id && !payslip.deleted_at);
 
     rows.push({
-      id: payslip?.id ?? "",
-      payslipNumber: payslip?.payslip_number ?? "Pending",
+      id: payslipReady ? payslip!.id : "",
+      payslipNumber: payslipReady ? payslip!.payslip_number : "Pending",
       employeeId: row.employee_id,
       employeeCode: employee?.employee_code ?? "",
       employeeName: employee
@@ -330,19 +367,19 @@ async function listHrPayslipsFromPayrollRun(
       grossSalary: Number(row.gross_salary ?? 0),
       netSalary: Number(row.net_salary ?? 0),
       payrollStatus: payroll.payroll_status as PayrollStatus,
-      issuedAt: payslip?.issued_at ?? "",
-      salaryCreditDate: payslip?.salary_credit_date ?? "",
-      publishedAt: payslip?.published_at ?? "",
+      issuedAt: payslipReady ? payslip!.issued_at ?? "" : "",
+      salaryCreditDate: payslipReady ? payslip!.salary_credit_date ?? "" : "",
+      publishedAt: payslipReady ? payslip!.published_at ?? "" : "",
       availability: sent ? "available" : "under_review",
       canEmployeeAccess: sent,
       reviewMessage: sent ? null : "Payslip not sent yet",
-      payslipVersion: payslip?.payslip_version ?? "—",
+      payslipVersion: payslipReady ? payslip!.payslip_version ?? "—" : "—",
       paymentStatus: sent ? "Sent" : payslipReady ? "Ready to Send" : "Pending",
       isArchived: Boolean(payslip?.archived_at),
       versionCount: 1,
       payrollItemId: row.id,
       payslipSent: sent,
-      hasPayslip: Boolean(payslip?.id),
+      hasPayslip: payslipReady,
       departmentName: department?.name ?? null,
       designationTitle: designation?.title ?? null,
       employmentTypeName: employmentType?.name ?? null,

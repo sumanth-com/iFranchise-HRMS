@@ -5,11 +5,13 @@ type PostgresErrorShape = {
 };
 
 const DUPLICATE_PAYROLL_ITEM =
-  /payroll_items_unique_per_employee|duplicate key value violates unique constraint/i;
+  /payroll_items_unique_per_employee/i;
 // Match RLS only — do not treat check/unique/FK "new row violates …" as RLS.
 const RLS_VIOLATION =
   /row-level security policy|violat(es|ing) row-level security|42501/i;
 const DUPLICATE_KEY = /duplicate key value violates unique constraint/i;
+const DUPLICATE_PAYSLIP =
+  /payslips_|payslip_number/i;
 
 export function isRowLevelSecurityError(error: unknown): boolean {
   const code = (error as { code?: string } | null)?.code;
@@ -55,19 +57,19 @@ export function toUserFriendlyError(
     return "Some of the entered values are not allowed. Please review the form and try again.";
   }
 
-  if (pg.code === "23505" || DUPLICATE_PAYROLL_ITEM.test(raw)) {
+  if (pg.code === "23505" || DUPLICATE_PAYROLL_ITEM.test(raw) || DUPLICATE_KEY.test(raw)) {
     if (DUPLICATE_PAYROLL_ITEM.test(raw)) {
       return "Payroll for the selected period has already been generated. Open Company Payroll to review the existing run.";
+    }
+    if (DUPLICATE_PAYSLIP.test(raw)) {
+      // View/Send recover existing rows; this is a last-resort fallback only.
+      return "Unable to open this payslip right now. Please refresh and try again.";
     }
     return "This record already exists. Please review the existing entry before saving again.";
   }
 
   if (pg.code === "42501" || isRowLevelSecurityError(error)) {
     return "You do not have permission to perform this action. Contact your administrator if you need access.";
-  }
-
-  if (DUPLICATE_KEY.test(raw)) {
-    return "This record already exists. Please review the existing entry before saving again.";
   }
 
   if (error.name === "PayrollIntegrityError") {

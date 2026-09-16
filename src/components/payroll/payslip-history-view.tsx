@@ -435,10 +435,17 @@ export function PayslipHistoryView({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [sendTarget, setSendTarget] = useState<PayslipListItem | null>(null);
+  const [rows, setRows] = useState(history.data);
+  const [stats, setStats] = useState(history.stats);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
   const [monthValue, setMonthValue] = useState(String(month));
   const [yearValue, setYearValue] = useState(String(year));
   const statusValue = searchParams.get("payslipStatus") ?? "all";
+
+  useEffect(() => {
+    setRows(history.data);
+    setStats(history.stats);
+  }, [history]);
 
   useEffect(() => {
     setMonthValue(String(month));
@@ -469,16 +476,32 @@ export function PayslipHistoryView({
 
   const underReview =
     mode === "employee"
-      ? history.data.find((row) => row.availability === "under_review")
+      ? rows.find((row) => row.availability === "under_review")
       : undefined;
 
   function openPreview(row: PayslipListItem) {
     if (mode !== "hr") {
+      if (!row.id) {
+        toast.error("Payslip is not available for this employee yet.");
+        return;
+      }
       setActivePayslipId(row.id);
       setPreviewOpen(true);
       return;
     }
-    if (!row.payrollItemId) return;
+
+    // Open immediately when the row already has a payslip id — no extra round trip.
+    if (row.hasPayslip && row.id) {
+      setActivePayslipId(row.id);
+      setPreviewOpen(true);
+      return;
+    }
+
+    if (!row.payrollItemId) {
+      toast.error("Payslip is not available for this employee yet.");
+      return;
+    }
+
     setViewingId(row.payrollItemId);
     void (async () => {
       const result = await ensurePayrollItemPayslipAction(row.payrollItemId!);
@@ -487,9 +510,46 @@ export function PayslipHistoryView({
         toast.error(result.message);
         return;
       }
+      setRows((prev) =>
+        prev.map((entry) =>
+          entry.payrollItemId === row.payrollItemId
+            ? {
+                ...entry,
+                id: result.data,
+                hasPayslip: true,
+                paymentStatus: entry.payslipSent ? entry.paymentStatus : "Ready to Send",
+              }
+            : entry,
+        ),
+      );
       setActivePayslipId(result.data);
       setPreviewOpen(true);
     })();
+  }
+
+  function markRowSent(payrollItemId: string) {
+    const sentAt = new Date().toISOString();
+    setRows((prev) =>
+      prev.map((entry) =>
+        entry.payrollItemId === payrollItemId
+          ? {
+              ...entry,
+              payslipSent: true,
+              paymentStatus: "Sent",
+              availability: "available",
+              canEmployeeAccess: true,
+              reviewMessage: null,
+              publishedAt: entry.publishedAt || sentAt,
+            }
+          : entry,
+      ),
+    );
+    setStats((prev) => ({
+      ...prev,
+      creditedCount: prev.creditedCount + 1,
+      underReviewCount: Math.max(0, prev.underReviewCount - 1),
+      totalPayslips: prev.totalPayslips + 1,
+    }));
   }
 
   return (
@@ -519,7 +579,7 @@ export function PayslipHistoryView({
         </div>
       ) : null}
 
-      <PayslipHistorySummaryCards stats={history.stats} mode={mode} />
+      <PayslipHistorySummaryCards stats={stats} mode={mode} />
 
       <div
         className={cn(
@@ -628,9 +688,9 @@ export function PayslipHistoryView({
               <Loader2 className="size-4 animate-spin" />
               Loading payslips...
             </div>
-          ) : history.data.length > 0 ? (
+          ) : rows.length > 0 ? (
             <PayslipTable
-              rows={history.data}
+              rows={rows}
               mode={mode}
               showEmployee={mode === "hr"}
               onPreview={openPreview}
@@ -705,9 +765,9 @@ export function PayslipHistoryView({
             onOpenChange={(open) => {
               if (!open) setSendTarget(null);
             }}
-            onSent={() => {
+            onSent={(payrollItemId) => {
+              markRowSent(payrollItemId);
               setSendTarget(null);
-              router.refresh();
             }}
           />
         </>

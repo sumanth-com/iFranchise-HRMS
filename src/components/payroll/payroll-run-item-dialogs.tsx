@@ -240,14 +240,16 @@ export function PayrollSendPayslipDialog({
   target: PayrollLineTarget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSent: () => void;
+  onSent: (payrollItemId: string) => void;
 }) {
-  const [isPending, startTransition] = useTransition();
+  const [isSending, setIsSending] = useState(false);
 
-  function handleSend() {
-    if (!target) return;
-    startTransition(async () => {
-      const result = await releaseEmployeePayslipAction(target.payrollItemId);
+  async function handleSend() {
+    if (!target || isSending) return;
+    const payrollItemId = target.payrollItemId;
+    setIsSending(true);
+    try {
+      const result = await releaseEmployeePayslipAction(payrollItemId);
       if (!result.success) {
         toast.error(result.message);
         return;
@@ -258,12 +260,20 @@ export function PayrollSendPayslipDialog({
           : "Payslip sent successfully. The employee can now view it in their portal.",
       );
       onOpenChange(false);
-      onSent();
-    });
+      onSent(payrollItemId);
+    } finally {
+      setIsSending(false);
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (isSending) return;
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="p-0 sm:max-w-md">
         <DialogHeader className="border-b px-5 py-4 pr-12 text-left">
           <DialogTitle>Send Payslip</DialogTitle>
@@ -280,11 +290,16 @@ export function PayrollSendPayslipDialog({
           </p>
         </div>
         <div className="flex justify-end gap-2 border-t px-5 py-3">
-          <Button type="button" variant="outline" disabled={isPending} onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSending}
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button type="button" disabled={isPending} onClick={handleSend}>
-            {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          <Button type="button" disabled={isSending || !target} onClick={() => void handleSend()}>
+            {isSending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
             Send Payslip
           </Button>
         </div>
