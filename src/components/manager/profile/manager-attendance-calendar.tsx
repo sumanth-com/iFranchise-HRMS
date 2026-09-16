@@ -55,7 +55,7 @@ const TOOLTIP_STYLES: Record<string, string> = {
   holiday: "border-border bg-muted-foreground text-white",
   week_off: "border-border bg-muted-foreground text-white",
   on_request: "border-amber-500/30 bg-amber-500 text-white",
-  today: "border-emerald-700/30 bg-emerald-600 text-white",
+  today: "border-border bg-muted-foreground text-white",
 };
 
 const LEGEND = [
@@ -87,14 +87,17 @@ function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
   if (day.leaveTypeName) {
     return { label: day.leaveTypeName, tone: "on_leave" };
   }
-  if (day.isToday) {
-    return { label: "Today", tone: "today" };
-  }
   if (day.status) {
     const label = ATTENDANCE_DISPLAY_STATUS_LABELS[day.status as AttendanceDisplayStatus];
     if (label && label !== "—") {
-      return { label, tone: day.status };
+      return {
+        label: day.isToday ? `${label} · Today` : label,
+        tone: day.status,
+      };
     }
+  }
+  if (day.isToday) {
+    return { label: "Today", tone: "today" };
   }
   if (day.inMonth && getDay(parseISO(day.date)) === 0) {
     return { label: "Weekend", tone: "week_off" };
@@ -304,11 +307,10 @@ export function ManagerAttendanceCalendar({
             const isSelected = selectedDate === live.date;
             const isHolidayOrWeekend =
               live.status === "holiday" || live.status === "week_off";
+            // Status pill for any in-month day with a punch/leave status — including today.
+            // Do not force Present green on today; unmarked days stay neutral.
             const pillClass =
-              !live.isToday &&
-              live.inMonth &&
-              live.status &&
-              !isHolidayOrWeekend
+              live.inMonth && live.status && !isHolidayOrWeekend
                 ? PILL_STYLES[live.status]
                 : null;
             const tooltip = live.inMonth ? getCalendarDayTooltip(live) : null;
@@ -321,24 +323,40 @@ export function ManagerAttendanceCalendar({
                 className={cn(
                   "attendance-day-cell flex min-h-0 w-full items-center justify-center rounded-xl text-sm font-medium transition-[background-color,box-shadow,color] duration-150",
                   !live.inMonth && "pointer-events-none opacity-25",
-                  live.isToday &&
-                    "attendance-day-today bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-700 ring-offset-2 ring-offset-background dark:ring-offset-[#060914]",
-                  !live.isToday &&
-                    live.inMonth &&
+                  live.inMonth &&
                     isHolidayOrWeekend &&
                     "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
+                  // Today marker: ring only — fill comes from status pill when checked in.
+                  live.isToday &&
+                    "attendance-day-today shadow-sm ring-2 ring-offset-2 ring-offset-background dark:ring-offset-[#060914]",
+                  live.isToday &&
+                    live.status === "late" &&
+                    "ring-orange-600",
+                  live.isToday &&
+                    (live.status === "present" || live.status === "half_day") &&
+                    "ring-emerald-700",
+                  live.isToday &&
+                    live.status === "absent" &&
+                    "ring-red-600",
+                  live.isToday &&
+                    live.status === "on_leave" &&
+                    "ring-violet-600",
+                  live.isToday &&
+                    !pillClass &&
+                    !isHolidayOrWeekend &&
+                    "ring-muted-foreground/40",
                   isSelected &&
                     !live.isToday &&
                     "ring-2 ring-primary/70 ring-offset-1 dark:ring-white/25 dark:ring-offset-[#060914]",
                   live.inMonth &&
                     !live.isToday &&
+                    !pillClass &&
                     "hover:bg-white/10",
                 )}
               >
                 <span
                   className={cn(
                     "inline-flex size-8 items-center justify-center rounded-full",
-                    live.isToday && "text-white",
                     pillClass,
                   )}
                 >
