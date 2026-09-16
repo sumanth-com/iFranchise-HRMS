@@ -47,6 +47,14 @@ const PROCESSING_PILL_CLASS =
 const AWAITING_PILL_CLASS =
   "inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-500/20 dark:bg-amber-400/12 dark:text-amber-300 dark:ring-amber-400/25";
 
+const PAYSLIP_HISTORY_GRID =
+  "grid w-full min-w-[40rem] grid-cols-[minmax(0,1fr)_minmax(0,1.55fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1.2fr)] items-center";
+
+const PAYSLIP_HISTORY_HEADER_CELL =
+  "h-11 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-white";
+
+const PAYSLIP_HISTORY_CELL = "min-w-0 px-4 py-2.5 text-sm";
+
 function EmployeePayslipStatusPill({ row }: { row: PayslipListItem }) {
   if (row.canEmployeeAccess) {
     return (
@@ -420,82 +428,97 @@ export function EmployeePayrollView({
         bodyClassName="overflow-x-auto"
       >
         {releasedPayslips.length > 0 ? (
-          <table className="w-full min-w-[44rem] text-sm">
-            <thead>
-              <tr className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Month
-                </th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Payslip ID
-                </th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Gross Earning
-                </th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Net salary
-                </th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Status
-                </th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {releasedPayslips.map((row: PayslipListItem) => (
-                <tr key={row.id} className="border-b last:border-0">
-                  <td className="py-2.5 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
-                  <td className="py-2.5 pr-3 text-muted-foreground">{row.payslipNumber}</td>
-                  <td className="py-2.5 pr-3 tabular-nums">{money(row.grossSalary)}</td>
-                  <td className="py-2.5 pr-3 tabular-nums font-medium">{money(row.netSalary)}</td>
-                  <td className="py-2.5 pr-3">
-                    <EmployeePayslipStatusPill row={row} />
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        disabled={!row.canEmployeeAccess}
-                        onClick={() => openPayslip(row.id)}
-                      >
-                        <FileText className="size-3.5" />
-                        View
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        disabled={!row.canEmployeeAccess}
-                        onClick={async () => {
-                          if (!row.canEmployeeAccess) return;
-                          try {
-                            const response = await fetch(`/api/payslips/${row.id}/pdf`);
-                            if (!response.ok) throw new Error("Download failed");
-                            const blob = await response.blob();
-                            const url = URL.createObjectURL(blob);
-                            const anchor = document.createElement("a");
-                            anchor.href = url;
-                            anchor.download = `payslip-${row.payslipNumber}.pdf`;
-                            anchor.click();
-                            URL.revokeObjectURL(url);
-                          } catch {
-                            openPayslip(row.id);
-                          }
-                        }}
-                      >
-                        <Download className="size-3.5" />
-                        PDF
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div role="table" aria-label="Payslip history" className="w-full">
+            <div
+              role="row"
+              className={cn(
+                PAYSLIP_HISTORY_GRID,
+                "bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600",
+              )}
+            >
+              <div role="columnheader" className={cn(PAYSLIP_HISTORY_HEADER_CELL, "text-left")}>
+                Month
+              </div>
+              <div role="columnheader" className={cn(PAYSLIP_HISTORY_HEADER_CELL, "text-left")}>
+                Payslip ID
+              </div>
+              <div role="columnheader" className={cn(PAYSLIP_HISTORY_HEADER_CELL, "text-right")}>
+                Net Salary
+              </div>
+              <div role="columnheader" className={cn(PAYSLIP_HISTORY_HEADER_CELL, "text-center")}>
+                Status
+              </div>
+              <div role="columnheader" className={cn(PAYSLIP_HISTORY_HEADER_CELL, "text-right")}>
+                Actions
+              </div>
+            </div>
+            {releasedPayslips.map((row: PayslipListItem) => (
+              <div
+                key={row.id}
+                role="row"
+                className={cn(PAYSLIP_HISTORY_GRID, "border-b last:border-0")}
+              >
+                <div role="cell" className={cn(PAYSLIP_HISTORY_CELL, "text-left font-medium")}>
+                  {fmtMonth(row.payrollMonth)}
+                </div>
+                <div
+                  role="cell"
+                  className={cn(PAYSLIP_HISTORY_CELL, "truncate text-left text-muted-foreground")}
+                  title={row.payslipNumber}
+                >
+                  {row.payslipNumber}
+                </div>
+                <div
+                  role="cell"
+                  className={cn(PAYSLIP_HISTORY_CELL, "text-right font-medium tabular-nums")}
+                >
+                  {money(row.netSalary)}
+                </div>
+                <div role="cell" className={cn(PAYSLIP_HISTORY_CELL, "flex justify-center")}>
+                  <EmployeePayslipStatusPill row={row} />
+                </div>
+                <div role="cell" className={cn(PAYSLIP_HISTORY_CELL, "flex justify-end")}>
+                  <div className="inline-flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={!row.canEmployeeAccess}
+                      onClick={() => openPayslip(row.id)}
+                    >
+                      <FileText className="size-3.5" />
+                      View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={!row.canEmployeeAccess}
+                      onClick={async () => {
+                        if (!row.canEmployeeAccess) return;
+                        try {
+                          const response = await fetch(`/api/payslips/${row.id}/pdf`);
+                          if (!response.ok) throw new Error("Download failed");
+                          const blob = await response.blob();
+                          const url = URL.createObjectURL(blob);
+                          const anchor = document.createElement("a");
+                          anchor.href = url;
+                          anchor.download = `payslip-${row.payslipNumber}.pdf`;
+                          anchor.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          openPayslip(row.id);
+                        }
+                      }}
+                    >
+                      <Download className="size-3.5" />
+                      PDF
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">
             No payslips have been sent to you yet. They will appear here once HR publishes them.
