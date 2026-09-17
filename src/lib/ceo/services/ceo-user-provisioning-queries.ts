@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -388,8 +390,9 @@ async function loadRolesFromInvitations(
 
 /**
  * Portal-invited and active directory users (for summaries and contact lookups).
+ * Request-scoped cache: summary + list + lookups share one directory rebuild.
  */
-async function loadProvisionedPortalUsers(
+const loadProvisionedPortalUsers = cache(async function loadProvisionedPortalUsers(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<NormalizedExecutiveUser[]> {
@@ -563,10 +566,10 @@ async function loadProvisionedPortalUsers(
   }
 
   return [...byEmployee.values()].sort(compareProvisioningPeopleByName);
-}
+});
 
 /** All employees visible in the Employees module, enriched with portal provisioning data. */
-async function loadUserProvisioningListUsers(
+const loadUserProvisioningListUsers = cache(async function loadUserProvisioningListUsers(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<NormalizedExecutiveUser[]> {
@@ -645,7 +648,7 @@ async function loadUserProvisioningListUsers(
   }
 
   return [...byEmployee.values()].sort(compareProvisioningPeopleByName);
-}
+});
 
 export function summarizeExecutiveUsers(
   users: NormalizedExecutiveUser[],
@@ -877,13 +880,58 @@ export async function getCeoProvisioningUserDetail(
   profile: UserProfile,
   employeeId: string,
 ): Promise<CeoProvisioningUserDetail | null> {
-  const users = await loadUserProvisioningListUsers(supabase, profile);
-  const user = users.find((u) => u.employeeId === employeeId);
-  if (!user) return null;
+  const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
+
+  const { data: employee, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `
+      ${EMPLOYEE_SELECT_FIELDS},
+      invited_role:invited_role_id ( code, name, portal_key )
+    `,
+    )
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!employee) return null;
+
+  const row = employee as LooseRow;
+  const designation = unwrapRelation<LooseRow>(row.designations);
+  if (
+    !shouldIncludeInUserProvisioningList({
+      email: row.email,
+      employee_code: row.employee_code,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      designationTitle: designation?.title ?? null,
+      app_hidden_at: row.app_hidden_at,
+      deleted_at: row.deleted_at,
+    })
+  ) {
+    return null;
+  }
+
+  const roleIds = row.invited_role_id ? [String(row.invited_role_id)] : [];
+  const [rolesById, rolesByEmployeeId, rolesByInvitation] = await Promise.all([
+    loadRolesById(admin, organizationId, roleIds),
+    loadEmployeeRolesFromUserRoles(admin, organizationId, [employeeId]),
+    loadRolesFromInvitations(admin, organizationId, [employeeId]),
+  ]);
+
+  const user = buildProvisioningUserRow(
+    row,
+    resolveEmployeeRole(row, rolesById, rolesByEmployeeId, rolesByInvitation),
+    profile,
+  );
 
   const permissions = await getRolePermissionCodes(
     supabase,
-    profile.employee.organizationId,
+    organizationId,
     user.roleCode,
   );
 

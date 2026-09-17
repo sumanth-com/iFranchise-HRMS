@@ -232,7 +232,6 @@ export function CeoUserProvisioningView({
           className="gap-1.5"
           onClick={() => {
             setInviteOpen(true);
-            void refreshModuleData(pageParams);
           }}
           disabled={!inviteServiceReady}
         >

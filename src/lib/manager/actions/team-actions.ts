@@ -86,7 +86,10 @@ export async function fetchTeamEmployeesAction(
 ): Promise<TeamListResult> {
   const parsed = teamListParamsSchema.parse(params);
   const { profile, supabase, teamIds } = await getAuthenticatedContext();
-  return listTeamEmployees(supabase, profile, teamIds, parsed);
+  return listTeamEmployees(supabase, profile, teamIds, parsed, {
+    includeAttendanceAndLeave: false,
+    includeSignedAvatars: false,
+  });
 }
 
 export async function fetchTeamSummaryAction(): Promise<TeamSummary> {
@@ -324,6 +327,7 @@ export async function removeTeamMemberAction(
 
 export async function getManagerTeamPageData(
   params: TeamListParams,
+  options?: { includeFormLookups?: boolean },
 ): Promise<ManagerTeamPageData> {
   await requireServerPermission(PORTAL_PERMISSIONS.manager);
   const parsed = teamListParamsSchema.parse(params);
@@ -338,14 +342,25 @@ export async function getManagerTeamPageData(
     profile,
   );
   const organizationId = profile.employee.organizationId;
+  const includeFormLookups = options?.includeFormLookups === true;
 
   const [summary, employees, lookups, teamMemberOptions, designationOptions] =
     await Promise.all([
       getTeamSummary(supabase, profile, teamIds),
-      listTeamEmployees(supabase, profile, teamIds, parsed),
-      getTeamFilterLookups(supabase, organizationId, teamIds),
-      getTeamMemberOptions(supabase, organizationId, teamIds),
-      getTeamDesignationOptions(supabase, organizationId),
+      listTeamEmployees(supabase, profile, teamIds, parsed, {
+        // List cards only need directory fields; enrich on demand for tables.
+        includeAttendanceAndLeave: false,
+        includeSignedAvatars: false,
+      }),
+      includeFormLookups
+        ? getTeamFilterLookups(supabase, organizationId, teamIds)
+        : Promise.resolve({ departments: [], designations: [], employmentTypes: [] }),
+      includeFormLookups
+        ? getTeamMemberOptions(supabase, organizationId, teamIds)
+        : Promise.resolve([]),
+      includeFormLookups
+        ? getTeamDesignationOptions(supabase, organizationId)
+        : Promise.resolve([]),
     ]);
 
   return {

@@ -1,6 +1,5 @@
 import {
   addDays,
-  format,
   isWithinInterval,
   parseISO,
 } from "date-fns";
@@ -151,7 +150,8 @@ export async function getTeamSummary(
     employeesResult,
     attendanceResult,
     profilesResult,
-    reviewsResult,
+    reviewsTotalRes,
+    reviewsCompletedRes,
   ] = await Promise.all([
     supabase
       .schema("hrms")
@@ -175,16 +175,23 @@ export async function getTeamSummary(
       .in("employee_id", teamIds)
       .is("deleted_at", null),
     fromHrms(supabase, "performance_reviews")
-      .select("id, review_status")
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .in("employee_id", teamIds)
+      .is("deleted_at", null),
+    fromHrms(supabase, "performance_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("employee_id", teamIds)
+      .in("review_status", ["approved", "submitted"])
       .is("deleted_at", null),
   ]);
 
   if (employeesResult.error) throw new Error(employeesResult.error.message);
   if (attendanceResult.error) throw new Error(attendanceResult.error.message);
   if (profilesResult.error) throw new Error(profilesResult.error.message);
-  if (reviewsResult.error) throw new Error(reviewsResult.error.message);
+  if (reviewsTotalRes.error) throw new Error(reviewsTotalRes.error.message);
+  if (reviewsCompletedRes.error) throw new Error(reviewsCompletedRes.error.message);
 
   let presentToday = 0;
   let onLeaveToday = 0;
@@ -226,14 +233,11 @@ export async function getTeamSummary(
     }
   }
 
-  const reviews = reviewsResult.data ?? [];
-  const completedReviews = (reviewsResult.data ?? []).filter(
-    (row: { review_status: string }) =>
-      row.review_status === "approved" || row.review_status === "submitted",
-  ).length;
+  const reviewsTotal = reviewsTotalRes.count ?? 0;
+  const completedReviews = reviewsCompletedRes.count ?? 0;
   const teamCompletionRate =
-    reviews.length > 0
-      ? Math.round((completedReviews / reviews.length) * 100)
+    reviewsTotal > 0
+      ? Math.round((completedReviews / reviewsTotal) * 100)
       : markedToday > 0
         ? Math.round((markedToday / teamIds.length) * 100)
         : 0;
@@ -343,6 +347,10 @@ export async function listTeamEmployees(
   profile: UserProfile,
   teamIds: string[],
   params: TeamListParams,
+  options?: {
+    includeAttendanceAndLeave?: boolean;
+    includeSignedAvatars?: boolean;
+  },
 ): Promise<TeamListResult> {
   const {
     page,
@@ -364,6 +372,8 @@ export async function listTeamEmployees(
   const today = getTodayDateString();
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+  const includeAttendanceAndLeave = options?.includeAttendanceAndLeave !== false;
+  const includeSignedAvatars = options?.includeSignedAvatars !== false;
 
   let query = supabase
     .schema("hrms")
@@ -416,8 +426,8 @@ export async function listTeamEmployees(
   const rows = (data ?? []) as LooseRow[];
   const pageEmployeeIds = rows.map((row) => row.id as string);
 
-  const [attendanceResult, leaveBalancesResult] = await Promise.all([
-    pageEmployeeIds.length
+  const [attendanceResult, leaveBalancesResult, signedByPath] = await Promise.all([
+    includeAttendanceAndLeave && pageEmployeeIds.length
       ? supabase
           .schema("hrms")
           .from("attendance")
@@ -426,8 +436,8 @@ export async function listTeamEmployees(
           .eq("attendance_date", today)
           .in("employee_id", pageEmployeeIds)
           .is("deleted_at", null)
-      : Promise.resolve({ data: [], error: null }),
-    pageEmployeeIds.length
+      : Promise.resolve({ data: [] as Array<{ employee_id: string; attendance_status: string }>, error: null }),
+    includeAttendanceAndLeave && pageEmployeeIds.length
       ? supabase
           .schema("hrms")
           .from("leave_balances")
@@ -435,7 +445,16 @@ export async function listTeamEmployees(
           .in("employee_id", pageEmployeeIds)
           .eq("balance_year", CURRENT_YEAR)
           .is("deleted_at", null)
-      : Promise.resolve({ data: [], error: null }),
+      : Promise.resolve({ data: [] as Array<{ employee_id: string; balance_days: number | null }>, error: null }),
+    includeSignedAvatars
+      ? createSignedStorageUrls(
+          supabase,
+          EMPLOYEE_STORAGE_BUCKETS.profileImages,
+          rows.map(
+            (row) => unwrap(row.employee_profiles)?.profile_image_storage_path ?? null,
+          ),
+        )
+      : Promise.resolve(new Map<string, string>()),
   ]);
 
   if (attendanceResult.error) throw new Error(attendanceResult.error.message);
@@ -454,15 +473,6 @@ export async function listTeamEmployees(
       current + Number(row.balance_days ?? 0),
     );
   }
-
-  const imagePaths = rows.map(
-    (row) => unwrap(row.employee_profiles)?.profile_image_storage_path ?? null,
-  );
-  const signedByPath = await createSignedStorageUrls(
-    supabase,
-    EMPLOYEE_STORAGE_BUCKETS.profileImages,
-    imagePaths,
-  );
 
   return {
     data: rows.map((row): TeamMemberListItem => {

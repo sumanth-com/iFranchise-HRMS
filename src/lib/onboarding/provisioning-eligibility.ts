@@ -45,6 +45,7 @@ export async function isOnboardingPortalReady(caseId: string): Promise<boolean> 
 
 export async function assertOnboardingProvisioningEligible(
   detail: OnboardingCaseDetail,
+  options?: { portalReady?: boolean },
 ): Promise<void> {
   if (detail.employeeId) {
     throw new Error("This candidate has already been provisioned.");
@@ -62,7 +63,10 @@ export async function assertOnboardingProvisioningEligible(
     );
   }
 
-  const portalReady = await isOnboardingPortalReady(detail.id);
+  const portalReady =
+    typeof options?.portalReady === "boolean"
+      ? options.portalReady
+      : await isOnboardingPortalReady(detail.id);
   if (!portalReady) {
     throw new Error(
       "The candidate has not finished portal password setup. Ask them to complete onboarding login first.",

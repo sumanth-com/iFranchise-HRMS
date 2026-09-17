@@ -301,7 +301,11 @@ export async function listOnboardingCases(
   return { data: (data ?? []).map((r) => mapListRow(r as LooseRow)), total: count ?? 0 };
 }
 
-async function loadCaseDocuments(caseId: string): Promise<OnboardingDocumentRecord[]> {
+async function loadCaseDocuments(
+  caseId: string,
+  options?: { includeSignedUrls?: boolean },
+): Promise<OnboardingDocumentRecord[]> {
+  const includeSignedUrls = options?.includeSignedUrls !== false;
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
@@ -316,7 +320,7 @@ async function loadCaseDocuments(caseId: string): Promise<OnboardingDocumentReco
   const docs: OnboardingDocumentRecord[] = [];
   for (const row of data ?? []) {
     let signedUrl: string | null = null;
-    if (row.storage_path) {
+    if (includeSignedUrls && row.storage_path) {
       try {
         const { data: signed, error: signedError } = await admin.storage
           .from("onboarding-documents")
@@ -411,6 +415,7 @@ export async function getOnboardingCaseDetail(
   supabase: AuthSupabaseClient,
   organizationId: string,
   caseId: string,
+  options?: { includeDocumentSignedUrls?: boolean },
 ): Promise<OnboardingCaseDetail> {
   const { data: row, error } = await supabase
     .schema("hrms")
@@ -437,7 +442,9 @@ export async function getOnboardingCaseDetail(
 
   const [sections, documents, policies, agreements, signature, timeline] = await Promise.all([
     supabase.schema("hrms").from("onboarding_sections").select("section_key, data, completed_at").eq("case_id", caseId),
-    loadCaseDocuments(caseId),
+    loadCaseDocuments(caseId, {
+      includeSignedUrls: options?.includeDocumentSignedUrls !== false,
+    }),
     supabase.schema("hrms").from("onboarding_policy_acknowledgements").select("policy_code").eq("case_id", caseId),
     supabase.schema("hrms").from("onboarding_agreements").select("agreement_type, signed_at, locked_at").eq("case_id", caseId),
     supabase.schema("hrms").from("onboarding_signatures").select("id, signature_type, signature_style, finalized_at").eq("case_id", caseId).order("finalized_at", { ascending: false }).limit(1).maybeSingle(),

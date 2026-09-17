@@ -231,13 +231,12 @@ export async function loadUserProvisioningInviteRoles(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<ProvisionableRole[]> {
-  const roles: ProvisionableRole[] = [];
-
-  for (const code of USER_PROVISIONING_INVITE_ROLE_CODES) {
-    const role = await resolveInviteRole(supabase, organizationId, code);
-    if (role) roles.push(role);
-  }
-
+  const resolved = await Promise.all(
+    USER_PROVISIONING_INVITE_ROLE_CODES.map((code) =>
+      resolveInviteRole(supabase, organizationId, code),
+    ),
+  );
+  const roles = resolved.filter((role): role is ProvisionableRole => Boolean(role));
   return sortInviteRoles(roles);
 }
 

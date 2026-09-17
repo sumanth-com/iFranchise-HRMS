@@ -29,18 +29,38 @@ export async function listProvisioningEligibleOnboardingCandidates(
 
   if (error) throw new Error(error.message);
 
-  const eligible: ProvisioningEligibleCandidate[] = [];
+  const caseIds = (data ?? []).map((row) => row.id as string);
+  if (caseIds.length === 0) return [];
 
-  for (const row of data ?? []) {
-    const caseId = row.id as string;
-    try {
-      const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId);
-      await assertOnboardingProvisioningEligible(detail);
-      eligible.push(mapDetailToEligibleCandidate(detail));
-    } catch {
-      // Skip cases that fail eligibility (stale list / incomplete data).
-    }
-  }
+  // Batch portal-ready checks once instead of per-case sequential lookups.
+  const { data: portalAccounts, error: portalError } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .select("case_id, auth_user_id")
+    .in("case_id", caseIds);
+  if (portalError) throw new Error(portalError.message);
 
-  return eligible;
+  const portalReadyByCase = new Set(
+    (portalAccounts ?? [])
+      .filter((row) => Boolean(row.auth_user_id))
+      .map((row) => row.case_id as string),
+  );
+
+  const settled = await Promise.all(
+    caseIds.map(async (caseId) => {
+      try {
+        if (!portalReadyByCase.has(caseId)) return null;
+        // Eligibility only needs document metadata — skip storage signed URLs.
+        const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId, {
+          includeDocumentSignedUrls: false,
+        });
+        await assertOnboardingProvisioningEligible(detail, { portalReady: true });
+        return mapDetailToEligibleCandidate(detail);
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  return settled.filter((row): row is ProvisioningEligibleCandidate => Boolean(row));
 }

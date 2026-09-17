@@ -48,7 +48,10 @@ export default async function ManagerTeamMemberPage({ params }: ManagerTeamMembe
     redirect(MANAGER_ROUTES.teamMember(resolved));
   }
 
-  const data = await getManagerTeamPageData(teamListParamsSchema.parse({ page: 1, pageSize: 1 }));
+  const data = await getManagerTeamPageData(
+    teamListParamsSchema.parse({ page: 1, pageSize: 1 }),
+    { includeFormLookups: true },
+  );
 
   return (
     <Suspense
