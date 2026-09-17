@@ -55,7 +55,7 @@ const ACTIVITY_ICONS: Record<ManagerActivityKind, LucideIcon> = {
   interview_completed: BriefcaseBusiness,
 };
 
-const LIVE_POLL_MS = 30_000;
+const LIVE_POLL_MS = 60_000;
 const TIME_REFRESH_MS = 60_000;
 
 function urgencyClass(urgency: ManagerActionItem["urgency"]) {

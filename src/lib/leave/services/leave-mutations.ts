@@ -1629,10 +1629,15 @@ export async function cancelLeaveRequest(
   });
   if (previousStatus === "approved") {
     const duration = request.duration_breakdown as LeaveDurationBreakdown | null;
+    const runtime = await loadLeavePolicyRuntime(
+      supabase,
+      profile.employee.organizationId,
+    );
     await clearAttendanceForLeaveRequest(supabase, profile, {
       employeeId: request.employee_id,
       leaveRequestId,
       duration,
+      calendar: runtime.calendar,
     });
     await refreshDraftPayrollAfterLeaveChange(supabase, profile, request.employee_id);
   }
@@ -1652,24 +1657,39 @@ export async function deleteLeaveRequest(
     throw new Error("You are not authorized to delete this leave request");
   }
 
-  if (!hasHrDelete) {
-    const { data: request, error: requestError } = await supabase
-      .schema("hrms")
-      .from("leave_requests")
-      .select("id, employee_id, leave_status")
-      .eq("id", leaveRequestId)
-      .is("deleted_at", null)
-      .maybeSingle();
+  const { data: existing, error: existingError } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select("id, employee_id, leave_status, duration_breakdown")
+    .eq("id", leaveRequestId)
+    .is("deleted_at", null)
+    .maybeSingle();
 
-    if (requestError || !request) {
-      throw new Error(requestError?.message ?? "Leave request not found");
-    }
-    if (request.employee_id !== profile.employee.id) {
+  if (existingError || !existing) {
+    throw new Error(existingError?.message ?? "Leave request not found");
+  }
+
+  if (!hasHrDelete) {
+    if (existing.employee_id !== profile.employee.id) {
       throw new Error("You can only delete your own leave requests");
     }
-    if (request.leave_status !== "pending") {
+    if (existing.leave_status !== "pending") {
       throw new Error("You can only delete pending leave requests");
     }
+  }
+
+  if (existing.leave_status === "approved") {
+    const duration = existing.duration_breakdown as LeaveDurationBreakdown | null;
+    const runtime = await loadLeavePolicyRuntime(
+      supabase,
+      profile.employee.organizationId,
+    );
+    await clearAttendanceForLeaveRequest(supabase, profile, {
+      employeeId: existing.employee_id,
+      leaveRequestId,
+      duration,
+      calendar: runtime.calendar,
+    });
   }
 
   const { data, error } = await supabase.schema("hrms").rpc("soft_delete_leave_request", {
@@ -1678,6 +1698,10 @@ export async function deleteLeaveRequest(
 
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Leave request not found or already deleted.");
+
+  if (existing.leave_status === "approved") {
+    await refreshDraftPayrollAfterLeaveChange(supabase, profile, existing.employee_id);
+  }
 }
 
 export async function updateLeaveRequest(

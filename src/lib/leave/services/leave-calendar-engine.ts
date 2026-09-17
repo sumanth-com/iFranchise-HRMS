@@ -197,8 +197,9 @@ function isAbsenceWorkingClass(dayClass: LeaveDayClass): boolean {
 }
 
 /**
- * Weekly offs (and public holidays when enabled) sandwiched between leave days.
- * Delegates to the strict immediate-neighbour policy in leave-sandwich-policy.
+ * Weekly offs (and public holidays when enabled) sandwiched by adjacent leave.
+ * Weekly offs use one-sided adjacency; public holidays keep both-sides.
+ * Delegates to leave-sandwich-policy.
  */
 export function sandwichWeeklyOffDates(
   absenceWorkingDates: Iterable<string>,
@@ -316,7 +317,7 @@ export function calculateLeaveDuration(input: {
         inRequestedRange,
         note: isPublicHolidayDate(date, calendar)
           ? `${formatDayLabel(date)} is counted as a sandwich public holiday because leave was applied on both adjacent working days.`
-          : `${formatDayLabel(date)} is counted under the sandwich rule because leave was applied on both adjacent working days.`,
+          : `${formatDayLabel(date)} is counted under the sandwich rule because leave was applied on an adjacent working day.`,
       });
       continue;
     }

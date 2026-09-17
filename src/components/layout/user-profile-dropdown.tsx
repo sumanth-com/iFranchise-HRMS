@@ -61,21 +61,25 @@ export function UserProfileDropdown() {
     avatarRequestIdRef.current = requestId;
     let cancelled = false;
 
-    void (async () => {
-      const result = await getMyProfileImageUrlAction();
-      if (cancelled || requestId !== avatarRequestIdRef.current) return;
-      if (!result.success || !result.data) {
-        setAvatarUrl(null);
-        return;
-      }
+    // Defer avatar signing so shell + page data are not competing on first paint.
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const result = await getMyProfileImageUrlAction();
+        if (cancelled || requestId !== avatarRequestIdRef.current) return;
+        if (!result.success || !result.data) {
+          setAvatarUrl(null);
+          return;
+        }
 
-      const canDisplay = await canDisplayImageUrl(result.data);
-      if (cancelled || requestId !== avatarRequestIdRef.current) return;
-      setAvatarUrl(canDisplay ? result.data : null);
-    })();
+        const canDisplay = await canDisplayImageUrl(result.data);
+        if (cancelled || requestId !== avatarRequestIdRef.current) return;
+        setAvatarUrl(canDisplay ? result.data : null);
+      })();
+    }, 1200);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [profile.employee.id]);
 

@@ -474,17 +474,43 @@ export async function getPayrollSummary(
   let grossPayroll = currentPayroll ? Number(currentPayroll.total_gross) : 0;
   let totalDeductions = currentPayroll ? Number(currentPayroll.total_deductions) : 0;
   let netPayroll = currentPayroll ? Number(currentPayroll.total_net) : 0;
-  if (currentPayroll?.id) {
-    const { data: items, error: itemsError } = await supabase
+
+  const yearStart = getPayrollMonthDate(1, targetYear);
+  const yearEnd = getPayrollMonthDate(12, targetYear);
+
+  // Pending count + year overview are independent of item integrity; run in parallel.
+  const [itemsResult, pendingCountResult, yearPayrollsResult] = await Promise.all([
+    currentPayroll?.id
+      ? supabase
+          .schema("hrms")
+          .from("payroll_items")
+          .select(PAYROLL_ITEM_INTEGRITY_SELECT)
+          .eq("payroll_id", currentPayroll.id)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: null, error: null }),
+    supabase
       .schema("hrms")
-      .from("payroll_items")
-      .select(PAYROLL_ITEM_INTEGRITY_SELECT)
-      .eq("payroll_id", currentPayroll.id)
-      .is("deleted_at", null);
-    if (itemsError) throw new Error(itemsError.message);
+      .from("payrolls")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("payroll_status", ["draft", "processing", "processed"])
+      .is("deleted_at", null),
+    supabase
+      .schema("hrms")
+      .from("payrolls")
+      .select("payroll_month, payroll_status, total_gross, total_net")
+      .eq("organization_id", organizationId)
+      .gte("payroll_month", yearStart)
+      .lte("payroll_month", yearEnd)
+      .is("deleted_at", null)
+      .order("payroll_month", { ascending: true }),
+  ]);
+
+  if (currentPayroll?.id) {
+    if (itemsResult.error) throw new Error(itemsResult.error.message);
     const periodEnd = getMonthDateRange(targetMonth, targetYear).endDate;
     const report = evaluatePayrollIntegrity({
-      items: (items ?? []).map((item) => ({
+      items: (itemsResult.data ?? []).map((item) => ({
         employeeId: String(item.employee_id),
         grossSalary: Number(item.gross_salary ?? 0),
         totalDeductions: Number(item.total_deductions ?? 0),
@@ -504,27 +530,8 @@ export async function getPayrollSummary(
     netPayroll = report.totals.totalNet;
   }
 
-  const { count: pendingCount } = await supabase
-    .schema("hrms")
-    .from("payrolls")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .in("payroll_status", ["draft", "processing", "processed"])
-    .is("deleted_at", null);
-
-  const yearStart = getPayrollMonthDate(1, targetYear);
-  const yearEnd = getPayrollMonthDate(12, targetYear);
-
-  const { data: yearPayrolls } = await supabase
-    .schema("hrms")
-    .from("payrolls")
-    .select("payroll_month, payroll_status, total_gross, total_net")
-    .eq("organization_id", organizationId)
-    .gte("payroll_month", yearStart)
-    .lte("payroll_month", yearEnd)
-    .is("deleted_at", null)
-    .order("payroll_month", { ascending: true });
-
+  const pendingCount = pendingCountResult.count;
+  const yearPayrolls = yearPayrollsResult.data;
   const monthlyOverview = Array.from({ length: 12 }, (_, index) => {
     const m = index + 1;
     const monthDate = getPayrollMonthDate(m, targetYear);

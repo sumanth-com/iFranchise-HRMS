@@ -140,16 +140,26 @@ export async function loadUpcomingCelebrations(
   const windowEnd = format(addDays(todayDate, 7), "yyyy-MM-dd");
   const events: EmployeeUpcomingEvent[] = [];
 
-  const holidaysResult = await supabase
-    .schema("hrms")
-    .from("holidays")
-    .select("id, name, holiday_date, is_optional, holiday_type")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .gte("holiday_date", today)
-    .lte("holiday_date", windowEnd)
-    .order("holiday_date")
-    .limit(8);
+  // Holidays and employee roster are independent — fetch in parallel.
+  const [holidaysResult, employeesResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("holidays")
+      .select("id, name, holiday_date, is_optional, holiday_type")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .gte("holiday_date", today)
+      .lte("holiday_date", windowEnd)
+      .order("holiday_date")
+      .limit(8),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, employee_code, first_name, last_name, employment_status")
+      .eq("organization_id", organizationId)
+      .in("employment_status", [...ACTIVE_EMPLOYMENT])
+      .is("deleted_at", null),
+  ]);
 
   if (holidaysResult.error) {
     console.error("[celebrations] holidays query failed", holidaysResult.error.message);
@@ -178,14 +188,6 @@ export async function loadUpcomingCelebrations(
   // Birthdays: employees + profiles as separate queries so a join/RLS quirk
   // cannot drop the whole celebrations panel (or hide DOBs for executives).
   try {
-    const employeesResult = await supabase
-      .schema("hrms")
-      .from("employees")
-      .select("id, employee_code, first_name, last_name, employment_status")
-      .eq("organization_id", organizationId)
-      .in("employment_status", [...ACTIVE_EMPLOYMENT])
-      .is("deleted_at", null);
-
     if (employeesResult.error) throw new Error(employeesResult.error.message);
 
     const employees = employeesResult.data ?? [];

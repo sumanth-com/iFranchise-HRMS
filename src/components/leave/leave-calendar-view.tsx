@@ -265,26 +265,6 @@ export function LeaveCalendarView({
     return "bg-primary/5 ring-1 ring-inset ring-primary/20";
   }
 
-  const leavesByDate = useMemo(() => {
-    const map = new Map<string, LeaveCalendarEntry[]>();
-
-    leaves.forEach((leave) => {
-      const dates =
-        leave.dayAllocations && leave.dayAllocations.length > 0
-          ? leave.dayAllocations
-              .filter((item) => item.kind !== "none")
-              .map((item) => item.date)
-          : expandDateRange(leave.startDate, leave.endDate);
-      dates.forEach((date) => {
-        const existing = map.get(date) ?? [];
-        existing.push(leave);
-        map.set(date, existing);
-      });
-    });
-
-    return map;
-  }, [leaves]);
-
   const calendarWithHolidays = useMemo<LeaveCalendarContext>(
     () => ({
       ...calendar,
@@ -315,6 +295,40 @@ export function LeaveCalendarView({
     });
     return dates;
   }, [leaves, calendarWithHolidays]);
+
+  const leavesByDate = useMemo(() => {
+    const map = new Map<string, LeaveCalendarEntry[]>();
+
+    leaves.forEach((leave) => {
+      const pendingHrReview =
+        Boolean(leave.hrReviewRequired) &&
+        leave.leaveStatus === "pending" &&
+        !leave.hrDecision;
+
+      const dates =
+        leave.dayAllocations && leave.dayAllocations.length > 0
+          ? leave.dayAllocations
+              .filter((item) => {
+                // Pending HR review stores days as kind "none" until HR decides;
+                // still show those requested/counted days on the calendar.
+                if (item.kind !== "none") return true;
+                if (!pendingHrReview || !(item.counted > 0)) return false;
+                // Sandwich Sundays use the dedicated sandwich overlay chip.
+                return !sandwichDates.has(item.date);
+              })
+              .map((item) => item.date)
+          : expandDateRange(leave.startDate, leave.endDate).filter(
+              (date) => !sandwichDates.has(date),
+            );
+      dates.forEach((date) => {
+        const existing = map.get(date) ?? [];
+        existing.push(leave);
+        map.set(date, existing);
+      });
+    });
+
+    return map;
+  }, [leaves, sandwichDates]);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM");
 

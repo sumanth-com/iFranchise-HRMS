@@ -814,17 +814,18 @@ export async function getAssetDetail(
 
   const asset = mapAsset(row as AssetRow);
 
-  const assignments = await listAssignments(supabase, profile, {
-    page: 1,
-    pageSize: 50,
-    assetId,
-  });
-
-  const maintenance = await listMaintenance(supabase, profile, {
-    page: 1,
-    pageSize: 20,
-    assetId,
-  });
+  const [assignments, maintenance] = await Promise.all([
+    listAssignments(supabase, profile, {
+      page: 1,
+      pageSize: 50,
+      assetId,
+    }),
+    listMaintenance(supabase, profile, {
+      page: 1,
+      pageSize: 20,
+      assetId,
+    }),
+  ]);
 
   return {
     asset,

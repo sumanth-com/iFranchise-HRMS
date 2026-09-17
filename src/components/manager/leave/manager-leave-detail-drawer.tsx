@@ -2,7 +2,7 @@
 
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
@@ -68,15 +68,24 @@ export function ManagerLeaveDetailDrawer({
   );
   const [isLoading, startLoading] = useTransition();
   const [isPending, startAction] = useTransition();
+  const detailCacheRef = useRef(new Map<string, TeamLeaveDetailBundle>());
 
   useEffect(() => {
     if (!open || !leaveRequestId) return;
-    setDetail(null);
     setApprovalNotes("");
     setInfoMessage("");
     setActionMode(null);
+
+    const cached = detailCacheRef.current.get(leaveRequestId);
+    if (cached) {
+      setDetail(cached);
+      return;
+    }
+
+    setDetail(null);
     startLoading(async () => {
       const bundle = await fetchTeamLeaveDetailAction(leaveRequestId);
+      if (bundle) detailCacheRef.current.set(leaveRequestId, bundle);
       setDetail(bundle);
     });
   }, [open, leaveRequestId]);
@@ -97,6 +106,7 @@ export function ManagerLeaveDetailDrawer({
       setApprovalNotes("");
       onActionComplete?.();
       const refreshed = await fetchTeamLeaveDetailAction(detail.id);
+      if (refreshed) detailCacheRef.current.set(detail.id, refreshed);
       setDetail(refreshed);
     });
   }
@@ -120,6 +130,7 @@ export function ManagerLeaveDetailDrawer({
       setApprovalNotes("");
       onActionComplete?.();
       const refreshed = await fetchTeamLeaveDetailAction(detail.id);
+      if (refreshed) detailCacheRef.current.set(detail.id, refreshed);
       setDetail(refreshed);
     });
   }
@@ -143,6 +154,7 @@ export function ManagerLeaveDetailDrawer({
       setInfoMessage("");
       onActionComplete?.();
       const refreshed = await fetchTeamLeaveDetailAction(detail.id);
+      if (refreshed) detailCacheRef.current.set(detail.id, refreshed);
       setDetail(refreshed);
     });
   }

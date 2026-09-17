@@ -374,7 +374,11 @@ export function computeExcelPaidWorkingDays(
   leave: LeaveMonthSummary,
 ): number {
   const paidLeaveDays =
-    leave.paidLeaveDays > 0 ? leave.paidLeaveDays : attendance.onLeaveDays;
+    leave.paidLeaveDays > 0
+      ? leave.paidLeaveDays
+      : leave.lopDays > 0
+        ? 0
+        : attendance.onLeaveDays;
   return roundCurrency(
     attendance.presentDays +
       attendance.halfDays * 0.5 +

@@ -74,10 +74,11 @@ describe("sandwich leave", () => {
     assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("does not sandwich Sunday from Monday-only leave", () => {
+  it("sandwiches the preceding Sunday from Monday-only leave", () => {
     const result = duration("2026-09-14", "2026-09-14");
-    assert.equal(result.sandwichDays, 0);
-    assert.equal(result.totalLeaveDays, 1);
+    assert.equal(result.sandwichDays, 1);
+    assert.ok(result.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
+    assert.equal(result.totalLeaveDays, 2);
   });
 
   it("sandwiches Sunday when Friday through Monday includes both adjacent working days", () => {
@@ -95,11 +96,12 @@ describe("sandwich leave", () => {
     assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("treats 4th Saturday leave as a full working day without one-sided Sunday sandwich", () => {
+  it("sandwiches the following Sunday from Saturday-only leave", () => {
     const result = duration("2026-09-26", "2026-09-26");
     assert.equal(result.workingDays, 1);
-    assert.equal(result.sandwichDays, 0);
-    assert.equal(result.totalLeaveDays, 1);
+    assert.equal(result.sandwichDays, 1);
+    assert.ok(result.days.some((day) => day.date === "2026-09-27" && day.kind === "sandwich"));
+    assert.equal(result.totalLeaveDays, 2);
   });
 
   it("sandwiches Sunday when Saturday and Monday are both absent", () => {
@@ -127,11 +129,12 @@ describe("sandwich leave", () => {
     assert.equal(result.totalLeaveDays, 4);
   });
 
-  it("does not sandwich Sunday when only the Saturday half-day is taken", () => {
-    const result = duration("2026-09-12", "2026-09-13");
+  it("sandwiches Sunday when Saturday half-day leave is taken", () => {
+    const result = duration("2026-09-12", "2026-09-12");
     assert.equal(result.workingDays, 1);
-    assert.equal(result.sandwichDays, 0);
-    assert.equal(result.totalLeaveDays, 1);
+    assert.equal(result.sandwichDays, 1);
+    assert.ok(result.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
+    assert.equal(result.totalLeaveDays, 2);
   });
 
   it("never sandwiches an official public holiday", () => {
@@ -143,13 +146,14 @@ describe("sandwich leave", () => {
     assert.equal(result.sandwichDays, 0);
   });
 
-  it("does not count an official holiday between two absences as sandwich LOP", () => {
+  it("sandwiches an official holiday between two absences and the Sunday before Monday leave", () => {
     const result = duration("2026-08-24", "2026-08-27", ["2026-08-25"]);
     assert.equal(
       result.days.some((day) => day.date === "2026-08-25" && day.kind === "sandwich"),
       true,
     );
-    assert.equal(result.sandwichDays, 1);
+    assert.ok(result.days.some((day) => day.date === "2026-08-23" && day.kind === "sandwich"));
+    assert.equal(result.sandwichDays, 2);
   });
 
   it("sandwiches Sunday in a continuous Fri–Mon absence while keeping the official Saturday holiday uncounted as requested leave", () => {

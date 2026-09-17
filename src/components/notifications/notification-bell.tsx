@@ -101,8 +101,9 @@ export function NotificationBell() {
 
   usePollWhenVisible(() => void refresh(), POLL_INTERVAL_MS, { skipInitial: true });
 
+  // Open instantly with polled data; do not force a network round-trip on every open.
   useEffect(() => {
-    if (open) void refresh();
+    if (open && !initializedRef.current) void refresh();
   }, [open, refresh]);
 
   useEffect(() => {

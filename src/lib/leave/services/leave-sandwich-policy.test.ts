@@ -91,6 +91,66 @@ describe("official sandwich leave policy", () => {
     assert.equal(duration.totalLeaveDays, 1);
   });
 
+  it("TEST 4b: Saturday-only leave sandwiches the following Sunday as LOP", () => {
+    const duration = calculateLeaveDuration({
+      startDate: "2026-09-26",
+      endDate: "2026-09-26",
+      isHalfDay: false,
+      calendar: calendar(),
+    });
+    assert.equal(duration.sandwichDays, 1);
+    assert.ok(duration.days.some((day) => day.date === "2026-09-27" && day.kind === "sandwich"));
+    assert.equal(duration.totalLeaveDays, 2);
+
+    const allocations = allocateLeaveDaysByBalance(duration, 2, {
+      calendar: calendar(),
+      isPaidLeaveType: true,
+    });
+    const split = splitLeaveDaysFromAllocations(allocations, true);
+    assert.equal(split.paidDays, 1);
+    assert.equal(split.lopDays, 1);
+    assert.equal(
+      allocations.filter((day) => day.date === "2026-09-27" && day.kind === "lop").length,
+      1,
+    );
+  });
+
+  it("TEST 4c: Monday-only leave sandwiches the preceding Sunday as LOP", () => {
+    const duration = calculateLeaveDuration({
+      startDate: "2026-09-14",
+      endDate: "2026-09-14",
+      isHalfDay: false,
+      calendar: calendar(),
+    });
+    assert.equal(duration.sandwichDays, 1);
+    assert.ok(duration.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
+    assert.equal(duration.totalLeaveDays, 2);
+
+    const allocations = allocateLeaveDaysByBalance(duration, 2, {
+      calendar: calendar(),
+      isPaidLeaveType: true,
+    });
+    const split = splitLeaveDaysFromAllocations(allocations, true);
+    assert.equal(split.paidDays, 1);
+    assert.equal(split.lopDays, 1);
+    assert.equal(
+      allocations.filter((day) => day.date === "2026-09-13" && day.kind === "lop").length,
+      1,
+    );
+  });
+
+  it("TEST 4d: normal Sunday with no adjacent leave is not sandwiched", () => {
+    const sandwiched = sandwichedInterveningDates(
+      new Set(["2026-09-16"]),
+      "2026-09-16",
+      "2026-09-16",
+      calendar(),
+    );
+    assert.equal(sandwiched.has("2026-09-13"), false);
+    assert.equal(sandwiched.has("2026-09-20"), false);
+    assert.equal(sandwiched.size, 0);
+  });
+
   it("TEST 5: leave before and after a configured public holiday sandwiches the holiday", () => {
     const cal = calendar(["2026-09-16"]);
     const requested = ["2026-09-15", "2026-09-16", "2026-09-17"];

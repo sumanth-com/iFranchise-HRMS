@@ -181,6 +181,7 @@ async function listHrReviewRequestIds(
   organizationId: string,
   employeeIds?: string[],
 ): Promise<HrReviewIdBuckets> {
+  // Only rows flagged for HR review — avoids downloading every leave request.
   let query = supabase
     .schema("hrms")
     .from("leave_requests")
@@ -189,6 +190,7 @@ async function listHrReviewRequestIds(
     )
     .in("leave_status", ["pending", "approved", "rejected"])
     .eq("employees.organization_id", organizationId)
+    .eq("duration_breakdown->>hrReviewRequired", "true")
     .is("deleted_at", null);
 
   if (employeeIds && employeeIds.length > 0) {

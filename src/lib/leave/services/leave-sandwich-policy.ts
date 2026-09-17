@@ -16,24 +16,6 @@ function isScheduleWorkingClass(dayClass: string): boolean {
   return dayClass === "working" || dayClass === "half_day";
 }
 
-function nearestAbsenceLeaveDate(
-  fromDate: string,
-  direction: 1 | -1,
-  absenceLeaveDates: Set<string>,
-  spanStart: string,
-  spanEnd: string,
-): string | null {
-  let cursor = addDays(parseISO(fromDate), direction);
-  const start = parseISO(spanStart);
-  const end = parseISO(spanEnd);
-  while (cursor >= start && cursor <= end) {
-    const iso = format(cursor, "yyyy-MM-dd");
-    if (absenceLeaveDates.has(iso)) return iso;
-    cursor = addDays(cursor, direction);
-  }
-  return null;
-}
-
 /** Next Mon–Sat schedule working/half day (skips weekly offs and declared holidays). */
 export function nextScheduleWorkingDate(
   date: string,
@@ -128,8 +110,15 @@ export function isSandwichInterveningDay(
 }
 
 /**
- * Strict sandwich rule: a weekly off or public holiday is sandwiched only when
- * approved leave exists on the schedule-working days immediately before AND after it.
+ * Weekly-off sandwich: a weekly off becomes sandwich leave/LOP when approved leave
+ * exists on the schedule-working day immediately before OR after it.
+ * Examples with Sunday weekly off:
+ * - Leave on Saturday → following Sunday is sandwich
+ * - Leave on Monday → preceding Sunday is sandwich
+ * - Leave on Saturday and Monday → Sunday is sandwich
+ *
+ * Public holidays keep the strict both-adjacent-working-days rule and are never
+ * converted to LOP solely by one-sided leave.
  */
 export function sandwichedInterveningDates(
   absenceLeaveDates: Set<string>,
@@ -142,9 +131,21 @@ export function sandwichedInterveningDates(
     return sandwiched;
   }
 
+  // Expand the scan window so Sat-only / Mon-only leave still sees the adjacent Sunday.
+  let scanStart = spanStart;
+  let scanEnd = spanEnd;
+  for (const leaveDate of absenceLeaveDates) {
+    for (const delta of [-1, 1] as const) {
+      const neighbor = format(addDays(parseISO(leaveDate), delta), "yyyy-MM-dd");
+      if (!isSandwichInterveningDay(neighbor, calendar)) continue;
+      if (neighbor < scanStart) scanStart = neighbor;
+      if (neighbor > scanEnd) scanEnd = neighbor;
+    }
+  }
+
   for (const day of eachDayOfInterval({
-    start: parseISO(spanStart),
-    end: parseISO(spanEnd),
+    start: parseISO(scanStart),
+    end: parseISO(scanEnd),
   })) {
     const iso = format(day, "yyyy-MM-dd");
     if (!isSandwichInterveningDay(iso, calendar)) continue;
@@ -153,21 +154,25 @@ export function sandwichedInterveningDates(
     const isWeeklyOff = schedule === "weekly_off" && calendar.sandwich.includeWeekends;
     const isHoliday = isPublicHolidayDate(iso, calendar) && calendar.sandwich.includeHolidays;
 
-    let before: string | null = null;
-    let after: string | null = null;
-
     if (isWeeklyOff) {
-      before = nearestAbsenceLeaveDate(iso, -1, absenceLeaveDates, spanStart, spanEnd);
-      after = nearestAbsenceLeaveDate(iso, 1, absenceLeaveDates, spanStart, spanEnd);
-    } else if (isHoliday) {
-      before = previousScheduleWorkingDate(iso, calendar);
-      after = nextScheduleWorkingDate(iso, calendar);
-      if (before && !absenceLeaveDates.has(before)) before = null;
-      if (after && !absenceLeaveDates.has(after)) after = null;
+      const before = previousScheduleWorkingDate(iso, calendar);
+      const after = nextScheduleWorkingDate(iso, calendar);
+      const beforeHit = Boolean(before && absenceLeaveDates.has(before));
+      const afterHit = Boolean(after && absenceLeaveDates.has(after));
+      if (beforeHit || afterHit) {
+        sandwiched.add(iso);
+      }
+      continue;
     }
 
-    if (before && after) {
-      sandwiched.add(iso);
+    if (isHoliday) {
+      let before = previousScheduleWorkingDate(iso, calendar);
+      let after = nextScheduleWorkingDate(iso, calendar);
+      if (before && !absenceLeaveDates.has(before)) before = null;
+      if (after && !absenceLeaveDates.has(after)) after = null;
+      if (before && after) {
+        sandwiched.add(iso);
+      }
     }
   }
 
@@ -190,9 +195,20 @@ export function unpaidAbsenceWeeklyOffDates(
     return unpaidWeeklyOffs;
   }
 
+  let scanStart = spanStart;
+  let scanEnd = spanEnd;
+  for (const leaveDate of occupiedAbsenceDates) {
+    for (const delta of [-1, 1] as const) {
+      const neighbor = format(addDays(parseISO(leaveDate), delta), "yyyy-MM-dd");
+      if (classifyScheduleDay(neighbor, calendar) !== "weekly_off") continue;
+      if (neighbor < scanStart) scanStart = neighbor;
+      if (neighbor > scanEnd) scanEnd = neighbor;
+    }
+  }
+
   for (const day of eachDayOfInterval({
-    start: parseISO(spanStart),
-    end: parseISO(spanEnd),
+    start: parseISO(scanStart),
+    end: parseISO(scanEnd),
   })) {
     const iso = format(day, "yyyy-MM-dd");
     if (classifyScheduleDay(iso, calendar) !== "weekly_off") continue;
