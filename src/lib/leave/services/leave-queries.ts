@@ -28,7 +28,7 @@ import {
 import { applyLeavePolicyToBalanceSnapshot } from "@/lib/leave/leave-entitlement";
 import { isLeaveTypeAllowedForBand, resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
-import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode } from "@/lib/leave/services/leave-monthly-accrual";
+import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode, MONTHLY_ACCRUAL_DAYS_PER_MONTH } from "@/lib/leave/services/leave-monthly-accrual";
 import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
 import { DEFAULT_LEAVE_PROBATION_RULES, allocateLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
 import {
@@ -1018,10 +1018,12 @@ export async function getEmployeeLeaveBalanceSnapshot(
   monthYear?: { month: number; year: number },
   organizationIdHint?: string,
 ): Promise<LeaveEmployeeBalanceSnapshot[]> {
-  const now = new Date();
-  const calendarYear = monthYear?.year ?? balanceYearParam;
+  const todayIst = getTodayDateString();
+  const [todayYear, todayMonth] = todayIst.slice(0, 10).split("-").map(Number);
+  const calendarYear = monthYear?.year ?? todayYear;
   const balanceYear = balanceYearParam;
-  const month = monthYear?.month ?? now.getMonth() + 1;
+  // Always use Asia/Kolkata month — never the server's local clock.
+  const month = monthYear?.month ?? todayMonth;
   const monthRange = getMonthDateRange(month, calendarYear);
   const yearRange = { start: `${calendarYear}-01-01`, end: `${calendarYear}-12-31` };
 
@@ -1242,7 +1244,10 @@ export async function getEmployeeLeaveBalanceSnapshot(
       pendingDays: roundLeaveDays(pendingDays),
       balanceDays: roundLeaveDays(balanceDays),
       monthUsedDays: roundLeaveDays(monthUsedByCode[code] ?? 0),
-      monthTotalDays: roundLeaveDays(allocatedDays),
+      // Monthly-accrual types restart each calendar month at +1 day credit.
+      monthTotalDays: isMonthlyAccrualLeaveCode(code)
+        ? MONTHLY_ACCRUAL_DAYS_PER_MONTH
+        : roundLeaveDays(allocatedDays),
       yearTakenDays: roundLeaveDays(yearTakenByCode[code] ?? 0),
     };
   });
@@ -1272,7 +1277,8 @@ export async function getEmployeeLeaveBalanceSnapshot(
     }
   }
 
-  const asOfDate = monthRange.end;
+  const asOfDate =
+    month === todayMonth && calendarYear === todayYear ? todayIst : monthRange.end;
   const policyAdjusted = snapshots.map((row) =>
     applyLeavePolicyToBalanceSnapshot(row, {
       joiningDate: employeeJoiningDate,

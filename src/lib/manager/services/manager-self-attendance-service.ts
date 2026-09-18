@@ -3,6 +3,7 @@ import {
   completedWorkHoursFromPunches,
   completedWorkingSecondsFromPunches,
   elapsedWorkingSeconds,
+  formatLiveWorkingDuration,
   formatWorkingDuration,
 } from "@/lib/employee/attendance-format";
 import {
@@ -252,12 +253,21 @@ function buildTodayPanel(
       priorWorkSeconds: storedPrior,
     },
   );
+  // Open session: wall-clock from check-in → now (+ prior sessions). Checked out: punch total.
+  const workingSeconds = elapsedWorkingSeconds(
+    checkInAt,
+    checkOutAt,
+    new Date(),
+    checkOutAt ? priorCompletedSeconds : storedPrior,
+  );
   const workHours = checkOutAt
     ? completedWorkHoursFromPunches(checkInAt, checkOutAt, {
         storedWorkHours: row ? Number(row.work_hours ?? 0) : 0,
         priorWorkSeconds: storedPrior,
       })
-    : Number(row?.work_hours ?? 0);
+    : checkInAt
+      ? Math.round((workingSeconds / 3600) * 100) / 100
+      : Number(row?.work_hours ?? 0);
   const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
   const overtimeHours = row
     ? Number(row.overtime_hours ?? 0)
@@ -278,13 +288,6 @@ function buildTodayPanel(
     notes: row?.notes,
   });
 
-  const workingSeconds = elapsedWorkingSeconds(
-    checkInAt,
-    checkOutAt,
-    new Date(),
-    checkOutAt ? priorCompletedSeconds : storedPrior,
-  );
-
   return {
     attendanceId: row?.id ?? null,
     attendanceDate,
@@ -298,7 +301,9 @@ function buildTodayPanel(
     lateMinutes,
     isLocked: false,
     lockMessage: null,
-    workingDurationLabel: formatWorkingDuration(workingSeconds),
+    workingDurationLabel: checkInAt && !checkOutAt
+      ? formatLiveWorkingDuration(workingSeconds)
+      : formatWorkingDuration(workingSeconds),
     hasCheckInLocation: locationFlags.hasCheckInLocation,
     hasCheckOutLocation: locationFlags.hasCheckOutLocation,
   };

@@ -75,10 +75,15 @@ async function loadLeaveKpis(
   supabase: AuthSupabaseClient,
   employeeId: string,
 ): Promise<{ totalBalanceDays: number; pendingCount: number }> {
-  const balanceYear = getCurrentBalanceYear();
+  const today = getTodayDateString();
+  const balanceYear = getCurrentBalanceYear(today);
+  const [todayYear, todayMonth] = today.slice(0, 10).split("-").map(Number);
 
   const [snapshots, pendingResult] = await Promise.all([
-    getEmployeeLeaveBalanceSnapshot(supabase, employeeId, balanceYear),
+    getEmployeeLeaveBalanceSnapshot(supabase, employeeId, balanceYear, {
+      month: todayMonth,
+      year: todayYear,
+    }),
     supabase
       .schema("hrms")
       .from("leave_requests")
@@ -90,6 +95,7 @@ async function loadLeaveKpis(
 
   if (pendingResult.error) throw new Error(pendingResult.error.message);
 
+  // Available CL + EL after this month's accrual and policy adjustments.
   const totalBalanceDays = snapshots.reduce((sum, row) => {
     if (!DASHBOARD_LEAVE_BALANCE_CODES.has(row.leaveTypeCode)) return sum;
     return sum + Math.max(0, Number(row.balanceDays ?? 0));
