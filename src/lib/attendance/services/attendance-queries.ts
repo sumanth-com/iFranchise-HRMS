@@ -10,11 +10,9 @@ import type {
 } from "@/types/attendance";
 import { attendanceListParamsSchema } from "@/lib/validations/attendance";
 import {
-  computeLateMinutes,
   computeWorkHours,
   getTodayDateString,
   isAfterOfficeCheckoutTime,
-  OFFICE_LATE_AFTER_TIME,
 } from "@/lib/attendance/services/attendance-utils";
 import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
@@ -306,24 +304,14 @@ async function loadAttendanceRoster(
             : computeWorkHours(checkInAt, checkOutAt)
           : Number(att?.work_hours ?? 0);
 
+      // Prefer the stored row status so HR manual Present/Absent/On Leave sticks.
+      // Punch flows already write present/late/absent; re-deriving from punches
+      // (e.g. <15m work → absent) was snapping HR overrides back after refresh.
       let status: AttendanceDisplayStatus;
-      if (checkInAt) {
-        const lateMinutes = computeLateMinutes(
-          checkInAt,
-          rosterDate,
-          OFFICE_LATE_AFTER_TIME,
-        );
-        if (checkOutAt && punchedWorkHours < 0.25) {
-          status = "absent";
-        } else if (lateMinutes > 0) {
-          status = "late";
-        } else {
-          status = (att?.attendance_status as AttendanceStatus) || "present";
-        }
+      if (att?.attendance_status) {
+        status = att.attendance_status as AttendanceStatus;
       } else if (hasApprovedLeave) {
         status = "on_leave";
-      } else if (att?.attendance_status) {
-        status = att.attendance_status as AttendanceStatus;
       } else if (!isSingleDay) {
         status = "upcoming";
       } else if (rosterDate === todayStr) {

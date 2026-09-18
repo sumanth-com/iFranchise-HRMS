@@ -240,23 +240,37 @@ async function getActiveAttendanceForEmployeeDate(
   return data as ExistingAttendanceRow | null;
 }
 
+/** Same threshold as punch finalize: under 15 minutes is treated as not present. */
+const NEGLIGIBLE_WORK_HOURS = 0.25;
+
 function punchFieldsForManualStatus(
   status: ManualAttendanceStatus,
   attendanceDate: string,
   existing: ExistingAttendanceRow | null,
 ) {
   if (status === "present") {
-    const checkInAt =
-      existing?.check_in_at ?? combineDateAndTime(attendanceDate, OFFICE_CHECK_IN_TIME);
-    const checkOutAt =
-      existing?.check_out_at ?? combineDateAndTime(attendanceDate, OFFICE_CHECK_OUT_TIME);
-    const workHours = existing?.check_in_at && existing?.check_out_at
-      ? Number(existing.work_hours ?? computeWorkHours(checkInAt, checkOutAt))
-      : computeWorkHours(checkInAt, checkOutAt);
+    const existingIn = existing?.check_in_at ?? null;
+    const existingOut = existing?.check_out_at ?? null;
+    const existingHours =
+      existingIn && existingOut
+        ? Number(existing?.work_hours) > 0
+          ? Number(existing?.work_hours)
+          : computeWorkHours(existingIn, existingOut)
+        : 0;
+    // Keep real day punches; replace accidental short in/out so Present stays Present.
+    const useOfficeDay =
+      !existingIn || (Boolean(existingOut) && existingHours < NEGLIGIBLE_WORK_HOURS);
+
+    const checkInAt = useOfficeDay
+      ? combineDateAndTime(attendanceDate, OFFICE_CHECK_IN_TIME)
+      : existingIn!;
+    const checkOutAt = useOfficeDay
+      ? combineDateAndTime(attendanceDate, OFFICE_CHECK_OUT_TIME)
+      : (existingOut ?? combineDateAndTime(attendanceDate, OFFICE_CHECK_OUT_TIME));
     return {
       check_in_at: checkInAt,
       check_out_at: checkOutAt,
-      work_hours: workHours,
+      work_hours: computeWorkHours(checkInAt, checkOutAt),
       overtime_hours: Number(existing?.overtime_hours ?? 0),
     };
   }

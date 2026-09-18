@@ -955,8 +955,15 @@ export function AttendanceTable({
           if (!open) setManualTarget(null);
         }}
         onSaved={(next) => {
-          setRows((current) =>
-            current.map((row) =>
+          const statusFilter = attendanceStatus?.trim() || null;
+          const droppedByFilter =
+            Boolean(statusFilter) && statusFilter !== next.attendanceStatus;
+
+          setRows((current) => {
+            if (droppedByFilter) {
+              return current.filter((row) => row.id !== next.previousId);
+            }
+            return current.map((row) =>
               row.id === next.previousId
                 ? {
                     ...row,
@@ -967,8 +974,11 @@ export function AttendanceTable({
                     workHours: next.workHours,
                   }
                 : row,
-            ),
-          );
+            );
+          });
+          if (droppedByFilter) {
+            setRowTotal((current) => Math.max(0, current - 1));
+          }
           router.refresh();
         }}
       />
