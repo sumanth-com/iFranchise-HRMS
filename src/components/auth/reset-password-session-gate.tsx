@@ -53,9 +53,22 @@ function hasInviteOrRecoveryMaterial(searchParams: URLSearchParams): {
   };
 }
 
+function sessionMatchesExpected(
+  email: string | null | undefined,
+  expectedEmail: string,
+): boolean {
+  if (!expectedEmail) return true;
+  const sessionEmail = normalizeEmail(email);
+  if (!sessionEmail) return true;
+  return sessionEmail === expectedEmail;
+}
+
 /**
  * Ensures the reset/activate page is bound to the invite/recovery session —
  * never an unrelated browser session that would update the wrong password.
+ *
+ * Remount-safe for one-time codes: if exchange fails because the code was
+ * already consumed, keep a matching recovery/invite session instead of clearing it.
  */
 export function ResetPasswordSessionGate({
   children,
@@ -75,6 +88,32 @@ export function ResetPasswordSessionGate({
     let cancelled = false;
     const expectedEmail = normalizeEmail(searchParams.get("email"));
 
+    async function finishReady() {
+      if (!cancelled) setStatus("ready");
+    }
+
+    async function finishInvalid() {
+      if (!cancelled) {
+        setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
+        setStatus("error");
+      }
+    }
+
+    async function acceptIfMatchingSession(
+      supabase: ReturnType<typeof createClient>,
+    ): Promise<boolean> {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return false;
+      if (!sessionMatchesExpected(user.email, expectedEmail)) {
+        await supabase.auth.signOut({ scope: "local" });
+        return false;
+      }
+      await finishReady();
+      return true;
+    }
+
     async function establishSession() {
       const supabase = createClient();
       const material = hasInviteOrRecoveryMaterial(searchParams);
@@ -88,9 +127,13 @@ export function ResetPasswordSessionGate({
         data: { user: existingUser },
       } = await supabase.auth.getUser();
 
-      // Invite/recovery links must always be consumed. An existing HR/admin
-      // (or stale) session must not short-circuit and steal the password update.
-      if (hasLinkMaterial && existingUser) {
+      // Clear only an unrelated session (e.g. HR still logged in). Keep a
+      // matching recovery/invite session so remounts can retry used OTPs safely.
+      if (
+        hasLinkMaterial &&
+        existingUser &&
+        !sessionMatchesExpected(existingUser.email, expectedEmail)
+      ) {
         await supabase.auth.signOut({ scope: "local" });
       }
 
@@ -106,54 +149,16 @@ export function ResetPasswordSessionGate({
           `${window.location.pathname}${window.location.search}`,
         );
 
-        if (!error) {
-          const {
-            data: { user: sessionUser },
-          } = await supabase.auth.getUser();
-          if (sessionUser) {
-            if (
-              expectedEmail &&
-              normalizeEmail(sessionUser.email) &&
-              normalizeEmail(sessionUser.email) !== expectedEmail
-            ) {
-              await supabase.auth.signOut({ scope: "local" });
-              if (!cancelled) {
-                setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
-                setStatus("error");
-              }
-              return;
-            }
-            if (!cancelled) setStatus("ready");
-            return;
-          }
-        }
+        if (!error && (await acceptIfMatchingSession(supabase))) return;
       }
 
       if (material.code) {
         const { error } = await supabase.auth.exchangeCodeForSession(material.code);
         cleanUrl(window.location.pathname, new URLSearchParams(window.location.search));
 
-        if (!error) {
-          const {
-            data: { user: sessionUser },
-          } = await supabase.auth.getUser();
-          if (sessionUser) {
-            if (
-              expectedEmail &&
-              normalizeEmail(sessionUser.email) &&
-              normalizeEmail(sessionUser.email) !== expectedEmail
-            ) {
-              await supabase.auth.signOut({ scope: "local" });
-              if (!cancelled) {
-                setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
-                setStatus("error");
-              }
-              return;
-            }
-            if (!cancelled) setStatus("ready");
-            return;
-          }
-        }
+        if (!error && (await acceptIfMatchingSession(supabase))) return;
+        // Already-used code on remount: matching session from the first mount is enough.
+        if (error && (await acceptIfMatchingSession(supabase))) return;
       }
 
       if (material.tokenHash && material.type) {
@@ -163,73 +168,20 @@ export function ResetPasswordSessionGate({
         });
         cleanUrl(window.location.pathname, new URLSearchParams(window.location.search));
 
-        if (!error) {
-          const {
-            data: { user: sessionUser },
-          } = await supabase.auth.getUser();
-          if (sessionUser) {
-            if (
-              expectedEmail &&
-              normalizeEmail(sessionUser.email) &&
-              normalizeEmail(sessionUser.email) !== expectedEmail
-            ) {
-              await supabase.auth.signOut({ scope: "local" });
-              if (!cancelled) {
-                setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
-                setStatus("error");
-              }
-              return;
-            }
-            if (!cancelled) setStatus("ready");
-            return;
-          }
-        }
+        if (!error && (await acceptIfMatchingSession(supabase))) return;
+        if (error && (await acceptIfMatchingSession(supabase))) return;
       }
 
       // No link material: allow an already-authenticated recovery session
       // (e.g. redirected from /auth/callback with cookies already set).
       if (!hasLinkMaterial && existingUser) {
-        if (
-          expectedEmail &&
-          normalizeEmail(existingUser.email) &&
-          normalizeEmail(existingUser.email) !== expectedEmail
-        ) {
-          await supabase.auth.signOut({ scope: "local" });
-          if (!cancelled) {
-            setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
-            setStatus("error");
-          }
-          return;
-        }
-        if (!cancelled) setStatus("ready");
+        if (await acceptIfMatchingSession(supabase)) return;
+        await finishInvalid();
         return;
       }
 
-      // Re-check after exchanges in case callback already planted cookies.
-      const {
-        data: { user: finalUser },
-      } = await supabase.auth.getUser();
-      if (finalUser) {
-        if (
-          expectedEmail &&
-          normalizeEmail(finalUser.email) &&
-          normalizeEmail(finalUser.email) !== expectedEmail
-        ) {
-          await supabase.auth.signOut({ scope: "local" });
-          if (!cancelled) {
-            setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
-            setStatus("error");
-          }
-          return;
-        }
-        if (!cancelled) setStatus("ready");
-        return;
-      }
-
-      if (!cancelled) {
-        setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
-        setStatus("error");
-      }
+      if (await acceptIfMatchingSession(supabase)) return;
+      await finishInvalid();
     }
 
     void establishSession();

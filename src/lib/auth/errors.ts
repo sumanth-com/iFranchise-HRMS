@@ -195,6 +195,27 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
   }
 
   if (
+    normalized.includes("otp_expired") ||
+    normalized.includes("otp expired") ||
+    normalized.includes("token has expired") ||
+    normalized.includes("token is expired") ||
+    normalized.includes("expired token") ||
+    normalized.includes("invalid token") ||
+    normalized.includes("token not found") ||
+    normalized.includes("flow state") ||
+    normalized.includes("flow_state") ||
+    normalized.includes("pkce") ||
+    normalized.includes("auth code") ||
+    normalized.includes("authorization code") ||
+    normalized.includes("already been used") ||
+    normalized.includes("one-time token") ||
+    normalized.includes("email link is invalid") ||
+    normalized.includes("email link is expired")
+  ) {
+    return "RESET_LINK_INVALID";
+  }
+
+  if (
     normalized.includes("api key") ||
     normalized.includes("invalid jwt") ||
     normalized.includes("bad_jwt")
@@ -212,4 +233,16 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
 
   // Prefer a soft network-facing outcome over a technical "unexpected" code.
   return "NETWORK_ERROR";
+}
+
+/** True when Auth rejected a password because it matches the current one. */
+export function isSamePasswordAuthError(message: string): boolean {
+  const normalized = message.toLowerCase().trim();
+  return (
+    normalized.includes("different from the old password") ||
+    normalized.includes("should be different from the old") ||
+    normalized.includes("same as the old password") ||
+    normalized.includes("same password") ||
+    normalized.includes("password is unchanged")
+  );
 }

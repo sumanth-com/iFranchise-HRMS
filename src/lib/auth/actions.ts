@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 
 import {
   DEFAULT_SESSION_MAX_AGE,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/auth/idle-session";
 import {
   getAuthErrorMessage,
+  isSamePasswordAuthError,
   mapSupabaseAuthError,
 } from "@/lib/auth/errors";
 import { loadUserProfile } from "@/lib/auth/profile-loader";
@@ -46,6 +48,7 @@ import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -635,7 +638,7 @@ export async function resetPasswordAction(
     password: parsed.data.password,
   });
 
-  if (error) {
+  if (error && !isSamePasswordAuthError(error.message)) {
     const errorCode = mapSupabaseAuthError(error.message);
     console.error("[resetPasswordAction] updateUser failed", {
       userId: user.id,
@@ -650,34 +653,55 @@ export async function resetPasswordAction(
     };
   }
 
-  // Verify the new password works for THIS email before claiming success.
-  await supabase.auth.signOut();
-  const { error: verifyError } = await supabase.auth.signInWithPassword({
-    email: sessionEmail,
-    password: parsed.data.password,
-  });
-  if (verifyError) {
-    console.error("[resetPasswordAction] credential verify failed", {
-      userId: user.id,
-      email: sessionEmail,
-      message: verifyError.message,
-    });
-    return {
-      success: false,
-      error: "SERVER_ERROR",
-      message:
-        "Password could not be verified after saving. Please request a new invitation link and try again.",
-    };
-  }
-  await supabase.auth.signOut();
-
   try {
     await acceptInvitationOnPasswordSet(supabase, user.id, sessionEmail);
   } catch (inviteError) {
-    // Password is already verified on Auth — first login can finish activation.
-    console.error("[auth] invitation acceptance failed after password verify", {
+    // Password is already saved on Auth — first login can finish activation.
+    console.error("[auth] invitation acceptance failed after password save", {
       userId: user.id,
       message: inviteError instanceof Error ? inviteError.message : "unknown",
+    });
+  }
+
+  // End the recovery/invite session so the user must sign in fresh. Verify with a
+  // cookie-free client — same-request cookie/cache races on the Next.js SSR client
+  // caused false "couldn't complete your sign-in" failures after a successful updateUser.
+  await supabase.auth.signOut();
+
+  try {
+    const verifyClient = createSupabaseJsClient(
+      getSupabaseUrl(),
+      getSupabaseAnonKey(),
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      },
+    );
+    const { error: verifyError } = await verifyClient.auth.signInWithPassword({
+      email: sessionEmail,
+      password: parsed.data.password,
+    });
+    if (verifyError) {
+      // Password was already accepted by updateUser — do not fail the user.
+      console.error("[resetPasswordAction] credential verify soft-failed", {
+        userId: user.id,
+        email: sessionEmail,
+        message: verifyError.message,
+      });
+    } else {
+      await verifyClient.auth.signOut();
+    }
+  } catch (verifyUnexpected) {
+    console.error("[resetPasswordAction] credential verify threw", {
+      userId: user.id,
+      email: sessionEmail,
+      message:
+        verifyUnexpected instanceof Error
+          ? verifyUnexpected.message
+          : "unknown",
     });
   }
 

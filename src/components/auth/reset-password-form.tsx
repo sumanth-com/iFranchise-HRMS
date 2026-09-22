@@ -63,9 +63,17 @@ export function ResetPasswordForm() {
         const result = await resetPasswordAction(formData);
 
         if (!result.success) {
-          setFormError(resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"));
+          setFormError(
+            resolveUserFacingAuthMessage(
+              result.message || result.error,
+              "NETWORK_ERROR",
+            ),
+          );
           toast.error(
-            resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"),
+            resolveUserFacingAuthMessage(
+              result.message || result.error,
+              "NETWORK_ERROR",
+            ),
           );
           return;
         }
