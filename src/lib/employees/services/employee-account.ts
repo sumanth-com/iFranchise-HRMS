@@ -7,6 +7,7 @@ import type { ApplicationAuditInput } from "@/lib/audit/services/audit-utils";
 import { createNotification } from "@/lib/notifications/services/notification-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
+import { buildSuccessfulLoginAccountUpdates } from "@/lib/employees/employment-joining-date";
 import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
 import {
   getEmployeeGreetingName,
@@ -1464,19 +1465,14 @@ export async function recordEmployeeSuccessfulLogin(
     employeeRow.account_status === "invitation_pending" ||
     employeeRow.account_status === "invitation_accepted";
 
-  const updates: Record<string, unknown> = {
-    last_login_at: now,
-  };
-  if (isFirstLogin) updates.first_login_at = now;
-  if (employeeRow.employment_status === "draft") updates.employment_status = "active";
-  if (shouldActivate) {
-    updates.account_status = "active";
-    updates.account_activated_at = now;
-    updates.invitation_token = null;
-    updates.invitation_expires_at = null;
-    // Never invent or overwrite employment joining date from portal access / first login.
-    // Access lifecycle uses invitation_sent_at / first_login_at / account_activated_at only.
-  }
+  // Never invent or overwrite employment joining date from portal access / first login.
+  // Access lifecycle uses invitation_sent_at / first_login_at / account_activated_at only.
+  const updates = buildSuccessfulLoginAccountUpdates({
+    nowIso: now,
+    isFirstLogin,
+    shouldActivate,
+    employmentStatus: employeeRow.employment_status,
+  });
 
   await updateEmployeeAccountWithClient(supabase, employeeRow.id, updates);
 
