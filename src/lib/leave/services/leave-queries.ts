@@ -28,7 +28,13 @@ import {
 import { applyLeavePolicyToBalanceSnapshot } from "@/lib/leave/leave-entitlement";
 import { isLeaveTypeAllowedForBand, resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
-import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode, MONTHLY_ACCRUAL_DAYS_PER_MONTH } from "@/lib/leave/services/leave-monthly-accrual";
+import {
+  ensureEmployeeMonthlyLeaveAccruals,
+  isMonthlyAccrualLeaveCode,
+  MONTHLY_ACCRUAL_DAYS_PER_MONTH,
+  resolveExpectedEarnedLeaveCarryForward,
+  resolveExpectedMonthlyAccrualAllocatedDays,
+} from "@/lib/leave/services/leave-monthly-accrual";
 import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
 import { DEFAULT_LEAVE_PROBATION_RULES, allocateLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
 import {
@@ -41,8 +47,13 @@ import {
   type LeaveCalendarContext,
 } from "@/lib/leave/services/leave-calendar-engine";
 import {
+  leaveTypeCodeFromAttendanceNotes,
+  mergeAttendanceAndRequestLeaveUsage,
+} from "@/lib/leave/services/leave-attendance-usage";
+import {
   countLeaveDaysInRange,
   paidDaysFromLeaveRequest,
+  paidLeaveDaysInRange,
   roundLeaveDays,
 } from "@/lib/leave/services/leave-usage";
 import {
@@ -1146,9 +1157,9 @@ export async function getEmployeeLeaveBalanceSnapshot(
   if (balancesResult.error) throw new Error(balancesResult.error.message);
   const monthUsedByCode: Record<string, number> = {};
   const monthPendingByCode: Record<string, number> = {};
-  const yearUsedByCode: Record<string, number> = {};
   const yearTakenByCode: Record<string, number> = {};
-  const probationUsedAndPendingClByCode = { cl: 0 };
+  const requestMonthUsedByCode: Record<string, number> = {};
+  const requestYearPaidCl = { cl: 0 };
 
   for (const row of requestRows) {
     if (isPendingHrReview(row.leave_status, row.duration_breakdown)) continue;
@@ -1166,20 +1177,73 @@ export async function getEmployeeLeaveBalanceSnapshot(
       isHalfDay: Boolean(row.is_half_day),
       durationBreakdown: row.duration_breakdown,
     };
+    // Calendar span (incl. sandwich) — informational history only.
     const takenInYear = countLeaveDaysInRange(request, yearRange, calendar);
-    const takenInMonth = countLeaveDaysInRange(request, monthRange, calendar);
-    monthUsedByCode[code] = (monthUsedByCode[code] ?? 0) + takenInMonth;
+    // Paid entitlement usage only — never LOP / sandwich days.
+    const paidInMonth = paidLeaveDaysInRange(
+      {
+        startDate: row.start_date,
+        endDate: row.end_date,
+        duration_breakdown: row.duration_breakdown,
+      },
+      monthRange,
+    );
+    const paidInYear = paidLeaveDaysInRange(
+      {
+        startDate: row.start_date,
+        endDate: row.end_date,
+        duration_breakdown: row.duration_breakdown,
+      },
+      yearRange,
+    );
+    requestMonthUsedByCode[code] = (requestMonthUsedByCode[code] ?? 0) + paidInMonth;
     if (row.leave_status === "pending") {
-      monthPendingByCode[code] = (monthPendingByCode[code] ?? 0) + takenInMonth;
+      monthPendingByCode[code] = (monthPendingByCode[code] ?? 0) + paidInMonth;
     }
     yearTakenByCode[code] = (yearTakenByCode[code] ?? 0) + takenInYear;
-    if (row.leave_status === "approved") {
-      yearUsedByCode[code] = (yearUsedByCode[code] ?? 0) + takenInYear;
-    }
     if (code.toUpperCase() === "CL" && row.leave_status !== "rejected") {
-      probationUsedAndPendingClByCode.cl += takenInYear;
+      requestYearPaidCl.cl += paidInYear;
     }
   }
+
+  // Attendance sheet markers (src:CL / src:EL) are the usage source of truth.
+  const { data: attendanceUsageRows } = await supabase
+    .schema("hrms")
+    .from("attendance")
+    .select("attendance_date, notes")
+    .eq("employee_id", employeeId)
+    .gte("attendance_date", yearRange.start)
+    .lte("attendance_date", yearRange.end)
+    .is("deleted_at", null);
+
+  const attendanceMonthUsed: Record<string, number> = {};
+  let attendanceYearCl = 0;
+  for (const row of attendanceUsageRows ?? []) {
+    const code = leaveTypeCodeFromAttendanceNotes(row.notes);
+    if (!code) continue;
+    const date = String(row.attendance_date ?? "").slice(0, 10);
+    if (date >= monthRange.start && date <= monthRange.end) {
+      attendanceMonthUsed[code] = (attendanceMonthUsed[code] ?? 0) + 1;
+    }
+    if (code === "CL") attendanceYearCl += 1;
+  }
+
+  for (const code of new Set([
+    ...Object.keys(requestMonthUsedByCode),
+    ...Object.keys(attendanceMonthUsed),
+  ])) {
+    monthUsedByCode[code] = mergeAttendanceAndRequestLeaveUsage({
+      attendanceDays: attendanceMonthUsed[code] ?? 0,
+      requestPaidDays: requestMonthUsedByCode[code] ?? 0,
+    });
+  }
+
+  const probationUsedAndPendingClByCode = {
+    cl: mergeAttendanceAndRequestLeaveUsage({
+      attendanceDays: attendanceYearCl,
+      requestPaidDays: requestYearPaidCl.cl,
+    }),
+  };
 
   const balanceByCode = new Map<
     string,
@@ -1219,6 +1283,62 @@ export async function getEmployeeLeaveBalanceSnapshot(
     ]),
   );
 
+  const asOfDate =
+    month === todayMonth && calendarYear === todayYear ? todayIst : monthRange.end;
+
+  // EL carry-forward: policy-earned prior-year remaining (capped; never seeded CL).
+  let earnedLeaveCarryDays = 0;
+  if (balanceYear > 2000) {
+    let previousYearLedgerBalance: number | null = null;
+    const prevYear = balanceYear - 1;
+    const [{ data: previousElRows }, { data: prevElRequests }] = await Promise.all([
+      supabase
+        .schema("hrms")
+        .from("leave_balances")
+        .select("balance_days, leave_types:leave_type_id (code)")
+        .eq("employee_id", employeeId)
+        .eq("balance_year", prevYear)
+        .is("deleted_at", null),
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select(`total_days, duration_breakdown, leave_types:leave_type_id (code)`)
+        .eq("employee_id", employeeId)
+        .eq("leave_status", "approved")
+        .lte("start_date", `${prevYear}-12-31`)
+        .gte("end_date", `${prevYear}-01-01`)
+        .is("deleted_at", null),
+    ]);
+    for (const row of previousElRows ?? []) {
+      const leaveType = unwrapRelation(
+        row.leave_types as { code: string } | { code: string }[] | null,
+      );
+      if (String(leaveType?.code ?? "").toUpperCase() === "EL") {
+        previousYearLedgerBalance = Math.max(0, Number(row.balance_days) || 0);
+        break;
+      }
+    }
+
+    let previousYearPaidUsedDays = 0;
+    for (const row of prevElRequests ?? []) {
+      const leaveType = unwrapRelation(
+        row.leave_types as { code: string } | { code: string }[] | null,
+      );
+      if (String(leaveType?.code ?? "").toUpperCase() !== "EL") continue;
+      previousYearPaidUsedDays = roundLeaveDays(
+        previousYearPaidUsedDays + paidDaysFromLeaveRequest(row),
+      );
+    }
+
+    earnedLeaveCarryDays = resolveExpectedEarnedLeaveCarryForward({
+      joiningDate: employeeJoiningDate,
+      balanceYear,
+      daysPerYear: 12,
+      previousYearLedgerBalance,
+      previousYearPaidUsedDays,
+    });
+  }
+
   // Display codes are synthesized even without a balance row, so an ineligible
   // employee would otherwise still get a Menstruation Leave card showing 0/12.
   const snapshots = LEAVE_BALANCE_DISPLAY_CODES.filter(
@@ -1227,13 +1347,38 @@ export async function getEmployeeLeaveBalanceSnapshot(
     const balance = balanceByCode.get(code);
     const type = typeByCode.get(code);
     const daysPerYear = balance?.daysPerYear || type?.daysPerYear || 0;
-    const allocatedDays = isMonthlyAccrualLeaveCode(code)
-      ? (balance?.allocatedDays ?? 0)
-      : Math.max(balance?.allocatedDays || 0, daysPerYear);
-    const usedFromRequests = yearUsedByCode[code] ?? 0;
-    const usedDays = Math.max(balance?.usedDays ?? 0, usedFromRequests);
-    const pendingDays = balance?.pendingDays ?? 0;
+    // Ledger used/pending are paid days only (reconciled). Do not inflate available
+    // balance with calendar/sandwich leave-request day counts.
+    const usedDays = Math.max(0, balance?.usedDays ?? 0);
+    const pendingDays = Math.max(0, balance?.pendingDays ?? 0);
+
+    let allocatedDays: number;
+    if (isMonthlyAccrualLeaveCode(code)) {
+      if (leaveEligibilityBand === "cl_only" && code.toUpperCase() === "EL") {
+        allocatedDays = roundLeaveDays(usedDays + pendingDays);
+      } else {
+        const expectedAllocated = resolveExpectedMonthlyAccrualAllocatedDays({
+          leaveTypeCode: code,
+          joiningDate: employeeJoiningDate,
+          balanceYear,
+          asOfDate,
+          daysPerYear: daysPerYear || 12,
+          carriedFromPreviousYear: code.toUpperCase() === "EL" ? earnedLeaveCarryDays : 0,
+        });
+        // Prefer policy YTD (+ EL carry); never below already reserved used/pending.
+        allocatedDays = roundLeaveDays(
+          Math.max(expectedAllocated, usedDays + pendingDays),
+        );
+      }
+    } else {
+      allocatedDays = Math.max(balance?.allocatedDays || 0, daysPerYear);
+    }
+
     const balanceDays = Math.max(0, roundLeaveDays(allocatedDays - usedDays - pendingDays));
+    const carriedForwardDays =
+      code.toUpperCase() === "EL" && leaveEligibilityBand === "full_time_confirmed"
+        ? earnedLeaveCarryDays
+        : 0;
 
     return {
       leaveTypeCode: code,
@@ -1243,6 +1388,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
       usedDays: roundLeaveDays(usedDays),
       pendingDays: roundLeaveDays(pendingDays),
       balanceDays: roundLeaveDays(balanceDays),
+      carriedForwardDays: roundLeaveDays(carriedForwardDays),
       monthUsedDays: roundLeaveDays(monthUsedByCode[code] ?? 0),
       // Monthly-accrual types restart each calendar month at +1 day credit.
       monthTotalDays: isMonthlyAccrualLeaveCode(code)
@@ -1277,8 +1423,6 @@ export async function getEmployeeLeaveBalanceSnapshot(
     }
   }
 
-  const asOfDate =
-    month === todayMonth && calendarYear === todayYear ? todayIst : monthRange.end;
   const policyAdjusted = snapshots.map((row) =>
     applyLeavePolicyToBalanceSnapshot(row, {
       joiningDate: employeeJoiningDate,

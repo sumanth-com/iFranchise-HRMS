@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { LeaveFormInput } from "@/lib/validations/leave";
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
@@ -355,6 +356,11 @@ export async function initializeEmployeeLeaveBalances(
         employeeId,
         leaveType.id as string,
         balanceYear,
+        getTodayDateString(),
+        {
+          leaveTypeCode: code,
+          daysPerYear: Number(leaveType.days_per_year ?? 12),
+        },
       );
       allocatedDays = opening.allocatedDays;
       accruedThroughMonth = opening.accruedThroughMonth;
@@ -551,6 +557,10 @@ export async function createLeaveRequest(
         input.leaveTypeId,
         balanceYear,
         input.startDate,
+        {
+          leaveTypeCode: evaluated.leaveType.code,
+          daysPerYear: Number(evaluated.leaveType.daysPerYear ?? 12),
+        },
       );
       openingAllocated = opening.allocatedDays;
       accruedThroughMonth = opening.accruedThroughMonth;

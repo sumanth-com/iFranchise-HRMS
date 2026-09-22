@@ -201,6 +201,8 @@ export type LeaveEmployeeBalanceSnapshot = {
   usedDays: number;
   pendingDays: number;
   balanceDays: number;
+  /** EL days carried from the previous calendar year (0 for CL / ineligible bands). */
+  carriedForwardDays?: number;
   /** Days taken in the selected calendar month (approved + pending). */
   monthUsedDays: number;
   /** Monthly quota display — kept for apply-leave context. */

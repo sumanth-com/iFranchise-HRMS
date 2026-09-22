@@ -30,8 +30,25 @@ export function getLeaveBalanceAvailableDays(
   return roundLeaveDays(row.balanceDays ?? 0);
 }
 
+export function getLeaveBalanceCarriedForwardDays(
+  row: LeaveEmployeeBalanceSnapshot,
+): number {
+  return roundLeaveDays(Math.max(0, Number(row.carriedForwardDays ?? 0)));
+}
+
 export function formatLeaveBalanceAvailable(row: LeaveEmployeeBalanceSnapshot): string {
   return formatLeaveDayCount(Math.max(0, getLeaveBalanceAvailableDays(row)));
+}
+
+/** Caption under CL/EL/OH cards — includes EL carry-forward when present. */
+export function formatLeaveBalanceCardCaption(row: LeaveEmployeeBalanceSnapshot): string {
+  const code = String(row.leaveTypeCode ?? "").toUpperCase();
+  if (code === "OH") return "Available this year";
+  const carry = getLeaveBalanceCarriedForwardDays(row);
+  if (code === "EL" && carry > 0) {
+    return `${LEAVE_BALANCE_AVAILABLE_CAPTION} · includes ${formatLeaveDayCount(carry)} carried forward`;
+  }
+  return LEAVE_BALANCE_AVAILABLE_CAPTION;
 }
 
 /** Standard `used / entitlement` label used on surfaces that still show annual pools. */

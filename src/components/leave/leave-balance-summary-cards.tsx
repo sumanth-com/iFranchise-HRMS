@@ -9,8 +9,8 @@ import {
 } from "@/lib/leave/constants";
 import {
   formatLeaveBalanceAvailable,
+  formatLeaveBalanceCardCaption,
   getLeaveBalanceAvailableDays,
-  LEAVE_BALANCE_AVAILABLE_CAPTION,
 } from "@/lib/leave/leave-balance-display";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,7 @@ export function LeaveBalanceSummaryCards({
         LEAVE_BALANCE_DISPLAY_LABELS[code as keyof typeof LEAVE_BALANCE_DISPLAY_LABELS] ||
         code,
       value: row ? formatLeaveBalanceAvailable(row) : formatLeaveDayCount(available),
+      caption: row ? formatLeaveBalanceCardCaption(row) : "Available balance",
       tone: LEAVE_BALANCE_CARD_TONES[code as keyof typeof LEAVE_BALANCE_CARD_TONES],
     };
   });
@@ -102,9 +103,7 @@ export function LeaveBalanceSummaryCards({
                   {card.value}
                 </p>
                 <p className="mt-1.5 truncate text-[11px] leading-4 text-muted-foreground">
-                  {card.key === "OH"
-                    ? "Available this year"
-                    : LEAVE_BALANCE_AVAILABLE_CAPTION}
+                  {card.caption}
                   {selectable && card.key !== "OH"
                     ? isActive
                       ? " · showing this month's history"

@@ -67,6 +67,46 @@ export function paidDaysFromLeaveRequest(request: {
   return roundLeaveDays(Math.max(0, Number(request.total_days ?? 0)));
 }
 
+/**
+ * Paid CL/EL days that fall inside a date range. Uses dayAllocations when present so
+ * LOP / sandwich days are never counted as leave entitlement usage.
+ */
+export function paidLeaveDaysInRange(
+  request: {
+    startDate?: string;
+    endDate?: string;
+    total_days?: number | string | null;
+    duration_breakdown?: unknown;
+  },
+  range: { start: string; end: string },
+): number {
+  const breakdown = request.duration_breakdown as {
+    dayAllocations?: Array<{ date?: string; kind?: string; counted?: number }>;
+    paidDays?: unknown;
+  } | null;
+
+  if (Array.isArray(breakdown?.dayAllocations) && breakdown.dayAllocations.length > 0) {
+    return roundLeaveDays(
+      breakdown.dayAllocations.reduce((sum, day) => {
+        const date = String(day.date ?? "").slice(0, 10);
+        if (!date || date < range.start || date > range.end) return sum;
+        if (String(day.kind ?? "").toLowerCase() !== "paid") return sum;
+        return sum + Number(day.counted ?? 0);
+      }, 0),
+    );
+  }
+
+  const start = String(request.startDate ?? "").slice(0, 10);
+  const end = String(request.endDate ?? "").slice(0, 10);
+  if (!start || !end) return 0;
+  if (end < range.start || start > range.end) return 0;
+  // Fallback only when the whole request sits inside the range (avoids LOP mix-in).
+  if (start >= range.start && end <= range.end) {
+    return paidDaysFromLeaveRequest(request);
+  }
+  return 0;
+}
+
 export function countLeaveDaysInRange(
   request: {
     startDate: string;
