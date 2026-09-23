@@ -1,10 +1,6 @@
 /**
- * Sync Sep 12–23 2026 attendance from the HR attendance sheet screenshot.
- *
- * Attendance rows only — does not create leave_requests or touch payroll/GPS/UI.
- * Does not modify any attendance before 2026-09-12.
- * Blank sheet cells are skipped (no insert/update for that date).
- *
+ * Full Sep 1–22 2026 attendance sync from HR sheet screenshots.
+ * Attendance rows only. Blank cells on shown dates clear existing rows.
  * Default: dry-run. Pass --apply to write.
  */
 import path from "node:path";
@@ -16,15 +12,23 @@ import { mapAttendanceCode } from "./lib/excel-attendance.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
 const APPLY = process.argv.includes("--apply");
-const DATE_FROM = "2026-09-12";
-const DATE_TO = "2026-09-23";
-const IMPORT_NOTE = "sheet-screenshot-sync-2026-09-12-23";
+const DATE_FROM = "2026-09-01";
+const DATE_TO = "2026-09-22";
+const IMPORT_NOTE = "sheet-full-sept-2026-01-22";
 
-/**
- * Screenshot matrix (12–23 Sep 2026). Codes: p/P / H / CL / A.
- * Blank days omitted. Order matches the sheet rows.
- */
-const STANDARD_DAYS = {
+/** Days present on the sheet for everyone (blank = omit / clear). */
+const STANDARD = {
+  "01": "P",
+  "02": "P",
+  "03": "P",
+  "04": "P",
+  "05": "P",
+  "06": "H",
+  "07": "P",
+  "08": "P",
+  "09": "P",
+  "10": "P",
+  "11": "P",
   "12": "P",
   "13": "H",
   "14": "P",
@@ -35,30 +39,67 @@ const STANDARD_DAYS = {
   "19": "P",
   "20": "H",
   "21": "P",
-  // 22-09-2026: Present for everyone except Anmol Prasad.
+  // 22-09-2026: Present for everyone on the sheet except Anmol Prasad.
   "22": "P",
 };
 
 const SHEET_ROWS = [
-  { name: "Om", code: "IF2025002", days: { ...STANDARD_DAYS, "21": "CL" } },
-  { name: "Himani", code: "IF2026002", days: { ...STANDARD_DAYS } },
-  { name: "Akshita", code: "IF2026012", days: { ...STANDARD_DAYS } },
-  { name: "Ekta", code: "IF2026001", days: { ...STANDARD_DAYS, "21": "CL" } },
-  { name: "Diksha", code: "IF2026011", days: { ...STANDARD_DAYS } },
-  { name: "Swetha", code: "IF2026010", days: { ...STANDARD_DAYS } },
-  { name: "Sumanth", code: "IF2026009", days: { ...STANDARD_DAYS } },
-  { name: "Sneha Mahajan", code: "IF2026014", days: { ...STANDARD_DAYS } },
-  { name: "Prajjwal Negi", code: "IF2026015", days: { ...STANDARD_DAYS } },
-  { name: "Syed Samit Ali", code: "IF2026017", days: { ...STANDARD_DAYS } },
-  { name: "Vivek Rawat", code: "IF2026018", days: { ...STANDARD_DAYS } },
-  { name: "Venupusa Hemavathi", code: "IF2026019", days: { ...STANDARD_DAYS } },
-  { name: "Shakshay Gupta", code: "IF2026021", days: { ...STANDARD_DAYS } },
-  { name: "Shiwali Singh", code: "IF2026020", days: { ...STANDARD_DAYS } },
+  { name: "Om", code: "IF2025002", days: { ...STANDARD, "21": "CL" }, blank: [] },
+  { name: "Himani", code: "IF2026002", days: { ...STANDARD }, blank: [] },
+  { name: "Akshita", code: "IF2026012", days: { ...STANDARD }, blank: [] },
+  {
+    name: "Ekta",
+    code: "IF2026001",
+    days: { ...STANDARD, "04": "H", "05": "CL", "21": "CL" },
+    blank: [],
+  },
+  {
+    name: "Diksha",
+    code: "IF2026011",
+    days: { ...STANDARD, "08": "LOP" },
+    blank: [],
+  },
+  { name: "Swetha", code: "IF2026010", days: { ...STANDARD }, blank: [] },
+  { name: "Sumanth", code: "IF2026009", days: { ...STANDARD }, blank: [] },
+  {
+    name: "Sneha Mahajan",
+    code: "IF2026014",
+    days: { ...STANDARD, "08": "CL" },
+    blank: [],
+  },
+  { name: "Prajjwal Negi", code: "IF2026015", days: { ...STANDARD }, blank: [] },
+  { name: "Syed Samit Ali", code: "IF2026017", days: { ...STANDARD }, blank: [] },
+  {
+    name: "Vivek Rawat",
+    code: "IF2026018",
+    days: { ...STANDARD, "05": "CL" },
+    blank: [],
+  },
+  { name: "Venupusa Hemavathi", code: "IF2026019", days: { ...STANDARD }, blank: [] },
+  { name: "Shakshay Gupta", code: "IF2026021", days: { ...STANDARD }, blank: [] },
+  {
+    name: "Shiwali Singh",
+    code: "IF2026020",
+    days: { ...STANDARD, "09": "LOP" },
+    blank: [],
+  },
+  // Anmol Prasad (sheet row 15) — not Present on 22-09; optional if missing from HRMS.
   {
     name: "Anmol Prasad",
     code: "IF2026022",
     optional: true,
     days: {
+      "01": "P",
+      "02": "P",
+      "03": "P",
+      "04": "P",
+      "05": "P",
+      "06": "H",
+      "07": "P",
+      "08": "P",
+      "09": "P",
+      "10": "P",
+      "11": "P",
       "12": "CL",
       "13": "H",
       "14": "A",
@@ -70,8 +111,8 @@ const SHEET_ROWS = [
       "20": "A",
       "21": "A",
       "22": "A",
-      "23": "A",
     },
+    blank: [],
   },
 ];
 
@@ -104,7 +145,7 @@ function punchFields(status, date) {
   };
 }
 
-function buildSheetRecords(rows = SHEET_ROWS) {
+function buildSheetRecords(rows) {
   const records = [];
   for (const row of rows) {
     for (const [dd, sourceCode] of Object.entries(row.days)) {
@@ -125,6 +166,20 @@ function buildSheetRecords(rows = SHEET_ROWS) {
   return records;
 }
 
+function buildBlankClears(rows) {
+  const clears = [];
+  for (const row of rows) {
+    for (const dd of row.blank ?? []) {
+      clears.push({
+        employeeCode: row.code,
+        sourceName: row.name,
+        date: `2026-09-${dd}`,
+      });
+    }
+  }
+  return clears;
+}
+
 async function fetchAll(supabase, table, select, filters = {}) {
   const pageSize = 1000;
   let from = 0;
@@ -136,24 +191,16 @@ async function fetchAll(supabase, table, select, filters = {}) {
       .select(select)
       .range(from, from + pageSize - 1);
     if (filters.gte) {
-      for (const [key, value] of Object.entries(filters.gte)) {
-        query = query.gte(key, value);
-      }
+      for (const [key, value] of Object.entries(filters.gte)) query = query.gte(key, value);
     }
     if (filters.lte) {
-      for (const [key, value] of Object.entries(filters.lte)) {
-        query = query.lte(key, value);
-      }
+      for (const [key, value] of Object.entries(filters.lte)) query = query.lte(key, value);
     }
     if (filters.in) {
-      for (const [key, value] of Object.entries(filters.in)) {
-        query = query.in(key, value);
-      }
+      for (const [key, value] of Object.entries(filters.in)) query = query.in(key, value);
     }
     if (filters.is) {
-      for (const [key, value] of Object.entries(filters.is)) {
-        query = query.is(key, value);
-      }
+      for (const [key, value] of Object.entries(filters.is)) query = query.is(key, value);
     }
     const { data, error } = await query;
     if (error) throw new Error(`${table}: ${error.message}`);
@@ -181,7 +228,6 @@ async function main() {
   const liveByCode = new Map(
     employees.map((row) => [String(row.employee_code).trim().toUpperCase(), row]),
   );
-
   const missingRequired = SHEET_ROWS.filter((r) => !r.optional && !liveByCode.has(r.code)).map(
     (r) => r.code,
   );
@@ -189,14 +235,16 @@ async function main() {
     (r) => `${r.name} (${r.code})`,
   );
   if (missingRequired.length) {
-    throw new Error(`Missing employees in HRMS: ${missingRequired.join(", ")}`);
+    throw new Error(`Missing employees: ${missingRequired.join(", ")}`);
   }
   if (missingOptional.length) {
     console.warn("SKIPPING_MISSING_OPTIONAL_EMPLOYEES", missingOptional);
   }
 
   const activeRows = SHEET_ROWS.filter((r) => liveByCode.has(r.code));
+  const activeCodes = activeRows.map((r) => r.code);
   const sheetRecords = buildSheetRecords(activeRows);
+  const blankClears = buildBlankClears(activeRows);
 
   const existing = await fetchAll(
     sb,
@@ -208,20 +256,10 @@ async function main() {
     existing.map((row) => [`${row.employee_id}|${row.attendance_date}`, row]),
   );
 
-  // Safety: never plan writes before DATE_FROM
-  for (const rec of sheetRecords) {
-    if (rec.date < DATE_FROM) {
-      throw new Error(`Refusing to touch pre-range date ${rec.date}`);
-    }
-  }
-
   const inserts = [];
   const updates = [];
-  const skipped = {
-    identical: 0,
-    keptRealPresentPunch: 0,
-  };
-  const byEmployee = new Map();
+  const softDeletes = [];
+  const skipped = { identical: 0, keptRealPresentPunch: 0 };
   const planned = [];
 
   for (const rec of sheetRecords) {
@@ -240,19 +278,10 @@ async function main() {
       ...punches,
     };
 
-    const counts = byEmployee.get(rec.employeeCode) ?? {
-      code: rec.employeeCode,
-      name: rec.sourceName,
-      insert: 0,
-      update: 0,
-      skip: 0,
-    };
-
     const current = existingByKey.get(key);
     if (!current || current.deleted_at != null) {
       if (current?.deleted_at != null) {
         updates.push({ id: current.id, ...payload });
-        counts.update += 1;
         planned.push({
           action: "undelete+update",
           code: rec.employeeCode,
@@ -264,7 +293,6 @@ async function main() {
         });
       } else {
         inserts.push(payload);
-        counts.insert += 1;
         planned.push({
           action: "insert",
           code: rec.employeeCode,
@@ -274,7 +302,6 @@ async function main() {
           status: rec.mappedStatus,
         });
       }
-      byEmployee.set(rec.employeeCode, counts);
       continue;
     }
 
@@ -286,8 +313,6 @@ async function main() {
     if (realPresentPunch) {
       if (current.attendance_status === "present") {
         skipped.keptRealPresentPunch += 1;
-        counts.skip += 1;
-        byEmployee.set(rec.employeeCode, counts);
         continue;
       }
       updates.push({
@@ -303,7 +328,6 @@ async function main() {
         check_in_at: current.check_in_at,
         check_out_at: current.check_out_at,
       });
-      counts.update += 1;
       planned.push({
         action: "update-status-keep-punch",
         code: rec.employeeCode,
@@ -313,7 +337,6 @@ async function main() {
         from: current.attendance_status,
         to: "present",
       });
-      byEmployee.set(rec.employeeCode, counts);
       continue;
     }
 
@@ -322,17 +345,12 @@ async function main() {
       rec.mappedStatus === "present"
         ? isSyntheticOfficePunch(current.check_in_at, rec.date, "10:00")
         : !current.check_in_at;
-
     if (sameStatus && samePunchShape) {
       skipped.identical += 1;
-      counts.skip += 1;
-      byEmployee.set(rec.employeeCode, counts);
       continue;
     }
 
     updates.push({ id: current.id, ...payload });
-    counts.update += 1;
-    byEmployee.set(rec.employeeCode, counts);
     planned.push({
       action: "update",
       code: rec.employeeCode,
@@ -344,28 +362,48 @@ async function main() {
     });
   }
 
+  const now = new Date().toISOString();
+  for (const clear of blankClears) {
+    const emp = liveByCode.get(clear.employeeCode);
+    const key = `${emp.id}|${clear.date}`;
+    const current = existingByKey.get(key);
+    if (current && current.deleted_at == null) {
+      softDeletes.push(current.id);
+      planned.push({
+        action: "soft-delete-blank",
+        code: clear.employeeCode,
+        name: clear.sourceName,
+        date: clear.date,
+        from: current.attendance_status,
+      });
+    }
+  }
+
   const exceptions = planned.filter((row) =>
-    ["CL", "A", "H", "LOP"].includes(row.sheet),
+    ["CL", "A", "H", "LOP"].includes(row.sheet) || row.action === "soft-delete-blank",
   );
 
-  const summary = {
-    source: "screenshot-matrix-12-23",
-    range: { from: DATE_FROM, to: DATE_TO },
-    mode: APPLY ? "apply" : "dry-run",
-    sheetRecords: sheetRecords.length,
-    insert: inserts.length,
-    update: updates.length,
-    skipped,
-    exceptionChanges: exceptions,
-    plannedSample: planned.slice(0, 50),
-    plannedTotal: planned.length,
-    employees: [...byEmployee.values()].sort((a, b) => a.code.localeCompare(b.code)),
-  };
-
-  console.log(JSON.stringify(summary, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        range: { from: DATE_FROM, to: DATE_TO },
+        mode: APPLY ? "apply" : "dry-run",
+        sheetRecords: sheetRecords.length,
+        insert: inserts.length,
+        update: updates.length,
+        softDelete: softDeletes.length,
+        skipped,
+        exceptionSample: exceptions.slice(0, 60),
+        exceptionTotal: exceptions.length,
+        plannedTotal: planned.length,
+      },
+      null,
+      2,
+    ),
+  );
 
   if (!APPLY) {
-    console.log("\nDry-run only. Re-run with --apply to write Sep 12–23 attendance.");
+    console.log("\nDry-run only. Re-run with --apply to write.");
     return;
   }
 
@@ -380,12 +418,18 @@ async function main() {
     const { error } = await sb
       .schema("hrms")
       .from("attendance")
-      .update({
-        ...rest,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ ...rest, updated_at: now })
       .eq("id", id);
     if (error) throw new Error(`update ${id} failed: ${error.message}`);
+  }
+
+  if (softDeletes.length) {
+    const { error } = await sb
+      .schema("hrms")
+      .from("attendance")
+      .update({ deleted_at: now, updated_at: now })
+      .in("id", softDeletes);
+    if (error) throw new Error(`soft-delete failed: ${error.message}`);
   }
 
   const expectedByCode = Object.fromEntries(
@@ -401,7 +445,7 @@ async function main() {
   );
 
   const mismatches = [];
-  for (const code of activeRows.map((r) => r.code)) {
+  for (const code of activeCodes) {
     const emp = liveByCode.get(code);
     const { data, error } = await sb
       .schema("hrms")
@@ -416,22 +460,35 @@ async function main() {
       (data ?? []).map((r) => [r.attendance_date, r.attendance_status]),
     );
     for (const [date, want] of Object.entries(expectedByCode[code])) {
-      if (got[date] !== want) {
-        mismatches.push({ code, date, want, got: got[date] ?? null });
-      }
+      if (got[date] !== want) mismatches.push({ code, date, want, got: got[date] ?? null });
+    }
+    const row = activeRows.find((r) => r.code === code);
+    for (const dd of row.blank ?? []) {
+      const date = `2026-09-${dd}`;
+      if (got[date]) mismatches.push({ code, date, want: null, got: got[date] });
     }
   }
 
-  // Confirm nothing before 12 Sep was in this batch
   console.log(
     JSON.stringify(
       {
-        applied: { insert: inserts.length, update: updates.length },
+        applied: {
+          insert: inserts.length,
+          update: updates.length,
+          softDelete: softDeletes.length,
+        },
+        skippedOptionalEmployees: missingOptional,
         verifyMismatchCount: mismatches.length,
         mismatches,
-        om: expectedByCode.IF2025002,
-        ekta: expectedByCode.IF2026001,
-        anmol: expectedByCode.IF2026022,
+        spot: {
+          ekta: expectedByCode.IF2026001,
+          vivek: expectedByCode.IF2026018,
+          sneha: expectedByCode.IF2026014,
+          diksha: expectedByCode.IF2026011,
+          shiwali: expectedByCode.IF2026020,
+          anmol: expectedByCode.IF2026022 ?? null,
+          om: expectedByCode.IF2025002,
+        },
       },
       null,
       2,
@@ -440,7 +497,7 @@ async function main() {
 
   if (mismatches.length) {
     process.exitCode = 1;
-    console.error("Verification failed — statuses do not match screenshot.");
+    console.error("Verification failed.");
   }
 }
 
