@@ -84,9 +84,14 @@ export function ManagerLeaveDetailDrawer({
 
     setDetail(null);
     startLoading(async () => {
-      const bundle = await fetchTeamLeaveDetailAction(leaveRequestId);
-      if (bundle) detailCacheRef.current.set(leaveRequestId, bundle);
-      setDetail(bundle);
+      try {
+        const bundle = await fetchTeamLeaveDetailAction(leaveRequestId);
+        if (bundle) detailCacheRef.current.set(leaveRequestId, bundle);
+        setDetail(bundle);
+      } catch (error) {
+        console.error("[manager-leave-detail-drawer] load failed", error);
+        setDetail(null);
+      }
     });
   }, [open, leaveRequestId]);
 

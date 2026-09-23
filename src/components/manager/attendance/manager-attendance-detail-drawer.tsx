@@ -80,8 +80,13 @@ export function ManagerAttendanceDetailDrawer({
     setDetail(null);
     setReviewNotes("");
     startLoading(async () => {
-      const bundle = await fetchTeamAttendanceDetailAction(attendanceId);
-      setDetail(bundle);
+      try {
+        const bundle = await fetchTeamAttendanceDetailAction(attendanceId);
+        setDetail(bundle);
+      } catch (error) {
+        console.error("[manager-attendance-detail-drawer] load failed", error);
+        setDetail(null);
+      }
     });
   }, [open, attendanceId]);
 

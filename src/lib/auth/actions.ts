@@ -44,12 +44,12 @@ import {
   validateInvitationForUser,
 } from "@/lib/employees/services/employee-account";
 import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
-import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
+import { resolveUserPortalRoute, resolveUserPermissionCodes, resolveUserRoleCodes } from "@/lib/auth/permission-resolver";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getServerSession } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -130,12 +130,52 @@ export async function idleSessionLogoutAction(): Promise<void> {
 }
 
 /**
- * Drop the signed permission cookie so the next layout/RSC load resolves
- * roles and portal.*.access from the database (not a stale 5-minute cache).
+ * Re-resolve portal.*.access from the live DB and rewrite the signed permission
+ * cookie. Does NOT clear the cookie first (that forced a cold middleware + layout
+ * permission waterfall on every focus/timer sync).
+ *
+ * Returns `changed: true` only when permission codes differ from the prior cookie
+ * so callers can skip an unnecessary `router.refresh()`.
  */
-export async function refreshSessionPermissionsAction(): Promise<{ success: true }> {
-  await clearPermissionCacheCookie();
-  return { success: true };
+export async function refreshSessionPermissionsAction(): Promise<
+  | { success: true; changed: boolean }
+  | { success: false; message?: string }
+> {
+  try {
+    const session = await getServerSession();
+    if (!session?.user?.id) {
+      return { success: false, message: "Not authenticated" };
+    }
+
+    const supabase = session.supabase ?? (await createClient());
+    const previousCodes = await getVerifiedPermissionCodesForUser(session.user.id);
+    const [permissionCodes, roleCodes] = await Promise.all([
+      resolveUserPermissionCodes(supabase, session.user.id),
+      resolveUserRoleCodes(supabase, session.user.id),
+    ]);
+
+    await setPermissionCacheCookie(
+      session.user.id,
+      permissionCodes,
+      true,
+      roleCodes,
+    );
+
+    const prev = previousCodes ?? [];
+    const changed =
+      prev.length !== permissionCodes.length ||
+      prev.some((code) => !permissionCodes.includes(code)) ||
+      permissionCodes.some((code) => !prev.includes(code));
+
+    return { success: true, changed };
+  } catch (error) {
+    console.error("[auth] refreshSessionPermissionsAction failed", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to refresh permissions",
+    };
+  }
 }
 
 export async function loginAction(

@@ -1,0 +1,18 @@
+SEPTEMBER 2026 RECONCILIATION (Excel vs HRMS before fix)
+Excel H Sundays currently stored as week_off (unpaid). Excel TWD=P+H+CL+EL.
+
+Om                     | IF2025002  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=10633 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=8133 | gapTWD=3 | DOJ=2025-12-01
+Himani                 | IF2026002  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=10633 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=8133 | gapTWD=3 | DOJ=2026-02-02
+Akshita                | IF2026012  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=3033 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=2333 | gapTWD=3 | DOJ=2026-05-04
+Ekta                   | IF2026001  | Excel P=7 H=5 CL=1 EL=0 LOP=0 TWD=13 Final=10633 | HRMS att P=7 H=1 WO=4 leave=1 abs=0 | Payroll paidDays=10 net=8133 | gapTWD=3 | DOJ=2026-01-17
+Diksha                 | IF2026011  | Excel P=8 H=4 CL=0 EL=0 LOP=1 TWD=12 Final=19800 | HRMS att P=8 H=0 WO=4 leave=0 abs=1 | Payroll paidDays=9 net=14800 | gapTWD=3 | DOJ=2026-05-18
+Swetha                 | IF2026010  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=21467 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=16467 | gapTWD=3 | DOJ=2026-05-18
+Sumanth                | IF2026009  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=5200 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=4000 | gapTWD=3 | DOJ=2026-09-09
+Sneha Mahajan          | IF2026014  | Excel P=8 H=4 CL=1 EL=0 LOP=0 TWD=13 Final=4333 | HRMS att P=8 H=0 WO=4 leave=1 abs=0 | Payroll paidDays=10 net=3333 | gapTWD=3 | DOJ=2026-07-01
+Prajjwal Negi          | IF2026015  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=4333 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=3333 | gapTWD=3 | DOJ=2026-07-01
+Syed Samit Ali         | IF2026017  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=4333 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=3333 | gapTWD=3 | DOJ=2026-07-28
+Vivek Rawat            | IF2026018  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=23272 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=17856 | gapTWD=3 | DOJ=2026-08-02
+Venupusa Hemavathi     | IF2026019  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=4333 | HRMS att P=10 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=11 net=3667 | gapTWD=2 | DOJ=2026-08-03
+Shakshay Gupta         | IF2026021  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=21467 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=16467 | gapTWD=3 | DOJ=2026-08-03
+Shiwali Singh          | IF2026020  | Excel P=9 H=4 CL=0 EL=0 LOP=0 TWD=13 Final=21467 | HRMS att P=9 H=0 WO=4 leave=0 abs=0 | Payroll paidDays=10 net=16467 | gapTWD=3 | DOJ=2026-08-03
+Anmol Prasad           | IF2026022  | Excel P=8 H=4 CL=0 EL=0 LOP=1 TWD=12 Final=11800 | HRMS att P=8 H=0 WO=4 leave=1 abs=0 | Payroll paidDays=10 net=9800 | gapTWD=2 | DOJ=2026-08-16

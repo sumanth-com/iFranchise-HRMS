@@ -100,11 +100,15 @@ function CelebrationBirthdayPhoto({
       return;
     }
 
-    void getSignedUrlAction("profileImages", profileImagePath).then((result) => {
-      if (result.success) {
-        setImageUrl(result.data);
-      }
-    });
+    void getSignedUrlAction("profileImages", profileImagePath)
+      .then((result) => {
+        if (result.success) {
+          setImageUrl(result.data);
+        }
+      })
+      .catch(() => {
+        // Non-critical avatar fetch — keep initials fallback.
+      });
   }, [profileImagePath, signedUrl]);
 
   const showUpload = Boolean(imageUrl) && !remoteFailed;
@@ -541,10 +545,14 @@ export function EmployeeUpcomingEvents({
     if (!showImportantNotices) return;
     setViewedKeys(readLocalAnnouncementViews());
     let cancelled = false;
-    void listEmployeeAnnouncementsAction().then((result) => {
-      if (cancelled || !result.success) return;
-      setCompanyAnnouncements(result.data);
-    });
+    void listEmployeeAnnouncementsAction()
+      .then((result) => {
+        if (cancelled || !result.success) return;
+        setCompanyAnnouncements(result.data);
+      })
+      .catch(() => {
+        // Non-critical notices — do not crash the dashboard.
+      });
     return () => {
       cancelled = true;
     };

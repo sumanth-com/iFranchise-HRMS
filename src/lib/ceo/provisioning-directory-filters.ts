@@ -89,6 +89,13 @@ export function isProvisioningDirectoryRoleCode(
 }
 
 const MANAGER_ROLE = "manager";
+/** High-level roles that may also be selected as reporting managers in User Provisioning. */
+const PROVISIONING_MANAGER_LOOKUP_ROLE_CODES = new Set([
+  MANAGER_ROLE,
+  "ceo",
+  "co_founder",
+  "founder",
+]);
 /** HR contact selectors: HR portal roles only — not super_admin system accounts. */
 const HR_CONTACT_ROLE_CODES = new Set(["hr_admin", "hr_executive"]);
 
@@ -96,8 +103,9 @@ export function isSuperAdminProvisioningRole(roleCode: string | null | undefined
   return String(roleCode ?? "").toLowerCase() === "super_admin";
 }
 
+/** Roles eligible in the User Provisioning Manager dropdown (managers + CEO/executives). */
 export function isProvisioningManagerRole(roleCode: string | null | undefined) {
-  return String(roleCode ?? "").toLowerCase() === MANAGER_ROLE;
+  return PROVISIONING_MANAGER_LOOKUP_ROLE_CODES.has(String(roleCode ?? "").toLowerCase());
 }
 
 /** System / shell accounts that must never appear as selectable reporting managers. */

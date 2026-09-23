@@ -148,6 +148,7 @@ export function ManagerTeamMemberDrawer({
     resolveInitialTab(initialTab, readOnly),
   );
   const [detail, setDetail] = useState<TeamMemberDetailBundle | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, startLoading] = useTransition();
   const [actionMode, setActionMode] = useState<
     "feedback" | "oneOnOne" | "promotion" | "concern" | null
@@ -173,9 +174,18 @@ export function ManagerTeamMemberDrawer({
       setInternalActiveTab(nextTab);
     }
     setDetail(null);
+    setLoadError(null);
     startLoading(async () => {
-      const bundle = await fetchTeamMemberDetailAction(employeeId);
-      setDetail(bundle);
+      try {
+        const bundle = await fetchTeamMemberDetailAction(employeeId);
+        setDetail(bundle);
+      } catch (error) {
+        console.error("[manager-team-member-drawer] load failed", error);
+        setDetail(null);
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to load team member.",
+        );
+      }
     });
   }, [open, embedded, employeeId, initialTab, isControlled, onActiveTabChange, readOnly]);
 
@@ -199,7 +209,12 @@ export function ManagerTeamMemberDrawer({
         </div>
       ) : !employee ? (
         <div className="p-6">
-          <EmptyState title="Employee not found" description="This team member could not be loaded." />
+          <EmptyState
+            title={loadError ? "Unable to load team member" : "Employee not found"}
+            description={
+              loadError ?? "This team member could not be loaded."
+            }
+          />
         </div>
       ) : (
         <>

@@ -156,11 +156,19 @@ export function AuthProvider({
   }, [performSignOut]);
 
   const refreshProfile = useCallback(async () => {
-    const { refreshSessionPermissionsAction } = await import(
-      "@/lib/auth/actions"
-    );
-    await refreshSessionPermissionsAction();
-    router.refresh();
+    try {
+      const { refreshSessionPermissionsAction } = await import(
+        "@/lib/auth/actions"
+      );
+      const result = await refreshSessionPermissionsAction();
+      // Only remount RSC when portal.*.access actually changed — rewriting the
+      // cookie alone must not force a full layout/profile waterfall.
+      if (result.success && result.changed) {
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("[auth] permission sync failed", error);
+    }
   }, [router]);
 
   // Re-resolve portal.*.access after role grants without waiting for cookie TTL
@@ -226,7 +234,9 @@ export function AuthProvider({
       }
 
       if (event === "TOKEN_REFRESHED") {
-        router.refresh();
+        // Supabase already refreshed the client session. Avoid a full RSC shell
+        // remount on every token rotation — that re-runs layout profile + middleware.
+        return;
       }
     });
 
