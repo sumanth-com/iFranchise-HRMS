@@ -18,6 +18,15 @@ const STATUS_ITEMS = [
 
 type ManualStatus = (typeof STATUS_ITEMS)[number]["value"];
 
+export type ManualAttendanceStatusSaveResult = {
+  previousId: string;
+  id: string;
+  attendanceStatus: ManualStatus;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  workHours: number;
+};
+
 function toManualStatus(status: AttendanceDisplayStatus): ManualStatus | "" {
   if (status === "absent") return "absent";
   if (status === "on_leave") return "on_leave";
@@ -28,37 +37,37 @@ function toManualStatus(status: AttendanceDisplayStatus): ManualStatus | "" {
 }
 
 type ManualAttendanceStatusDialogProps = {
-  record: AttendanceListItem | null;
+  /** One or more attendance rows to update with the same status. */
+  records: AttendanceListItem[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved: (next: {
-    previousId: string;
-    id: string;
-    attendanceStatus: ManualStatus;
-    checkInAt: string | null;
-    checkOutAt: string | null;
-    workHours: number;
-  }) => void;
+  onSaved: (results: ManualAttendanceStatusSaveResult[]) => void;
 };
 
 export function ManualAttendanceStatusDialog({
-  record,
+  records,
   open,
   onOpenChange,
   onSaved,
 }: ManualAttendanceStatusDialogProps) {
   const [status, setStatus] = useState<ManualStatus | "">("");
   const [isPending, startTransition] = useTransition();
+  const isBulk = records.length > 1;
+  const primary = records[0] ?? null;
 
   useEffect(() => {
-    if (!open || !record) {
+    if (!open || !primary) {
       setStatus("");
       return;
     }
-    setStatus(toManualStatus(record.attendanceStatus));
-  }, [open, record]);
+    if (isBulk) {
+      setStatus("");
+      return;
+    }
+    setStatus(toManualStatus(primary.attendanceStatus));
+  }, [open, primary, isBulk]);
 
-  const canSave = Boolean(record && status) && !isPending;
+  const canSave = Boolean(records.length > 0 && status) && !isPending;
 
   return (
     <Modal
@@ -67,8 +76,12 @@ export function ManualAttendanceStatusDialog({
         if (isPending) return;
         onOpenChange(next);
       }}
-      title="Update attendance"
-      description="Set attendance for the selected date. Desktop check-in records stay on file when you mark Present."
+      title={isBulk ? "Update attendance status" : "Update attendance"}
+      description={
+        isBulk
+          ? `Set the same attendance status for ${records.length} selected records.`
+          : "Set attendance for the selected date. Desktop check-in records stay on file when you mark Present."
+      }
       contentClassName="sm:max-w-md"
       showCancel={false}
       footer={
@@ -85,47 +98,90 @@ export function ManualAttendanceStatusDialog({
             type="button"
             disabled={!canSave}
             onClick={() => {
-              if (!record || !status) return;
+              if (!status || records.length === 0) return;
+              const nextStatus = status;
               startTransition(async () => {
-                const result = await setManualAttendanceStatusAction({
-                  employeeId: record.employeeId,
-                  attendanceDate: record.attendanceDate,
-                  attendanceStatus: status,
-                });
-                if (!result.success) {
-                  toast.error(result.message);
+                const results: ManualAttendanceStatusSaveResult[] = [];
+                let failed = 0;
+                let firstError: string | null = null;
+
+                for (const record of records) {
+                  const result = await setManualAttendanceStatusAction({
+                    employeeId: record.employeeId,
+                    attendanceDate: record.attendanceDate,
+                    attendanceStatus: nextStatus,
+                  });
+                  if (!result.success) {
+                    failed += 1;
+                    if (!firstError) firstError = result.message;
+                    continue;
+                  }
+                  results.push({
+                    previousId: record.id,
+                    id: result.data.id,
+                    attendanceStatus: result.data.attendanceStatus,
+                    checkInAt: result.data.checkInAt,
+                    checkOutAt: result.data.checkOutAt,
+                    workHours: result.data.workHours,
+                  });
+                }
+
+                if (results.length === 0) {
+                  toast.error(firstError ?? "Failed to update attendance");
                   return;
                 }
-                onSaved({
-                  previousId: record.id,
-                  id: result.data.id,
-                  attendanceStatus: result.data.attendanceStatus,
-                  checkInAt: result.data.checkInAt,
-                  checkOutAt: result.data.checkOutAt,
-                  workHours: result.data.workHours,
-                });
+
+                onSaved(results);
                 onOpenChange(false);
-                toast.success("Attendance updated");
+
+                if (failed > 0) {
+                  toast.warning(
+                    `Updated ${results.length} of ${records.length}. ${failed} failed.`,
+                  );
+                } else {
+                  toast.success(
+                    isBulk
+                      ? `Updated status for ${results.length} records`
+                      : "Attendance updated",
+                  );
+                }
               });
             }}
           >
-            {isPending ? "Saving…" : "Save"}
+            {isPending ? "Saving…" : isBulk ? `Update ${records.length}` : "Save"}
           </Button>
         </>
       }
     >
-      {record ? (
+      {primary ? (
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Employee Name</p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{record.employeeName}</p>
+          {isBulk ? (
+            <p className="text-sm text-muted-foreground">
+              {records.length} employees selected for{" "}
+              <span className="font-medium text-foreground">
+                {primary.attendanceDate}
+                {records.every((r) => r.attendanceDate === primary.attendanceDate)
+                  ? ""
+                  : " (and other dates)"}
+              </span>
+              .
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Employee Name</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {primary.employeeName}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Employee ID</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {primary.employeeCode}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Employee ID</p>
-              <p className="mt-1 text-sm font-semibold text-foreground">{record.employeeCode}</p>
-            </div>
-          </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="manual-attendance-status">Attendance Status</Label>

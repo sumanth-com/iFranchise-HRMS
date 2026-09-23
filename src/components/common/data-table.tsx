@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 export type DataTableColumn<T> = {
   key: keyof T | string;
-  header: string;
+  header: ReactNode;
   className?: string;
   render?: (row: T) => ReactNode;
 };

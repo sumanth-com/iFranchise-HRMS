@@ -24,6 +24,12 @@ import { HrLeaveDetailPopup } from "@/components/leave/hr-leave-detail-popup";
 import {
   type LeaveSummaryFilterKey,
 } from "@/components/leave/leave-summary-cards";
+import {
+  ApprovalBulkToolbar,
+  ApprovalSelectCheckbox,
+  summarizeBulkResult,
+  useApprovalSelection,
+} from "@/components/approvals/approval-bulk-selection";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import {
@@ -48,6 +54,8 @@ import {
 } from "@/components/ui/table";
 import {
   approveLeaveRequestAction,
+  bulkApproveLeaveRequestAction,
+  bulkRejectLeaveRequestAction,
   cancelLeaveRequestAction,
   deleteLeaveRequestAction,
   fetchLeaveRequestsAction,
@@ -194,6 +202,7 @@ export function LeaveTable({
   const [approveError, setApproveError] = useState<string | null>(null);
   const [rejectComments, setRejectComments] = useState("");
   const [rejectError, setRejectError] = useState<string | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<"approve" | "reject" | null>(null);
 
   function openLeavePopup(row: LeaveListItem) {
     setViewLeaveId(row.id);
@@ -387,8 +396,59 @@ export function LeaveTable({
     [employees],
   );
 
+  const canBulkDecide = !embedded && (canApprove || canReject);
+  const actionableIds = useMemo(
+    () =>
+      canBulkDecide
+        ? tableState.records
+            .filter((row) => {
+              const isPendingStatus = row.leaveStatus === "pending";
+              const isHrReviewPending =
+                Boolean(row.hrReviewRequired) && !row.hrDecision;
+              return isPendingStatus && !isHrReviewPending;
+            })
+            .map((row) => row.id)
+        : [],
+    [canBulkDecide, tableState.records],
+  );
+  const selection = useApprovalSelection(actionableIds);
+
   const columns = useMemo<ColumnDef<LeaveListItem>[]>(
     () => [
+      ...(canBulkDecide
+        ? [
+            {
+              id: "select",
+              header: () => (
+                <ApprovalSelectCheckbox
+                  checked={selection.allSelected}
+                  indeterminate={selection.someSelected}
+                  disabled={isPending || actionableIds.length === 0}
+                  ariaLabel="Select all pending leave requests"
+                  onCheckedChange={selection.toggleAll}
+                />
+              ),
+              cell: ({ row }: { row: { original: LeaveListItem } }) => {
+                const isPendingStatus = row.original.leaveStatus === "pending";
+                const isHrReviewPending =
+                  Boolean(row.original.hrReviewRequired) &&
+                  !row.original.hrDecision;
+                const selectable = isPendingStatus && !isHrReviewPending;
+                if (!selectable) return null;
+                return (
+                  <ApprovalSelectCheckbox
+                    checked={selection.selectedIds.has(row.original.id)}
+                    disabled={isPending}
+                    ariaLabel={`Select leave for ${row.original.employeeName}`}
+                    onCheckedChange={(checked) =>
+                      selection.toggleOne(row.original.id, checked)
+                    }
+                  />
+                );
+              },
+            } as ColumnDef<LeaveListItem>,
+          ]
+        : []),
       {
         id: "employee",
         header: "Employee",
@@ -528,7 +588,7 @@ export function LeaveTable({
         },
       },
     ],
-    [canApprove, canCancel, canDelete, canReject, embedded],
+    [canApprove, canBulkDecide, canCancel, canDelete, canReject, embedded, isPending, actionableIds.length, selection],
   );
 
   const table = useReactTable({
@@ -561,6 +621,62 @@ export function LeaveTable({
       setApproveComments("");
       setApproveError(null);
       await afterMutation(targetId, "approved");
+    });
+  };
+
+  const handleBulkApprove = () => {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    setApproveError(null);
+    startTransition(async () => {
+      const result = await bulkApproveLeaveRequestAction({
+        leaveRequestIds: ids,
+        comments: approveComments || "",
+      });
+      if (!result.success) {
+        setApproveError(result.message);
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(result.data, "approved");
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      setBulkTarget(null);
+      setApproveComments("");
+      setApproveError(null);
+      selection.clearSelection();
+      await reloadTable();
+      onMutated?.();
+    });
+  };
+
+  const handleBulkReject = () => {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    if (rejectComments.trim().length < 3) {
+      setRejectError("Rejection reason is required");
+      return;
+    }
+    setRejectError(null);
+    startTransition(async () => {
+      const result = await bulkRejectLeaveRequestAction({
+        leaveRequestIds: ids,
+        comments: rejectComments,
+      });
+      if (!result.success) {
+        setRejectError(result.message);
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(result.data, "rejected");
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      setBulkTarget(null);
+      setRejectComments("");
+      setRejectError(null);
+      selection.clearSelection();
+      await reloadTable();
+      onMutated?.();
     });
   };
 
@@ -803,12 +919,45 @@ export function LeaveTable({
       </div>
 
       <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
+        {canBulkDecide ? (
+          <div className="sticky top-0 z-20 border-b bg-white px-3 pt-3 dark:bg-input">
+            <ApprovalBulkToolbar
+              selectedCount={selection.selectedCount}
+              disabled={isPending}
+              onApprove={() => {
+                if (!canApprove) {
+                  toast.error("You do not have permission to approve leave");
+                  return;
+                }
+                setBulkTarget("approve");
+              }}
+              onReject={() => {
+                if (!canReject) {
+                  toast.error("You do not have permission to reject leave");
+                  return;
+                }
+                setBulkTarget("reject");
+              }}
+            />
+          </div>
+        ) : null}
         <table
           data-slot="table"
           className="w-max min-w-full caption-bottom bg-white text-sm dark:bg-input"
         >
           <TableHeader className={TABLE_HEADER_STICKY_CLASS}>
             <TableRow className={TABLE_HEADER_ROW_CLASS}>
+              {canBulkDecide ? (
+                <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "w-10")}>
+                  <ApprovalSelectCheckbox
+                    checked={selection.allSelected}
+                    indeterminate={selection.someSelected}
+                    disabled={isPending || actionableIds.length === 0}
+                    ariaLabel="Select all pending leave requests"
+                    onCheckedChange={selection.toggleAll}
+                  />
+                </TableHead>
+              ) : null}
               <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[14rem]")}>
                 Employee
               </TableHead>
@@ -845,7 +994,7 @@ export function LeaveTable({
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={embedded ? 9 : 10}
+                  colSpan={(embedded ? 9 : 10) + (canBulkDecide ? 1 : 0)}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No leave requests found.
@@ -870,7 +1019,7 @@ export function LeaveTable({
                             : TABLE_DATA_CELL_CLASS,
                       )}
                       onClick={
-                        cell.column.id === "actions"
+                        cell.column.id === "actions" || cell.column.id === "select"
                           ? (event) => event.stopPropagation()
                           : undefined
                       }
@@ -1133,6 +1282,106 @@ export function LeaveTable({
               onChange={(event) => setRejectComments(event.currentTarget.value)}
             />
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "approve"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkTarget(null);
+            setApproveComments("");
+            setApproveError(null);
+          }
+        }}
+        showCancel={false}
+        title="Approve selected leave requests"
+        description={`Approve ${selection.selectedCount} leave request${selection.selectedCount === 1 ? "" : "s"}?`}
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                setBulkTarget(null);
+                setApproveComments("");
+                setApproveError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button disabled={isPending} onClick={handleBulkApprove}>
+              {isPending ? "Approving…" : "Approve selected"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          {approveError ? (
+            <p className="text-sm text-destructive">{approveError}</p>
+          ) : null}
+          <Label htmlFor="bulkTableApproveComments">Comments (optional)</Label>
+          <textarea
+            id="bulkTableApproveComments"
+            rows={3}
+            value={approveComments}
+            disabled={isPending}
+            placeholder="Optional notes applied to each approval…"
+            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            onChange={(event) => setApproveComments(event.currentTarget.value)}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "reject"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkTarget(null);
+            setRejectComments("");
+            setRejectError(null);
+          }
+        }}
+        showCancel={false}
+        title="Reject selected leave requests"
+        description={`Reject ${selection.selectedCount} leave request${selection.selectedCount === 1 ? "" : "s"}?`}
+        footer={
+          <div className="flex w-full items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                setBulkTarget(null);
+                setRejectComments("");
+                setRejectError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={handleBulkReject}
+            >
+              {isPending ? "Rejecting…" : "Reject selected"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          {rejectError ? (
+            <p className="text-sm text-destructive">{rejectError}</p>
+          ) : null}
+          <Label htmlFor="bulkTableRejectComments">Rejection reason *</Label>
+          <textarea
+            id="bulkTableRejectComments"
+            rows={3}
+            value={rejectComments}
+            disabled={isPending}
+            placeholder="State the reason for rejecting these leave requests…"
+            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            onChange={(event) => setRejectComments(event.currentTarget.value)}
+          />
         </div>
       </Modal>
 

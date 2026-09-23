@@ -42,6 +42,25 @@ export const ceoLeaveRejectSchema = z.object({
     .max(1000),
 });
 
+const bulkIdList = z
+  .array(z.string().uuid("Invalid leave request"))
+  .min(1, "Select at least one request")
+  .max(50, "You can process up to 50 requests at once");
+
+export const ceoLeaveBulkDecisionSchema = z.object({
+  leaveRequestIds: bulkIdList,
+  comments: z.string().trim().max(1000).optional(),
+});
+
+export const ceoLeaveBulkRejectSchema = z.object({
+  leaveRequestIds: bulkIdList,
+  comments: z
+    .string()
+    .trim()
+    .min(3, "Provide a rejection reason")
+    .max(1000),
+});
+
 export const ceoLeaveForwardSchema = z.object({
   leaveRequestId: z.string().uuid("Invalid leave request"),
   targetEmployeeId: z.string().uuid("Select an approver to forward to"),

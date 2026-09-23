@@ -16,7 +16,10 @@ import type {
   CeoRegularizationQueueItem,
 } from "@/types/ceo-regularization";
 import { ceoLeaveCalendarSchema } from "@/lib/validations/ceo-leave";
-import { teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
+import {
+  teamCorrectionBulkReviewSchema,
+  teamCorrectionReviewSchema,
+} from "@/lib/validations/manager-team";
 
 const VIEW_PERMISSIONS = [PORTAL_PERMISSIONS.ceo, "attendance.view"];
 
@@ -102,6 +105,106 @@ export async function rejectCeoRegularizationAction(
         error instanceof Error
           ? error.message
           : "Failed to reject regularization request",
+    };
+  }
+}
+
+export async function bulkApproveCeoRegularizationAction(
+  input: unknown,
+): Promise<
+  CeoRegularizationActionResult<{
+    succeeded: number;
+    failed: number;
+    errors: string[];
+  }>
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const parsed = teamCorrectionBulkReviewSchema.parse(input);
+    const supabase = await createClient();
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const correctionId of parsed.correctionIds) {
+      try {
+        await reviewCeoAttendanceCorrection(
+          supabase,
+          profile,
+          { correctionId, reviewNotes: parsed.reviewNotes },
+          "approved",
+        );
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Approve failed",
+          );
+        }
+      }
+    }
+
+    revalidatePath(CEO_ROUTES.approvalsRegularization);
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk approve regularization requests",
+    };
+  }
+}
+
+export async function bulkRejectCeoRegularizationAction(
+  input: unknown,
+): Promise<
+  CeoRegularizationActionResult<{
+    succeeded: number;
+    failed: number;
+    errors: string[];
+  }>
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const parsed = teamCorrectionBulkReviewSchema.parse(input);
+    const supabase = await createClient();
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const correctionId of parsed.correctionIds) {
+      try {
+        await reviewCeoAttendanceCorrection(
+          supabase,
+          profile,
+          { correctionId, reviewNotes: parsed.reviewNotes },
+          "rejected",
+        );
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Reject failed",
+          );
+        }
+      }
+    }
+
+    revalidatePath(CEO_ROUTES.approvalsRegularization);
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk reject regularization requests",
     };
   }
 }

@@ -2,9 +2,15 @@
 
 import { format, parseISO } from "date-fns";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  ApprovalBulkToolbar,
+  ApprovalSelectCheckbox,
+  summarizeBulkResult,
+  useApprovalSelection,
+} from "@/components/approvals/approval-bulk-selection";
 import { LeavePanel } from "@/components/ceo/leave/ceo-leave-tables";
 import { Button } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
@@ -12,6 +18,8 @@ import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import {
   approveCeoRegularizationAction,
+  bulkApproveCeoRegularizationAction,
+  bulkRejectCeoRegularizationAction,
   rejectCeoRegularizationAction,
 } from "@/lib/ceo/actions/ceo-regularization-actions";
 import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
@@ -37,15 +45,22 @@ export function CeoRegularizationApprovalQueue({
   isLoading,
   onActed,
 }: CeoRegularizationApprovalQueueProps) {
+  const rowIds = useMemo(() => items.map((item) => item.id), [items]);
+  const selection = useApprovalSelection(rowIds);
+
   const [target, setTarget] = useState<{
     item: CeoRegularizationQueueItem;
     type: "approve" | "reject";
   } | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<"approve" | "reject" | null>(
+    null,
+  );
   const [rejectNotes, setRejectNotes] = useState("");
   const [isActing, startActing] = useTransition();
 
   const closeModal = () => {
     setTarget(null);
+    setBulkTarget(null);
     setRejectNotes("");
   };
 
@@ -86,7 +101,72 @@ export function CeoRegularizationApprovalQueue({
     });
   };
 
+  const handleBulkApprove = () => {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    startActing(async () => {
+      const result = await bulkApproveCeoRegularizationAction({
+        correctionIds: ids,
+      });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(result.data, "approved");
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      closeModal();
+      selection.clearSelection();
+      broadcastApprovalChange("regularization");
+      onActed();
+    });
+  };
+
+  const handleBulkReject = () => {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    startActing(async () => {
+      const result = await bulkRejectCeoRegularizationAction({
+        correctionIds: ids,
+        reviewNotes: rejectNotes.trim() || undefined,
+      });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(result.data, "rejected");
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      closeModal();
+      selection.clearSelection();
+      broadcastApprovalChange("regularization");
+      onActed();
+    });
+  };
+
   const columns: DataTableColumn<CeoRegularizationQueueItem>[] = [
+    {
+      key: "select",
+      header: (
+        <ApprovalSelectCheckbox
+          checked={selection.allSelected}
+          indeterminate={selection.someSelected}
+          disabled={isActing || items.length === 0}
+          ariaLabel="Select all regularization requests"
+          onCheckedChange={selection.toggleAll}
+          className="accent-white"
+        />
+      ),
+      className: "w-10",
+      render: (row) => (
+        <ApprovalSelectCheckbox
+          checked={selection.selectedIds.has(row.id)}
+          disabled={isActing}
+          ariaLabel={`Select regularization for ${row.employeeName}`}
+          onCheckedChange={(checked) => selection.toggleOne(row.id, checked)}
+        />
+      ),
+    },
     {
       key: "requestCategoryLabel",
       header: "Request Type",
@@ -177,6 +257,12 @@ export function CeoRegularizationApprovalQueue({
         description="Attendance regularization from HR and Manager users. Only you can approve or reject these requests."
         count={items.length}
       >
+        <ApprovalBulkToolbar
+          selectedCount={selection.selectedCount}
+          disabled={isActing}
+          onApprove={() => setBulkTarget("approve")}
+          onReject={() => setBulkTarget("reject")}
+        />
         <DataTable
           columns={columns}
           data={items}
@@ -250,6 +336,61 @@ export function CeoRegularizationApprovalQueue({
           <Label htmlFor="reject-notes">Rejection reason (optional)</Label>
           <textarea
             id="reject-notes"
+            className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={rejectNotes}
+            onChange={(event) => setRejectNotes(event.target.value)}
+            placeholder="Provide a reason for rejection"
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "approve"}
+        onOpenChange={(open) => !open && closeModal()}
+        title="Approve selected regularizations"
+        description={`Approve ${selection.selectedCount} regularization request${selection.selectedCount === 1 ? "" : "s"}?`}
+        showCancel={false}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeModal} disabled={isActing}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkApprove} disabled={isActing}>
+              Approve selected
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Each selected request will be approved with the same rules as a single approval.
+        </p>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "reject"}
+        onOpenChange={(open) => !open && closeModal()}
+        title="Reject selected regularizations"
+        description={`Reject ${selection.selectedCount} regularization request${selection.selectedCount === 1 ? "" : "s"}?`}
+        showCancel={false}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeModal} disabled={isActing}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkReject}
+              disabled={isActing}
+            >
+              Reject selected
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="bulk-reject-notes">Rejection reason (optional)</Label>
+          <textarea
+            id="bulk-reject-notes"
             className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={rejectNotes}
             onChange={(event) => setRejectNotes(event.target.value)}

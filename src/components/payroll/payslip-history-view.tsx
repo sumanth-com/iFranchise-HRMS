@@ -20,7 +20,12 @@ import { toast } from "sonner";
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
 import { PayrollSendPayslipDialog } from "@/components/payroll/payroll-run-item-dialogs";
+import {
+  ApprovalSelectCheckbox,
+  useApprovalSelection,
+} from "@/components/approvals/approval-bulk-selection";
 import { Button, buttonVariants } from "@/components/common/button";
+import { Modal } from "@/components/common/modal";
 import {
   TABLE_HEADER_CELL_CLASS,
   TABLE_HEADER_ROW_CLASS,
@@ -42,7 +47,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { emailMyPayslipAction } from "@/lib/employee/actions/employee-payroll-actions";
-import { emailPayslipAction, ensurePayrollItemPayslipAction } from "@/lib/payroll/actions";
+import {
+  emailPayslipAction,
+  ensurePayrollItemPayslipAction,
+  releaseEmployeePayslipAction,
+} from "@/lib/payroll/actions";
 import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-publication";
 import {
   formatCurrency,
@@ -267,6 +276,10 @@ function PayslipStatusIndicator({ row }: { row: PayslipListItem }) {
   );
 }
 
+function canSendPayslipRow(row: PayslipListItem) {
+  return Boolean(row.payrollItemId) && !row.payslipSent;
+}
+
 function PayslipTable({
   rows,
   mode,
@@ -274,6 +287,8 @@ function PayslipTable({
   onPreview,
   onSend,
   viewingId,
+  selection,
+  selectionDisabled,
 }: {
   rows: PayslipListItem[];
   mode: "employee" | "hr";
@@ -281,13 +296,39 @@ function PayslipTable({
   onPreview: (row: PayslipListItem) => void;
   onSend?: (row: PayslipListItem) => void;
   viewingId?: string | null;
+  selection?: ReturnType<typeof useApprovalSelection>;
+  selectionDisabled?: boolean;
 }) {
   if (mode === "hr") {
+    const showSelect = Boolean(selection);
     return (
       <table className="w-full min-w-[72rem] bg-white text-sm dark:bg-input">
         <thead className={TABLE_HEADER_STICKY_CLASS}>
           <tr className={TABLE_HEADER_ROW_CLASS}>
-            <th className={payrollStickyEmployeeHeaderClass("min-w-[14rem]")}>Employee</th>
+            {showSelect ? (
+              <th
+                className={cn(
+                  TABLE_HEADER_CELL_CLASS,
+                  "sticky left-0 top-0 z-40 w-[2.75rem] min-w-[2.75rem] bg-blue-600 px-2",
+                )}
+              >
+                <ApprovalSelectCheckbox
+                  checked={selection!.allSelected}
+                  indeterminate={selection!.someSelected}
+                  disabled={selectionDisabled}
+                  ariaLabel="Select all sendable payslips"
+                  onCheckedChange={selection!.toggleAll}
+                />
+              </th>
+            ) : null}
+            <th
+              className={cn(
+                payrollStickyEmployeeHeaderClass("min-w-[14rem]"),
+                showSelect && "left-[2.75rem]",
+              )}
+            >
+              Employee
+            </th>
             <th className={payrollStickyHeaderCellClass()}>Department</th>
             <th className={payrollStickyHeaderCellClass()}>Monthly salary</th>
             <th className={payrollStickyHeaderCellClass()}>Gross Earning</th>
@@ -302,9 +343,35 @@ function PayslipTable({
         <tbody className="bg-white dark:bg-input">
           {rows.map((row) => {
             const amounts = payslipAmounts(row);
+            const selectable = canSendPayslipRow(row);
+            const rowKey = row.payrollItemId ?? row.id;
             return (
-            <tr key={row.payrollItemId ?? row.id} className="group border-b last:border-b-0 hover:bg-zinc-50 dark:hover:bg-input/80">
-              <td className={payrollStickyEmployeeBodyClass("min-w-[14rem]")}>
+            <tr key={rowKey} className="group border-b last:border-b-0 hover:bg-zinc-50 dark:hover:bg-input/80">
+              {showSelect ? (
+                <td
+                  className={cn(
+                    "sticky left-0 z-20 w-[2.75rem] min-w-[2.75rem] border-r border-input/40 bg-white px-2 py-3 dark:bg-input",
+                    "group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+                  )}
+                >
+                  {selectable ? (
+                    <ApprovalSelectCheckbox
+                      checked={selection!.selectedIds.has(row.payrollItemId!)}
+                      disabled={selectionDisabled}
+                      ariaLabel={`Select payslip for ${row.employeeName}`}
+                      onCheckedChange={(checked) =>
+                        selection!.toggleOne(row.payrollItemId!, checked)
+                      }
+                    />
+                  ) : null}
+                </td>
+              ) : null}
+              <td
+                className={cn(
+                  payrollStickyEmployeeBodyClass("min-w-[14rem]"),
+                  showSelect && "left-[2.75rem]",
+                )}
+              >
                 <div className="truncate whitespace-nowrap font-medium" title={row.employeeName}>
                   {row.employeeName}
                 </div>
@@ -435,6 +502,8 @@ export function PayslipHistoryView({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [sendTarget, setSendTarget] = useState<PayslipListItem | null>(null);
+  const [bulkSendOpen, setBulkSendOpen] = useState(false);
+  const [bulkSending, setBulkSending] = useState(false);
   const [rows, setRows] = useState(history.data);
   const [stats, setStats] = useState(history.stats);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
@@ -454,6 +523,14 @@ export function PayslipHistoryView({
 
   const yearOptions = useMemo(() => getHrmsYears(), []);
 
+  const sendableIds = useMemo(
+    () =>
+      mode === "hr"
+        ? rows.filter(canSendPayslipRow).map((row) => row.payrollItemId!)
+        : [],
+    [mode, rows],
+  );
+  const selection = useApprovalSelection(sendableIds);
   const updateParams = useCallback(
     (nextMonth: string, nextYear: string, extra?: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -550,6 +627,79 @@ export function PayslipHistoryView({
       underReviewCount: Math.max(0, prev.underReviewCount - 1),
       totalPayslips: prev.totalPayslips + 1,
     }));
+  }
+
+  function markRowsSent(payrollItemIds: string[]) {
+    if (payrollItemIds.length === 0) return;
+    const sentAt = new Date().toISOString();
+    const idSet = new Set(payrollItemIds);
+    setRows((prev) =>
+      prev.map((entry) =>
+        entry.payrollItemId && idSet.has(entry.payrollItemId)
+          ? {
+              ...entry,
+              payslipSent: true,
+              paymentStatus: "Sent",
+              availability: "available",
+              canEmployeeAccess: true,
+              reviewMessage: null,
+              publishedAt: entry.publishedAt || sentAt,
+            }
+          : entry,
+      ),
+    );
+    setStats((prev) => ({
+      ...prev,
+      creditedCount: prev.creditedCount + payrollItemIds.length,
+      underReviewCount: Math.max(0, prev.underReviewCount - payrollItemIds.length),
+      totalPayslips: prev.totalPayslips + payrollItemIds.length,
+    }));
+  }
+
+  async function handleBulkSend() {
+    if (bulkSending || selection.selectedList.length === 0) return;
+    setBulkSending(true);
+    const ids = selection.selectedList;
+    let succeeded = 0;
+    let failed = 0;
+    let firstError: string | null = null;
+    const sentIds: string[] = [];
+
+    try {
+      for (const payrollItemId of ids) {
+        const result = await releaseEmployeePayslipAction(payrollItemId);
+        if (!result.success) {
+          failed += 1;
+          if (!firstError) firstError = result.message;
+          continue;
+        }
+        succeeded += 1;
+        sentIds.push(payrollItemId);
+      }
+
+      if (sentIds.length > 0) {
+        markRowsSent(sentIds);
+        selection.clearSelection();
+      }
+
+      if (succeeded === 0) {
+        toast.error(firstError ?? "Failed to send selected payslips");
+        return;
+      }
+
+      setBulkSendOpen(false);
+      if (failed > 0) {
+        toast.warning(`Sent ${succeeded} of ${ids.length}. ${failed} failed.`);
+      } else {
+        toast.success(
+          succeeded === 1
+            ? "Payslip sent successfully."
+            : `Sent ${succeeded} payslips successfully.`,
+        );
+      }
+    } finally {
+      setBulkSending(false);
+    }
   }
 
   return (
@@ -681,6 +831,23 @@ export function PayslipHistoryView({
         </div>
       ) : null}
 
+      {mode === "hr" && selection.selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2">
+          <p className="text-sm font-medium text-foreground">
+            {selection.selectedCount} selected
+          </p>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5"
+            disabled={bulkSending || isPending}
+            onClick={() => setBulkSendOpen(true)}
+          >
+            <Send className="size-3.5" />
+            Send selected
+          </Button>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className={PAYROLL_TABLE_SCROLL_CLASS}>
           {isPending ? (
@@ -696,6 +863,8 @@ export function PayslipHistoryView({
               onPreview={openPreview}
               onSend={mode === "hr" ? setSendTarget : undefined}
               viewingId={viewingId}
+              selection={mode === "hr" ? selection : undefined}
+              selectionDisabled={bulkSending || isPending}
             />
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">
@@ -770,6 +939,48 @@ export function PayslipHistoryView({
               setSendTarget(null);
             }}
           />
+          <Modal
+            open={bulkSendOpen}
+            onOpenChange={(open) => {
+              if (bulkSending) return;
+              setBulkSendOpen(open);
+            }}
+            title="Send selected payslips"
+            description={`Release ${selection.selectedCount} payslip${selection.selectedCount === 1 ? "" : "s"} to employees?`}
+            contentClassName="sm:max-w-md"
+            showCancel={false}
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={bulkSending}
+                  onClick={() => setBulkSendOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={bulkSending || selection.selectedCount === 0}
+                  onClick={() => void handleBulkSend()}
+                >
+                  {bulkSending ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    `Send ${selection.selectedCount}`
+                  )}
+                </Button>
+              </>
+            }
+          >
+            <p className="text-sm text-muted-foreground">
+              Employees will be able to view these payslips in their portal. Email delivery is
+              attempted when an address is on file.
+            </p>
+          </Modal>
         </>
       ) : (
         <EmployeePayslipDrawer

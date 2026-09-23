@@ -31,7 +31,8 @@ function revalidateCeoNotifications() {
   revalidatePath(CEO_ROUTES.notifications);
   revalidatePath(CEO_ROUTES.notificationsCenter);
   revalidatePath(CEO_ROUTES.notificationsHistory);
-  revalidatePath("/", "layout");
+  // Keep shell mounted — avoid revalidatePath("/", "layout") which remounts every portal.
+  revalidatePath(CEO_ROUTES.home);
 }
 
 export async function getCeoNotificationsModuleData(

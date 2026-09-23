@@ -322,6 +322,7 @@ export async function releaseEmployeePayslipAction(
       "payroll.process",
       "payslip.generate",
       "payroll.download",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = sendEmployeePayslipSchema.parse({ payrollItemId });

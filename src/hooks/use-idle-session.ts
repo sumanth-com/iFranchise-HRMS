@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { idleSessionLogoutAction, touchSessionActivityAction } from "@/lib/auth/actions";
 import {
+  IDLE_ACTIVITY_COOKIE_REFRESH_MS,
   IDLE_ACTIVITY_STORAGE_KEY,
   IDLE_LOGOUT_BROADCAST_KEY,
 } from "@/lib/auth/constants";
@@ -17,7 +18,7 @@ const ACTIVITY_EVENTS = [
   "touchstart",
 ] as const;
 
-const ACTIVITY_DEBOUNCE_MS = 30_000;
+const ACTIVITY_DEBOUNCE_MS = IDLE_ACTIVITY_COOKIE_REFRESH_MS;
 const IDLE_CHECK_INTERVAL_MS = 60_000;
 
 function readStoredActivity(): number {

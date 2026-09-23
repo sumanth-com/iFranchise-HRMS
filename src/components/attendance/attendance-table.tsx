@@ -28,6 +28,10 @@ import {
 import { AttendanceLocationDialog } from "@/components/attendance/attendance-location-dialog";
 import { ManualAttendanceStatusDialog } from "@/components/attendance/manual-attendance-status-dialog";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
+import {
+  ApprovalSelectCheckbox,
+  useApprovalSelection,
+} from "@/components/approvals/approval-bulk-selection";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
@@ -139,7 +143,7 @@ function formatDateRangeLabel(
 
 type AttendanceColumnMeta = {
   align?: "left" | "center";
-  sticky?: "id" | "name";
+  sticky?: "select" | "id" | "name";
 };
 
 const TABLE_HEAD_ROW_CLASS =
@@ -148,14 +152,36 @@ const TABLE_HEAD_CELL_BASE =
   "h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white";
 const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
 const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
+const STICKY_SELECT_WIDTH = "min-w-[2.75rem] w-[2.75rem]";
 const STICKY_ID_WIDTH = "min-w-[8.75rem] w-[8.75rem]";
 const STICKY_NAME_WIDTH = "min-w-[12.5rem] w-[12.5rem]";
+const STICKY_SELECT_LEFT = "left-0";
 const STICKY_ID_LEFT = "left-0";
+const STICKY_ID_LEFT_WITH_SELECT = "left-[2.75rem]";
 const STICKY_NAME_LEFT = "left-[8.75rem]";
+const STICKY_NAME_LEFT_WITH_SELECT = "left-[11.5rem]";
+const STICKY_HEADER_SELECT_CLASS = cn(
+  TABLE_HEAD_CELL_BASE,
+  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 px-2 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
+  STICKY_SELECT_LEFT,
+  STICKY_SELECT_WIDTH,
+);
+const STICKY_BODY_SELECT_CLASS = cn(
+  TABLE_DATA_CELL_BASE,
+  "sticky z-20 border-r border-input/40 bg-white px-2 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  STICKY_SELECT_LEFT,
+  STICKY_SELECT_WIDTH,
+);
 const STICKY_HEADER_ID_CLASS = cn(
   TABLE_HEAD_CELL_BASE,
   "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
   STICKY_ID_LEFT,
+  STICKY_ID_WIDTH,
+);
+const STICKY_HEADER_ID_WITH_SELECT_CLASS = cn(
+  TABLE_HEAD_CELL_BASE,
+  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
+  STICKY_ID_LEFT_WITH_SELECT,
   STICKY_ID_WIDTH,
 );
 const STICKY_HEADER_NAME_CLASS = cn(
@@ -164,16 +190,34 @@ const STICKY_HEADER_NAME_CLASS = cn(
   STICKY_NAME_LEFT,
   STICKY_NAME_WIDTH,
 );
+const STICKY_HEADER_NAME_WITH_SELECT_CLASS = cn(
+  TABLE_HEAD_CELL_BASE,
+  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
+  STICKY_NAME_LEFT_WITH_SELECT,
+  STICKY_NAME_WIDTH,
+);
 const STICKY_BODY_ID_CLASS = cn(
   TABLE_DATA_CELL_BASE,
   "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
   STICKY_ID_LEFT,
   STICKY_ID_WIDTH,
 );
+const STICKY_BODY_ID_WITH_SELECT_CLASS = cn(
+  TABLE_DATA_CELL_BASE,
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  STICKY_ID_LEFT_WITH_SELECT,
+  STICKY_ID_WIDTH,
+);
 const STICKY_BODY_NAME_CLASS = cn(
   TABLE_DATA_CELL_BASE,
   "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
   STICKY_NAME_LEFT,
+  STICKY_NAME_WIDTH,
+);
+const STICKY_BODY_NAME_WITH_SELECT_CLASS = cn(
+  TABLE_DATA_CELL_BASE,
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  STICKY_NAME_LEFT_WITH_SELECT,
   STICKY_NAME_WIDTH,
 );
 
@@ -222,7 +266,7 @@ export function AttendanceTable({
   const [rowTotal, setRowTotal] = useState(total);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
-  const [manualTarget, setManualTarget] = useState<AttendanceListItem | null>(null);
+  const [statusTargets, setStatusTargets] = useState<AttendanceListItem[]>([]);
   const [locationTarget, setLocationTarget] = useState<{
     attendanceId: string;
     point: AttendanceLocationPointKind;
@@ -240,6 +284,13 @@ export function AttendanceTable({
   useEffect(() => {
     navigationLockRef.current = false;
   }, [attendanceStatus, employeeId, departmentId, dateFrom, dateTo, page, search]);
+
+  const showManualStatusAction = canCreate || canEdit;
+  const selectableIds = useMemo(
+    () => (showManualStatusAction ? rows.map((row) => row.id) : []),
+    [rows, showManualStatusAction],
+  );
+  const selection = useApprovalSelection(selectableIds);
 
   const resolvedListPath = listBasePath ?? ATTENDANCE_ROUTES.list;
 
@@ -372,13 +423,11 @@ export function AttendanceTable({
     updateParams(updates);
   };
 
-  const showManualStatusAction = canCreate || canEdit;
-
   const openAttendanceRecord = useCallback(
     (record: AttendanceListItem) => {
       if (isVirtualAttendanceId(record.id)) {
         if (showManualStatusAction) {
-          setManualTarget(record);
+          setStatusTargets([record]);
           return;
         }
         toast.message("No attendance recorded for this date yet.");
@@ -416,6 +465,33 @@ export function AttendanceTable({
 
   const columns = useMemo<ColumnDef<AttendanceListItem, unknown>[]>(
     () => [
+      ...(showManualStatusAction
+        ? [
+            {
+              id: "select",
+              header: () => (
+                <ApprovalSelectCheckbox
+                  checked={selection.allSelected}
+                  indeterminate={selection.someSelected}
+                  disabled={isPending || selectableIds.length === 0}
+                  ariaLabel="Select all attendance rows"
+                  onCheckedChange={selection.toggleAll}
+                />
+              ),
+              meta: { sticky: "select" } satisfies AttendanceColumnMeta,
+              cell: ({ row }: { row: { original: AttendanceListItem } }) => (
+                <ApprovalSelectCheckbox
+                  checked={selection.selectedIds.has(row.original.id)}
+                  disabled={isPending}
+                  ariaLabel={`Select ${row.original.employeeName}`}
+                  onCheckedChange={(checked) =>
+                    selection.toggleOne(row.original.id, checked)
+                  }
+                />
+              ),
+            } as ColumnDef<AttendanceListItem, unknown>,
+          ]
+        : []),
       {
         id: "employeeCode",
         accessorKey: "employeeCode",
@@ -538,7 +614,7 @@ export function AttendanceTable({
                   size="icon-sm"
                   aria-label="Update attendance"
                   title="Update attendance"
-                  onClick={() => setManualTarget(row.original)}
+                  onClick={() => setStatusTargets([row.original])}
                 >
                   <Pencil className="size-4 text-violet-600" />
                 </Button>
@@ -597,8 +673,11 @@ export function AttendanceTable({
       canApproveCorrections,
       canCreate,
       canDelete,
+      isPending,
       isReviewing,
       openAttendanceRecord,
+      selectableIds.length,
+      selection,
       showManualStatusAction,
       teamRegularizationMode,
       handleCorrectionReview,
@@ -818,6 +897,29 @@ export function AttendanceTable({
         </p>
       ) : null}
 
+      {showManualStatusAction && selection.selectedCount > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2">
+          <p className="text-sm font-medium text-foreground">
+            {selection.selectedCount} selected
+          </p>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5"
+            disabled={isPending}
+            onClick={() => {
+              const selected = rows.filter((row) =>
+                selection.selectedIds.has(row.id),
+              );
+              if (selected.length === 0) return;
+              setStatusTargets(selected);
+            }}
+          >
+            <Pencil className="size-3.5" />
+            Change status
+          </Button>
+        </div>
+      ) : null}
+
       <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
         <table
           data-slot="table"
@@ -831,11 +933,17 @@ export function AttendanceTable({
                   const isActions = header.column.id === "actions";
                   const isCenter = meta?.align === "center";
                   const stickyClass =
-                    meta?.sticky === "id"
-                      ? STICKY_HEADER_ID_CLASS
-                      : meta?.sticky === "name"
-                        ? STICKY_HEADER_NAME_CLASS
-                        : null;
+                    meta?.sticky === "select"
+                      ? STICKY_HEADER_SELECT_CLASS
+                      : meta?.sticky === "id"
+                        ? showManualStatusAction
+                          ? STICKY_HEADER_ID_WITH_SELECT_CLASS
+                          : STICKY_HEADER_ID_CLASS
+                        : meta?.sticky === "name"
+                          ? showManualStatusAction
+                            ? STICKY_HEADER_NAME_WITH_SELECT_CLASS
+                            : STICKY_HEADER_NAME_CLASS
+                          : null;
 
                   return (
                     <TableHead
@@ -877,13 +985,20 @@ export function AttendanceTable({
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta as AttendanceColumnMeta | undefined;
                     const isActions = cell.column.id === "actions";
+                    const isSelect = cell.column.id === "select";
                     const isCenter = meta?.align === "center";
                     const stickyClass =
-                      meta?.sticky === "id"
-                        ? STICKY_BODY_ID_CLASS
-                        : meta?.sticky === "name"
-                          ? STICKY_BODY_NAME_CLASS
-                          : null;
+                      meta?.sticky === "select"
+                        ? STICKY_BODY_SELECT_CLASS
+                        : meta?.sticky === "id"
+                          ? showManualStatusAction
+                            ? STICKY_BODY_ID_WITH_SELECT_CLASS
+                            : STICKY_BODY_ID_CLASS
+                          : meta?.sticky === "name"
+                            ? showManualStatusAction
+                              ? STICKY_BODY_NAME_WITH_SELECT_CLASS
+                              : STICKY_BODY_NAME_CLASS
+                            : null;
 
                     return (
                       <TableCell
@@ -894,7 +1009,9 @@ export function AttendanceTable({
                           isCenter && "text-center",
                         )}
                         onClick={
-                          isActions ? (event) => event.stopPropagation() : undefined
+                          isActions || isSelect
+                            ? (event) => event.stopPropagation()
+                            : undefined
                         }
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -949,36 +1066,47 @@ export function AttendanceTable({
       />
 
       <ManualAttendanceStatusDialog
-        record={manualTarget}
-        open={Boolean(manualTarget)}
+        records={statusTargets}
+        open={statusTargets.length > 0}
         onOpenChange={(open) => {
-          if (!open) setManualTarget(null);
+          if (!open) setStatusTargets([]);
         }}
-        onSaved={(next) => {
+        onSaved={(results) => {
           const statusFilter = attendanceStatus?.trim() || null;
-          const droppedByFilter =
-            Boolean(statusFilter) && statusFilter !== next.attendanceStatus;
+          const resultByPreviousId = new Map(
+            results.map((result) => [result.previousId, result]),
+          );
+          let dropped = 0;
 
           setRows((current) => {
-            if (droppedByFilter) {
-              return current.filter((row) => row.id !== next.previousId);
+            const next: AttendanceListItem[] = [];
+            for (const row of current) {
+              const update = resultByPreviousId.get(row.id);
+              if (!update) {
+                next.push(row);
+                continue;
+              }
+              const droppedByFilter =
+                Boolean(statusFilter) && statusFilter !== update.attendanceStatus;
+              if (droppedByFilter) {
+                dropped += 1;
+                continue;
+              }
+              next.push({
+                ...row,
+                id: update.id,
+                attendanceStatus: update.attendanceStatus,
+                checkInAt: update.checkInAt,
+                checkOutAt: update.checkOutAt,
+                workHours: update.workHours,
+              });
             }
-            return current.map((row) =>
-              row.id === next.previousId
-                ? {
-                    ...row,
-                    id: next.id,
-                    attendanceStatus: next.attendanceStatus,
-                    checkInAt: next.checkInAt,
-                    checkOutAt: next.checkOutAt,
-                    workHours: next.workHours,
-                  }
-                : row,
-            );
+            return next;
           });
-          if (droppedByFilter) {
-            setRowTotal((current) => Math.max(0, current - 1));
+          if (dropped > 0) {
+            setRowTotal((current) => Math.max(0, current - dropped));
           }
+          selection.clearSelection();
           router.refresh();
         }}
       />

@@ -6,6 +6,8 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, type MouseEvent } from "react";
 
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
@@ -22,11 +24,24 @@ function formatPercent(value: number | null | undefined) {
   return `${safe.toFixed(safe % 1 === 0 ? 0 : 1)}%`;
 }
 
+/** Always open Approvals → Leave (never Executive). */
+const PENDING_APPROVALS_HREF = CEO_ROUTES.approvalsLeave;
+
 export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
+  const router = useRouter();
   const attendancePercent = asNumber(kpis.attendancePercent);
   const pendingApprovals = asNumber(kpis.pendingApprovals);
   const pendingLeaveApprovals = asNumber(kpis.pendingLeaveApprovals);
   const totalPendingApprovals = pendingApprovals + pendingLeaveApprovals;
+
+  const openLeaveApprovals = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      // Force Leave tab even if a stale client bundle still linked to Executive.
+      event.preventDefault();
+      router.push(PENDING_APPROVALS_HREF);
+    },
+    [router],
+  );
 
   return (
     <section
@@ -69,9 +84,8 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
         }
         iconBg={totalPendingApprovals > 0 ? "bg-violet-500/10" : "bg-muted"}
         tone="violet"
-        href={
-          pendingLeaveApprovals > 0 ? CEO_ROUTES.approvalsLeave : CEO_ROUTES.approvals
-        }
+        href={PENDING_APPROVALS_HREF}
+        onClick={openLeaveApprovals}
       />
       <EmployeeStatCard
         label="Payroll Cost"

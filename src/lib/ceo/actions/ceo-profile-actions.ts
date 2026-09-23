@@ -35,7 +35,8 @@ import { z } from "zod";
 function revalidateCeoProfile() {
   revalidatePath(CEO_ROUTES.profile);
   revalidatePath(CEO_ROUTES.settings);
-  revalidatePath("/", "layout");
+  // Keep shell mounted — avoid revalidatePath("/", "layout") which remounts every portal.
+  revalidatePath(CEO_ROUTES.home);
 }
 
 export async function getCeoProfileModuleData(): Promise<CeoProfilePageData> {

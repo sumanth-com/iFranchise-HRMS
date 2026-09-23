@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CalendarDays, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -90,7 +90,7 @@ export function EmployeeStatCard({
   hint?: string;
   tone?: EmployeeStatCardTone;
   href?: string;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
   active?: boolean;
   compact?: boolean;
   tall?: boolean;
@@ -155,7 +155,7 @@ export function EmployeeStatCard({
 
   if (href) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} className={className} onClick={onClick}>
         {content}
       </Link>
     );

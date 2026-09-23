@@ -40,6 +40,16 @@ export const resignationDecisionSchema = z.object({
   rejectedReason: z.string().trim().max(2000).optional().nullable(),
 });
 
+export const resignationBulkDecisionSchema = z.object({
+  resignationIds: z
+    .array(z.string().uuid())
+    .min(1, "Select at least one resignation")
+    .max(50, "You can process up to 50 resignations at once"),
+  decision: z.enum(["approve", "reject"]),
+  remarks: z.string().trim().max(2000).optional().nullable(),
+  rejectedReason: z.string().trim().max(2000).optional().nullable(),
+});
+
 export const clearanceDecisionSchema = z.object({
   clearanceId: z.string().uuid(),
   clearanceStatus: z.enum(["approved", "rejected", "not_required"]),

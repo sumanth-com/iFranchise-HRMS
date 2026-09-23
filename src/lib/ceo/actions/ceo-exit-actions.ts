@@ -13,6 +13,7 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import { ceoLeaveCalendarSchema } from "@/lib/validations/ceo-leave";
 import {
+  resignationBulkDecisionSchema,
   resignationDecisionSchema,
 } from "@/lib/validations/exit";
 import type { ExitResignationItem } from "@/types/exit";
@@ -87,6 +88,70 @@ export async function decideCeoExitAction(
         error instanceof Error
           ? error.message
           : "Failed to process CEO exit decision",
+    };
+  }
+}
+
+export async function bulkDecideCeoExitAction(
+  input: unknown,
+): Promise<
+  ActionResult<{ succeeded: number; failed: number; errors: string[] }>
+> {
+  try {
+    const profile = await requireServerAnyPermission([
+      PORTAL_PERMISSIONS.ceo,
+      "exit.approve",
+    ]);
+    const supabase = await createClient();
+    const parsed = resignationBulkDecisionSchema.parse(input);
+
+    if (
+      parsed.decision === "reject" &&
+      (parsed.rejectedReason?.trim().length ?? 0) < 3
+    ) {
+      return {
+        success: false,
+        message: "Rejection reason is required (minimum 3 characters)",
+      };
+    }
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const resignationId of parsed.resignationIds) {
+      try {
+        await decideResignation(
+          supabase,
+          profile,
+          {
+            resignationId,
+            decision: parsed.decision,
+            remarks: parsed.remarks,
+            rejectedReason: parsed.rejectedReason,
+          },
+          "ceo",
+        );
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Decision failed",
+          );
+        }
+      }
+    }
+
+    revalidatePath(CEO_ROUTES.approvalsExit);
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to process bulk CEO exit decisions",
     };
   }
 }

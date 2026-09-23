@@ -130,6 +130,21 @@ export const leaveRejectSchema = leaveApprovalSchema.extend({
   comments: z.string().min(3, "Rejection reason is required").max(500),
 });
 
+const leaveBulkIdList = z
+  .array(z.string().uuid())
+  .min(1, "Select at least one request")
+  .max(50, "You can process up to 50 requests at once");
+
+export const leaveBulkApprovalSchema = z.object({
+  leaveRequestIds: leaveBulkIdList,
+  comments: z.string().max(500).optional().or(z.literal("")),
+});
+
+export const leaveBulkRejectSchema = z.object({
+  leaveRequestIds: leaveBulkIdList,
+  comments: z.string().min(3, "Rejection reason is required").max(500),
+});
+
 export const hrLeaveReviewDecisionSchema = z.object({
   leaveRequestId: z.string().uuid(),
   decision: z.enum(["lop", "special", "reject"]),

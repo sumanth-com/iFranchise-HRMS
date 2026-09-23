@@ -12,7 +12,9 @@ import {
   AUTH_ROUTES,
 } from "@/lib/auth/constants";
 import {
+  parseActivityTimestamp,
   resolveActivityCookieMaxAge,
+  shouldRewriteIdleActivityCookie,
 } from "@/lib/auth/idle-session";
 import {
   getAuthErrorMessage,
@@ -30,6 +32,8 @@ import { sendHrmsPasswordResetEmail } from "@/lib/auth/password-reset-service";
 import {
   clearPermissionCacheCookie,
   getVerifiedPermissionCodesForUser,
+  getVerifiedPermissionPayloadForUser,
+  permissionPayloadChanged,
   setPermissionCacheCookie,
 } from "@/lib/auth/permission-cache";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
@@ -91,12 +95,25 @@ async function applyRememberMePreference(rememberMe: boolean) {
   });
 }
 
-async function touchIdleActivityCookie(rememberMe?: boolean) {
+async function touchIdleActivityCookie(
+  rememberMe?: boolean,
+  options?: { force?: boolean },
+) {
   const cookieStore = await cookies();
   let resolvedRememberMe = rememberMe;
 
   if (resolvedRememberMe === undefined) {
     resolvedRememberMe = cookieStore.get("remember_me")?.value === "1";
+  }
+
+  // Skip no-op rewrites — Set-Cookie on Server Actions also drops the client router cache.
+  if (!options?.force) {
+    const lastActivityMs = parseActivityTimestamp(
+      cookieStore.get(IDLE_ACTIVITY_COOKIE)?.value,
+    );
+    if (!shouldRewriteIdleActivityCookie(lastActivityMs)) {
+      return;
+    }
   }
 
   cookieStore.set(IDLE_ACTIVITY_COOKIE, Date.now().toString(), {
@@ -131,8 +148,9 @@ export async function idleSessionLogoutAction(): Promise<void> {
 
 /**
  * Re-resolve portal.*.access from the live DB and rewrite the signed permission
- * cookie. Does NOT clear the cookie first (that forced a cold middleware + layout
- * permission waterfall on every focus/timer sync).
+ * cookie only when codes/roles actually changed. Rewriting cookies on every
+ * focus/timer sync invalidates the Next.js client router cache and re-runs
+ * layout profile RSC — even when nothing changed.
  *
  * Returns `changed: true` only when permission codes differ from the prior cookie
  * so callers can skip an unnecessary `router.refresh()`.
@@ -148,24 +166,27 @@ export async function refreshSessionPermissionsAction(): Promise<
     }
 
     const supabase = session.supabase ?? (await createClient());
-    const previousCodes = await getVerifiedPermissionCodesForUser(session.user.id);
+    const previous = await getVerifiedPermissionPayloadForUser(session.user.id);
     const [permissionCodes, roleCodes] = await Promise.all([
       resolveUserPermissionCodes(supabase, session.user.id),
       resolveUserRoleCodes(supabase, session.user.id),
     ]);
 
-    await setPermissionCacheCookie(
-      session.user.id,
+    const changed = permissionPayloadChanged(
+      previous,
       permissionCodes,
-      true,
       roleCodes,
     );
 
-    const prev = previousCodes ?? [];
-    const changed =
-      prev.length !== permissionCodes.length ||
-      prev.some((code) => !permissionCodes.includes(code)) ||
-      permissionCodes.some((code) => !prev.includes(code));
+    // Skip cookies().set when unchanged — cookie writes force App Router cache invalidation.
+    if (changed) {
+      await setPermissionCacheCookie(
+        session.user.id,
+        permissionCodes,
+        true,
+        roleCodes,
+      );
+    }
 
     return { success: true, changed };
   } catch (error) {
@@ -304,7 +325,7 @@ export async function loginAction(
     }
 
     await applyRememberMePreference(rememberMe);
-    await touchIdleActivityCookie(rememberMe);
+    await touchIdleActivityCookie(rememberMe, { force: true });
 
     const userId = authData.user.id;
     const employee = profileResult.profile.employee;

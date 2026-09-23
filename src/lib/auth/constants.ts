@@ -50,8 +50,17 @@ export const REMEMBERED_EMAIL_STORAGE_KEY = "ifranchise-hrms-remembered-email";
 /** HttpOnly cookie tracking last meaningful activity (server-enforced idle timeout) */
 export const IDLE_ACTIVITY_COOKIE = "hrms_last_activity";
 
+/**
+ * Minimum gap between idle-activity cookie rewrites.
+ * Rewriting Set-Cookie on every soft-nav RSC flight invalidates the App Router
+ * client cache (and defeats experimental.staleTimes), causing skeleton + refetch
+ * on every module switch — including return visits.
+ */
+export const IDLE_ACTIVITY_COOKIE_REFRESH_MS = 5 * 60 * 1000;
+
 /** 2 hours of inactivity before silent session expiration */
 export const IDLE_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
 
 /** 30 days when "Remember me" is checked */
 export const REMEMBER_ME_MAX_AGE = 60 * 60 * 24 * 30;

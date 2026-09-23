@@ -54,6 +54,9 @@ const MODULE_PREFIX_MAPPINGS: Record<string, string> = {
 
   // Accountant Team Payroll (all section tabs highlight Team Payroll nav)
   "/accountant/payroll": "/accountant/payroll/run",
+
+  // CEO Team Payroll (run / payslips / reimbursements / accounts → Team Payroll nav)
+  "/ceo/payroll": "/ceo/payroll/run",
 };
 
 function navItemPath(href: string | null | undefined) {

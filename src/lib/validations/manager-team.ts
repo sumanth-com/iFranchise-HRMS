@@ -33,3 +33,11 @@ export const teamCorrectionReviewSchema = z.object({
   correctionId: z.string().uuid(),
   reviewNotes: z.string().max(2000).optional(),
 });
+
+export const teamCorrectionBulkReviewSchema = z.object({
+  correctionIds: z
+    .array(z.string().uuid())
+    .min(1, "Select at least one request")
+    .max(50, "You can process up to 50 requests at once"),
+  reviewNotes: z.string().max(2000).optional(),
+});

@@ -35,7 +35,7 @@ import {
   attendanceListParamsSchema,
   manualAttendanceStatusSchema,
 } from "@/lib/validations/attendance";
-import { teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
+import { teamCorrectionBulkReviewSchema, teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
 import type {
   AttendanceActionResult,
   AttendanceCorrectionDetail,
@@ -202,6 +202,7 @@ export async function setManualAttendanceStatusAction(
     const profile = await requireServerAnyPermission([
       "attendance.create",
       "attendance.edit",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = manualAttendanceStatusSchema.parse(input);
@@ -353,6 +354,100 @@ export async function rejectAttendanceCorrectionAction(input: unknown) {
       success: false as const,
       message:
         error instanceof Error ? error.message : "Failed to reject regularization.",
+    };
+  }
+}
+
+export async function bulkApproveAttendanceCorrectionAction(input: unknown) {
+  try {
+    const parsed = teamCorrectionBulkReviewSchema.parse(input);
+    const profile = await requireServerPermission("attendance.approve");
+    const supabase = await getAuthenticatedSupabase();
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const correctionId of parsed.correctionIds) {
+      try {
+        const result = await reviewOrganizationAttendanceCorrection(
+          supabase,
+          profile,
+          { correctionId, reviewNotes: parsed.reviewNotes },
+          "approved",
+        );
+        if (!result.success) {
+          failed += 1;
+          if (errors.length < 3) errors.push(result.message);
+          continue;
+        }
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Approve failed",
+          );
+        }
+      }
+    }
+
+    revalidateTeamAttendancePaths();
+    return { success: true as const, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk approve regularizations.",
+    };
+  }
+}
+
+export async function bulkRejectAttendanceCorrectionAction(input: unknown) {
+  try {
+    const parsed = teamCorrectionBulkReviewSchema.parse(input);
+    const profile = await requireServerPermission("attendance.approve");
+    const supabase = await getAuthenticatedSupabase();
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const correctionId of parsed.correctionIds) {
+      try {
+        const result = await reviewOrganizationAttendanceCorrection(
+          supabase,
+          profile,
+          { correctionId, reviewNotes: parsed.reviewNotes },
+          "rejected",
+        );
+        if (!result.success) {
+          failed += 1;
+          if (errors.length < 3) errors.push(result.message);
+          continue;
+        }
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Reject failed",
+          );
+        }
+      }
+    }
+
+    revalidateTeamAttendancePaths();
+    return { success: true as const, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk reject regularizations.",
     };
   }
 }

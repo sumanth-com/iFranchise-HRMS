@@ -95,11 +95,16 @@ function touchIdleActivityIfNeeded(
   request: NextRequest,
   response: NextResponse,
 ): void {
+  const lastActivityMs = parseActivityTimestamp(
+    request.cookies.get(IDLE_ACTIVITY_COOKIE)?.value,
+  );
+
   if (
     !shouldRefreshActivityInMiddleware({
       method: request.method,
       pathname: request.nextUrl.pathname,
       headers: request.headers,
+      lastActivityMs,
     })
   ) {
     return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
@@ -24,6 +24,9 @@ function isAuthorizedPath(path: string, allowedPrefixes: string[]) {
 /**
  * Warm the App Router cache for routes the current user can already see in nav.
  * Priority routes prefetch immediately; the rest warm on idle.
+ *
+ * Avoid focusin + pathname-tied re-warm: those fire competing RSC bursts while
+ * the user is still navigating / tabbing through the shell.
  */
 export function InstantNavPrefetch() {
   const router = useRouter();
@@ -33,14 +36,20 @@ export function InstantNavPrefetch() {
   // fires a burst of full RSC requests that compete with the page being navigated to.
   const seenRef = useRef<Set<string>>(new Set());
 
+  // Stabilize effect identity when AuthProvider rebuilds `navigation` with the same hrefs.
+  const navKey = useMemo(
+    () =>
+      navigation
+        .map((item) => (typeof item.href === "string" ? item.href : ""))
+        .filter(Boolean)
+        .join("|"),
+    [navigation],
+  );
+
   useEffect(() => {
     const seen = seenRef.current;
-    const allowedPrefixes = [
-      portalHome,
-      ...navigation
-        .map((item) => (typeof item.href === "string" ? toInternalPath(item.href) : null))
-        .filter((href): href is string => Boolean(href)),
-    ];
+    const navHrefs = navKey.split("|").filter(Boolean);
+    const allowedPrefixes = [portalHome, ...navHrefs];
 
     const prefetch = (href: string | null | undefined) => {
       const path = toInternalPath(href);
@@ -54,13 +63,8 @@ export function InstantNavPrefetch() {
       }
     };
 
-    const navHrefs = navigation
-      .map((item) => (typeof item.href === "string" ? item.href : null))
-      .filter((href): href is string => Boolean(href));
-
     // Warm sidebar modules when the browser is idle so this never competes with the
-    // in-flight navigation. Hover/pointer-down below still prefetches immediately, so
-    // switching stays instant.
+    // in-flight navigation. Pointer-down below still prefetches immediately.
     const warmNavModules = () => {
       prefetch(portalHome);
       for (const href of navHrefs) {
@@ -95,7 +99,8 @@ export function InstantNavPrefetch() {
       capture: true,
       passive: true,
     });
-    document.addEventListener("focusin", onPointerOver, { capture: true });
+    // Intentionally no focusin listener — keyboard focus walked the whole sidebar
+    // and prefetched every module as competing RSC requests.
 
     return () => {
       if (supportsIdle) {
@@ -105,9 +110,8 @@ export function InstantNavPrefetch() {
       }
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("focusin", onPointerOver, true);
     };
-  }, [navigation, portalHome, router]);
+  }, [navKey, portalHome, router]);
 
   return null;
 }

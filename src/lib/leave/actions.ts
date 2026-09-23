@@ -39,6 +39,8 @@ import { optionalHolidaysForList } from "@/lib/leave/optional-holiday";
 import {
   hrLeaveReviewDecisionSchema,
   leaveApprovalSchema,
+  leaveBulkApprovalSchema,
+  leaveBulkRejectSchema,
   leaveFormSchema,
   leaveListParamsSchema,
   leaveRejectSchema,
@@ -159,6 +161,98 @@ export async function rejectLeaveRequestAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to reject leave request",
+    };
+  }
+}
+
+export async function bulkApproveLeaveRequestAction(
+  input: unknown,
+): Promise<
+  LeaveActionResult<{ succeeded: number; failed: number; errors: string[] }>
+> {
+  try {
+    const profile = await requireServerPermission("leave.approve");
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = leaveBulkApprovalSchema.parse(input);
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const leaveRequestId of parsed.leaveRequestIds) {
+      try {
+        await approveLeaveRequest(
+          supabase,
+          profile,
+          leaveRequestId,
+          parsed.comments || undefined,
+        );
+        revalidateLeaveSelfServicePaths(leaveRequestId);
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Approve failed",
+          );
+        }
+      }
+    }
+
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk approve leave requests",
+    };
+  }
+}
+
+export async function bulkRejectLeaveRequestAction(
+  input: unknown,
+): Promise<
+  LeaveActionResult<{ succeeded: number; failed: number; errors: string[] }>
+> {
+  try {
+    const profile = await requireServerPermission("leave.reject");
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = leaveBulkRejectSchema.parse(input);
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const leaveRequestId of parsed.leaveRequestIds) {
+      try {
+        await rejectLeaveRequest(
+          supabase,
+          profile,
+          leaveRequestId,
+          parsed.comments,
+        );
+        revalidateLeaveSelfServicePaths(leaveRequestId);
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Reject failed",
+          );
+        }
+      }
+    }
+
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk reject leave requests",
     };
   }
 }

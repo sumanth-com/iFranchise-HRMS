@@ -2,9 +2,15 @@
 
 import { format, parseISO } from "date-fns";
 import { CheckCircle2, Eye, XCircle } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  ApprovalBulkToolbar,
+  ApprovalSelectCheckbox,
+  summarizeBulkResult,
+  useApprovalSelection,
+} from "@/components/approvals/approval-bulk-selection";
 import { LeavePanel } from "@/components/ceo/leave/ceo-leave-tables";
 import { Button } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
@@ -12,6 +18,8 @@ import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import {
   approveCeoLeaveAction,
+  bulkApproveCeoLeaveAction,
+  bulkRejectCeoLeaveAction,
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
 import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
@@ -50,15 +58,22 @@ export function CeoLeaveApprovalQueue({
   onView,
   onActed,
 }: CeoLeaveApprovalQueueProps) {
+  const rowIds = useMemo(() => items.map((item) => item.id), [items]);
+  const selection = useApprovalSelection(rowIds);
+
   const [target, setTarget] = useState<{
     item: CeoApprovalQueueItem;
     type: "approve" | "reject";
   } | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<"approve" | "reject" | null>(
+    null,
+  );
   const [rejectComments, setRejectComments] = useState("");
   const [isActing, startActing] = useTransition();
 
   const closeModal = () => {
     setTarget(null);
+    setBulkTarget(null);
     setRejectComments("");
   };
 
@@ -103,7 +118,76 @@ export function CeoLeaveApprovalQueue({
     });
   };
 
+  const handleBulkApprove = () => {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    startActing(async () => {
+      const result = await bulkApproveCeoLeaveAction({
+        leaveRequestIds: ids,
+      });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(result.data, "approved");
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      closeModal();
+      selection.clearSelection();
+      broadcastApprovalChange("leave");
+      onActed();
+    });
+  };
+
+  const handleBulkReject = () => {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    if (rejectComments.trim().length < 3) {
+      toast.error("Rejection reason is required");
+      return;
+    }
+    startActing(async () => {
+      const result = await bulkRejectCeoLeaveAction({
+        leaveRequestIds: ids,
+        comments: rejectComments,
+      });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(result.data, "rejected");
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      closeModal();
+      selection.clearSelection();
+      broadcastApprovalChange("leave");
+      onActed();
+    });
+  };
+
   const columns: DataTableColumn<CeoApprovalQueueItem>[] = [
+    {
+      key: "select",
+      header: (
+        <ApprovalSelectCheckbox
+          checked={selection.allSelected}
+          indeterminate={selection.someSelected}
+          disabled={isActing || items.length === 0}
+          ariaLabel="Select all leave requests"
+          onCheckedChange={selection.toggleAll}
+          className="accent-white"
+        />
+      ),
+      className: "w-10",
+      render: (row) => (
+        <ApprovalSelectCheckbox
+          checked={selection.selectedIds.has(row.id)}
+          disabled={isActing}
+          ariaLabel={`Select leave for ${row.employeeName}`}
+          onCheckedChange={(checked) => selection.toggleOne(row.id, checked)}
+        />
+      ),
+    },
     {
       key: "requestCategoryLabel",
       header: "Request Type",
@@ -201,6 +285,12 @@ export function CeoLeaveApprovalQueue({
       description="Leave requests from HR and Manager users routed for executive approval. Employee requests only appear here when assigned to you."
       count={items.length}
     >
+      <ApprovalBulkToolbar
+        selectedCount={selection.selectedCount}
+        disabled={isActing}
+        onApprove={() => setBulkTarget("approve")}
+        onReject={() => setBulkTarget("reject")}
+      />
       <DataTable
         columns={columns}
         data={items}
@@ -257,6 +347,46 @@ export function CeoLeaveApprovalQueue({
           <Label htmlFor="queueRejectComments">Rejection reason</Label>
           <textarea
             id="queueRejectComments"
+            rows={3}
+            value={rejectComments}
+            disabled={isActing}
+            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            onChange={(event) => setRejectComments(event.currentTarget.value)}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "approve"}
+        onOpenChange={(open) => !open && closeModal()}
+        title="Approve selected leave requests"
+        description={`Approve ${selection.selectedCount} leave request${selection.selectedCount === 1 ? "" : "s"}?`}
+        footer={
+          <Button disabled={isActing} onClick={handleBulkApprove}>
+            Confirm & Approve selected
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Each selected request will be approved using the same rules as a single approval.
+        </p>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "reject"}
+        onOpenChange={(open) => !open && closeModal()}
+        title="Reject selected leave requests"
+        description={`Reject ${selection.selectedCount} leave request${selection.selectedCount === 1 ? "" : "s"}?`}
+        footer={
+          <Button variant="destructive" disabled={isActing} onClick={handleBulkReject}>
+            Reject selected
+          </Button>
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="bulkQueueRejectComments">Rejection reason</Label>
+          <textarea
+            id="bulkQueueRejectComments"
             rows={3}
             value={rejectComments}
             disabled={isActing}

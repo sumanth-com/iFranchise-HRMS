@@ -67,12 +67,12 @@ export function CeoTeamAttendanceView({
         employees={employees}
         attendanceLookups={attendanceLookups}
         canCreate={false}
-        canEdit={false}
+        canEdit={true}
         canDelete={false}
         listBasePath={CEO_ROUTES.attendance}
         locationBasePath={CEO_ROUTES.attendance}
         title="Attendance"
-        description="Monitor company-wide attendance records and workforce presence. This page is read-only."
+        description="Monitor company-wide attendance records and workforce presence. Update status for selected employees when needed."
         historyCounts={historyCounts}
         onViewRecord={(row) => {
           setViewAttendanceId(row.id);

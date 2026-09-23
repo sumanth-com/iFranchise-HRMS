@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const APPROVALS_BROADCAST_CHANNEL = "hrms-approvals-sync";
 const APPROVALS_STORAGE_KEY = "hrms_approval_last_sync";
+const FOCUS_REFRESH_THROTTLE_MS = 30_000;
+
+const DEFAULT_APPROVAL_TABLES = [
+  "attendance_corrections",
+  "leave_approvals",
+  "leave_requests",
+  "exit_resignations",
+  "executive_approvals",
+] as const;
 
 export function broadcastApprovalChange(moduleName?: string) {
   if (typeof window === "undefined") return;
@@ -45,29 +54,42 @@ type UseApprovalsSyncOptions = {
 
 export function useApprovalsSync({
   onRefresh,
-  tables = [
-    "attendance_corrections",
-    "leave_approvals",
-    "leave_requests",
-    "exit_resignations",
-    "executive_approvals",
-  ],
+  tables,
   pollIntervalMs = 12000,
   enabled = true,
 }: UseApprovalsSyncOptions) {
   const refreshRef = useRef(onRefresh);
   refreshRef.current = onRefresh;
+  const lastFocusRefreshAt = useRef(0);
+
+  // Stabilize deps: callers often pass inline `tables={[...]}` which would
+  // tear down/recreate realtime + focus listeners on every parent render.
+  const tablesKey = useMemo(
+    () => (tables ?? DEFAULT_APPROVAL_TABLES).join("|"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: key from joined values
+    [tables?.join("|")],
+  );
+  const resolvedTables = useMemo(
+    () => tablesKey.split("|").filter(Boolean),
+    [tablesKey],
+  );
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const triggerRefresh = () => {
+    const triggerRefresh = (force = false) => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        if (document.visibilityState === "visible") {
-          void refreshRef.current();
+        if (document.visibilityState !== "visible") return;
+        if (!force) {
+          const now = Date.now();
+          if (now - lastFocusRefreshAt.current < FOCUS_REFRESH_THROTTLE_MS) {
+            return;
+          }
+          lastFocusRefreshAt.current = now;
         }
+        void refreshRef.current();
       }, 200);
     };
 
@@ -77,7 +99,7 @@ export function useApprovalsSync({
       if ("BroadcastChannel" in window) {
         broadcastChannel = new BroadcastChannel(APPROVALS_BROADCAST_CHANNEL);
         broadcastChannel.onmessage = () => {
-          triggerRefresh();
+          triggerRefresh(true);
         };
       }
     } catch {
@@ -87,16 +109,16 @@ export function useApprovalsSync({
     // 2. Cross-tab localStorage fallback listener
     const onStorage = (event: StorageEvent) => {
       if (event.key === APPROVALS_STORAGE_KEY) {
-        triggerRefresh();
+        triggerRefresh(true);
       }
     };
     window.addEventListener("storage", onStorage);
 
-    // 3. Tab visibility / window focus listener
-    const onFocus = () => triggerRefresh();
+    // 3. Tab visibility / window focus listener (throttled)
+    const onFocus = () => triggerRefresh(false);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        triggerRefresh();
+        triggerRefresh(false);
       }
     };
     window.addEventListener("focus", onFocus);
@@ -107,7 +129,7 @@ export function useApprovalsSync({
     const channelName = `approvals-sync-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase.channel(channelName);
 
-    for (const table of tables) {
+    for (const table of resolvedTables) {
       channel.on(
         "postgres_changes",
         {
@@ -116,7 +138,7 @@ export function useApprovalsSync({
           table,
         },
         () => {
-          triggerRefresh();
+          triggerRefresh(true);
         },
       );
     }
@@ -126,6 +148,7 @@ export function useApprovalsSync({
     // 5. Periodic polling while tab is open as fallback
     const intervalId = setInterval(() => {
       if (document.visibilityState === "visible") {
+        lastFocusRefreshAt.current = Date.now();
         void refreshRef.current();
       }
     }, pollIntervalMs);
@@ -141,5 +164,5 @@ export function useApprovalsSync({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       void supabase.removeChannel(channel);
     };
-  }, [enabled, pollIntervalMs, tables]);
+  }, [enabled, pollIntervalMs, tablesKey, resolvedTables]);
 }

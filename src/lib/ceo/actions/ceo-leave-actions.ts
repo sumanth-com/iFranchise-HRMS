@@ -36,6 +36,8 @@ import type {
   CeoLeaveRecord,
 } from "@/types/ceo-leave";
 import {
+  ceoLeaveBulkDecisionSchema,
+  ceoLeaveBulkRejectSchema,
   ceoLeaveCalendarSchema,
   ceoLeaveDecisionSchema,
   ceoLeaveFiltersSchema,
@@ -252,6 +254,102 @@ export async function rejectCeoLeaveAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to reject leave request",
+    };
+  }
+}
+
+export async function bulkApproveCeoLeaveAction(
+  input: unknown,
+): Promise<
+  CeoLeaveActionResult<{ succeeded: number; failed: number; errors: string[] }>
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const parsed = ceoLeaveBulkDecisionSchema.parse(input);
+    const supabase = await createClient();
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const leaveRequestId of parsed.leaveRequestIds) {
+      try {
+        await approveLeaveRequest(
+          supabase,
+          profile,
+          leaveRequestId,
+          parsed.comments,
+        );
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Approve failed",
+          );
+        }
+      }
+    }
+
+    revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(CEO_ROUTES.leave);
+
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk approve leave requests",
+    };
+  }
+}
+
+export async function bulkRejectCeoLeaveAction(
+  input: unknown,
+): Promise<
+  CeoLeaveActionResult<{ succeeded: number; failed: number; errors: string[] }>
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const parsed = ceoLeaveBulkRejectSchema.parse(input);
+    const supabase = await createClient();
+
+    let succeeded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const leaveRequestId of parsed.leaveRequestIds) {
+      try {
+        await rejectLeaveRequest(
+          supabase,
+          profile,
+          leaveRequestId,
+          parsed.comments,
+        );
+        succeeded += 1;
+      } catch (error) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(
+            error instanceof Error ? error.message : "Reject failed",
+          );
+        }
+      }
+    }
+
+    revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(CEO_ROUTES.leave);
+
+    return { success: true, data: { succeeded, failed, errors } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk reject leave requests",
     };
   }
 }

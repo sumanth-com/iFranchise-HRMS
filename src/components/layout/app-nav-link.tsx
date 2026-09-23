@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   type ComponentProps,
   type MouseEvent,
-  type FocusEvent,
   type PointerEvent,
 } from "react";
 
@@ -27,7 +26,6 @@ function hrefToPath(href: AppNavLinkProps["href"]): string | null {
 export function AppNavLink({
   prefetch = true,
   onMouseEnter,
-  onFocus,
   onPointerDown,
   href,
   ...props
@@ -60,10 +58,6 @@ export function AppNavLink({
       onMouseEnter={(event: MouseEvent<HTMLAnchorElement>) => {
         prefetchRoute();
         onMouseEnter?.(event);
-      }}
-      onFocus={(event: FocusEvent<HTMLAnchorElement>) => {
-        prefetchRoute();
-        onFocus?.(event);
       }}
       onTouchStart={(event) => {
         prefetchRoute();

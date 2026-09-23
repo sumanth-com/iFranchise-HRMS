@@ -229,7 +229,11 @@ export function AuthProvider({
           window.location.assign(resolvedPortalHome);
           return;
         }
-        router.refresh();
+        // Same user: Supabase can emit SIGNED_IN on session restore / multi-tab.
+        // Skip full RSC remount — TOKEN_REFRESHED already no-ops for the same reason.
+        if (event === "USER_UPDATED") {
+          router.refresh();
+        }
         return;
       }
 
@@ -255,7 +259,19 @@ export function AuthProvider({
   }, [performSignOut]);
 
   useEffect(() => {
-    setProfile(initialProfile);
+    setProfile((current) => {
+      if (
+        current.userId === initialProfile.userId &&
+        current.employee.id === initialProfile.employee.id &&
+        current.permissionCodes.length === initialProfile.permissionCodes.length &&
+        current.permissionCodes.every(
+          (code, index) => code === initialProfile.permissionCodes[index],
+        )
+      ) {
+        return current;
+      }
+      return initialProfile;
+    });
   }, [initialProfile]);
 
   const value = useMemo<AuthContextValue>(

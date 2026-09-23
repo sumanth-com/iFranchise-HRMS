@@ -177,6 +177,14 @@ export async function getCachedPermissionPayload(
 export async function getVerifiedPermissionCodesForUser(
   userId: string,
 ): Promise<string[] | null> {
+  const payload = await getVerifiedPermissionPayloadForUser(userId);
+  return payload?.codes ?? null;
+}
+
+/** Full verified cookie payload (codes + roles) for change detection without a rewrite. */
+export async function getVerifiedPermissionPayloadForUser(
+  userId: string,
+): Promise<PermissionCachePayload | null> {
   try {
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
@@ -185,11 +193,29 @@ export async function getVerifiedPermissionCodesForUser(
 
     const payload = await parseSignedPayload(value);
     if (!isUsablePermissionPayload(payload, userId)) return null;
-    return payload.codes;
+    return payload;
   } catch (error) {
     console.error("[permission-cache] RSC read failed", error);
     return null;
   }
+}
+
+/** True when live codes/roles differ from the signed cookie (or cookie is missing). */
+export function permissionPayloadChanged(
+  previous: PermissionCachePayload | null,
+  nextCodes: string[],
+  nextRoleCodes: string[],
+): boolean {
+  if (!previous) return true;
+  const prevCodes = previous.codes ?? [];
+  const prevRoles = previous.roleCodes ?? [];
+  if (prevCodes.length !== nextCodes.length) return true;
+  if (prevRoles.length !== nextRoleCodes.length) return true;
+  if (prevCodes.some((code) => !nextCodes.includes(code))) return true;
+  if (nextCodes.some((code) => !prevCodes.includes(code))) return true;
+  if (prevRoles.some((code) => !nextRoleCodes.includes(code))) return true;
+  if (nextRoleCodes.some((code) => !prevRoles.includes(code))) return true;
+  return false;
 }
 
 export async function attachPermissionCache(

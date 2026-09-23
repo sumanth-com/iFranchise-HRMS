@@ -2,14 +2,23 @@
 
 import { format } from "date-fns";
 import { CheckCircle2, Eye, Loader2, XCircle } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  ApprovalBulkToolbar,
+  ApprovalSelectCheckbox,
+  summarizeBulkResult,
+  useApprovalSelection,
+} from "@/components/approvals/approval-bulk-selection";
 import { LeavePanel } from "@/components/ceo/leave/ceo-leave-tables";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
-import { decideCeoExitAction } from "@/lib/ceo/actions/ceo-exit-actions";
+import {
+  bulkDecideCeoExitAction,
+  decideCeoExitAction,
+} from "@/lib/ceo/actions/ceo-exit-actions";
 import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
 import { getResignationDetailAction } from "@/lib/exit/actions";
 import { EXIT_STATUS_LABELS } from "@/lib/exit/constants";
@@ -33,13 +42,20 @@ export function CeoExitApprovalQueue({
   onActed,
 }: Props) {
   const rows = Array.isArray(items) ? items : [];
+  const rowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const selection = useApprovalSelection(rowIds);
+
   const [review, setReview] = useState<ReviewState | null>(null);
+  const [bulkTarget, setBulkTarget] = useState<"approve" | "reject" | null>(
+    null,
+  );
   const [remarks, setRemarks] = useState("");
   const [rejectedReason, setRejectedReason] = useState("");
   const [isActing, startActing] = useTransition();
 
   const closeReview = () => {
     setReview(null);
+    setBulkTarget(null);
     setRemarks("");
     setRejectedReason("");
   };
@@ -97,6 +113,38 @@ export function CeoExitApprovalQueue({
     });
   }
 
+  function submitBulkDecision(decision: "approve" | "reject") {
+    const ids = selection.selectedList;
+    if (ids.length === 0) return;
+    if (decision === "reject" && rejectedReason.trim().length < 3) {
+      toast.error("Rejection reason is required (minimum 3 characters)");
+      return;
+    }
+
+    startActing(async () => {
+      const result = await bulkDecideCeoExitAction({
+        resignationIds: ids,
+        decision,
+        remarks: remarks.trim() || null,
+        rejectedReason: decision === "reject" ? rejectedReason.trim() || null : null,
+      });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      const summary = summarizeBulkResult(
+        result.data,
+        decision === "approve" ? "approved" : "rejected",
+      );
+      if (summary.ok) toast.success(summary.message);
+      else toast.error(summary.message);
+      closeReview();
+      selection.clearSelection();
+      broadcastApprovalChange("exit");
+      onActed();
+    });
+  }
+
   const detail = review?.detail ?? review?.item;
 
   return (
@@ -106,10 +154,26 @@ export function CeoExitApprovalQueue({
         description="Resignations awaiting your final approval. Approval completes the resignation and deactivates portal access."
         count={rows.length}
       >
+        <ApprovalBulkToolbar
+          selectedCount={selection.selectedCount}
+          disabled={isActing}
+          onApprove={() => setBulkTarget("approve")}
+          onReject={() => setBulkTarget("reject")}
+        />
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full min-w-[52rem] text-sm">
             <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
               <tr className="border-white/10 bg-transparent hover:bg-white/5">
+                <th className="h-11 w-10 bg-transparent px-3 py-3 align-middle">
+                  <ApprovalSelectCheckbox
+                    checked={selection.allSelected}
+                    indeterminate={selection.someSelected}
+                    disabled={isActing || rows.length === 0}
+                    ariaLabel="Select all resignations"
+                    onCheckedChange={selection.toggleAll}
+                    className="accent-white"
+                  />
+                </th>
                 <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
                   Employee
                 </th>
@@ -137,7 +201,7 @@ export function CeoExitApprovalQueue({
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
                     {isLoading
@@ -148,6 +212,16 @@ export function CeoExitApprovalQueue({
               ) : (
                 rows.map((row) => (
                   <tr key={row.id} className="border-t">
+                    <td className="px-3 py-3">
+                      <ApprovalSelectCheckbox
+                        checked={selection.selectedIds.has(row.id)}
+                        disabled={isActing}
+                        ariaLabel={`Select resignation for ${row.employeeName}`}
+                        onCheckedChange={(checked) =>
+                          selection.toggleOne(row.id, checked)
+                        }
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="min-w-0">
                         <p className="truncate font-medium">{row.employeeName}</p>
@@ -305,6 +379,77 @@ export function CeoExitApprovalQueue({
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "approve"}
+        onOpenChange={(open) => !open && closeReview()}
+        title="Approve selected resignations"
+        description={`Approve ${selection.selectedCount} resignation${selection.selectedCount === 1 ? "" : "s"}? This deactivates portal access for each approved employee.`}
+        showCancel={false}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeReview} disabled={isActing}>
+              Cancel
+            </Button>
+            <Button
+              disabled={isActing}
+              onClick={() => submitBulkDecision("approve")}
+            >
+              <CheckCircle2 className="size-4" />
+              Approve selected
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="bulk-ceo-exit-remarks">Approval remarks (optional)</Label>
+          <textarea
+            id="bulk-ceo-exit-remarks"
+            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={remarks}
+            onChange={(event) => setRemarks(event.target.value)}
+            disabled={isActing}
+            placeholder="Optional notes applied to each approval"
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkTarget === "reject"}
+        onOpenChange={(open) => !open && closeReview()}
+        title="Reject selected resignations"
+        description={`Reject ${selection.selectedCount} resignation${selection.selectedCount === 1 ? "" : "s"}?`}
+        showCancel={false}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeReview} disabled={isActing}>
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              disabled={isActing}
+              onClick={() => submitBulkDecision("reject")}
+            >
+              <XCircle className="size-4" />
+              Reject selected
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="bulk-ceo-exit-reject-reason">
+            Rejection reason (required)
+          </Label>
+          <textarea
+            id="bulk-ceo-exit-reject-reason"
+            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={rejectedReason}
+            onChange={(event) => setRejectedReason(event.target.value)}
+            disabled={isActing}
+            placeholder="Required for all selected rejections"
+          />
+        </div>
       </Modal>
     </>
   );

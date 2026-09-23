@@ -1,6 +1,8 @@
 "use server";
 
 import {
+  getVerifiedPermissionPayloadForUser,
+  permissionPayloadChanged,
   setPermissionCacheCookie,
 } from "@/lib/auth/permission-cache";
 import {
@@ -33,18 +35,22 @@ export async function getPortalSwitcherStateAction(): Promise<PortalSwitcherStat
     }
 
     const supabase = session.supabase ?? (await createClient());
+    const previous = await getVerifiedPermissionPayloadForUser(session.user.id);
     const [permissionCodes, roleCodes] = await Promise.all([
       resolveUserPermissionCodes(supabase, session.user.id),
       resolveUserRoleCodes(supabase, session.user.id),
     ]);
 
-    // Keep middleware/layout cookie aligned with the fresh RPC result.
-    await setPermissionCacheCookie(
-      session.user.id,
-      permissionCodes,
-      true,
-      roleCodes,
-    );
+    // Only rewrite the cookie when live RPC differs — cookie writes invalidate
+    // the App Router client cache and re-run the portal layout waterfall.
+    if (permissionPayloadChanged(previous, permissionCodes, roleCodes)) {
+      await setPermissionCacheCookie(
+        session.user.id,
+        permissionCodes,
+        true,
+        roleCodes,
+      );
+    }
 
     const portals = filterPortalSwitchLinks(permissionCodes);
 

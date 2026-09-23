@@ -4,8 +4,13 @@ import { cache } from "react";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
-import { CEO_PENDING_APPROVAL_STATUSES } from "@/lib/ceo/executive-approvals-constants";
+import {
+  CEO_APPROVALS_SOURCE,
+  CEO_PENDING_APPROVAL_STATUSES,
+  PROMOTION_APPROVAL_TYPE,
+} from "@/lib/ceo/executive-approvals-constants";
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
+import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
 import { loadUpcomingCelebrations } from "@/lib/employee/services/employee-dashboard-queries";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
@@ -89,7 +94,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .is("deleted_at", null);
 
   const [
-    pendingLeaveRes,
+    pendingLeaveQueue,
     activeEmployeesRes,
     exitingRes,
     presentTodayRes,
@@ -102,11 +107,11 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     holidaysResult,
     recruitmentSummary,
   ] = await Promise.all([
-    fromHrms(supabase, "leave_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("leave_status", "pending")
-      .is("deleted_at", null),
+    // Same queue as Approvals → Leave (not all org-wide pending leave_requests).
+    listCeoApprovalQueue(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] leave approval queue failed", error);
+      return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
+    }),
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -130,9 +135,13 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .eq("payroll_month", payrollMonthDate)
       .is("deleted_at", null)
       .maybeSingle(),
+    // Match Approvals → Executive (promotion-scoped queue), not all request types.
     fromHrms(supabase, "executive_approval_requests")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
+      .eq("source_module", CEO_APPROVALS_SOURCE.performancePromotion)
+      .eq("approval_type", PROMOTION_APPROVAL_TYPE)
+      .not("source_record_id", "is", null)
       .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
       .is("deleted_at", null),
     loadUpcomingCelebrations(supabase, organizationId, today).catch((error) => {
@@ -225,7 +234,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       openPositions,
       recruitmentPipeline: recruitmentSummary?.activeCandidates ?? 0,
       pendingApprovals,
-      pendingLeaveApprovals: pendingLeaveRes.count ?? 0,
+      pendingLeaveApprovals: pendingLeaveQueue.length,
       attendancePercent,
       leavePercent: 0,
       averageProductivity: 0,
