@@ -40,19 +40,31 @@ function Stat({
 
 export function EmployeeAttendanceWidget({ today }: { today: ManagerTodayAttendance }) {
   const [elapsed, setElapsed] = useState(() =>
-    elapsedWorkingSeconds(today.checkInAt, today.checkOutAt),
+    elapsedWorkingSeconds(
+      today.checkInAt,
+      today.checkOutAt,
+      new Date(),
+      today.priorCompletedSeconds ?? 0,
+    ),
   );
 
   const isRunning = today.punchState === "checked_in";
 
   useEffect(() => {
-    setElapsed(elapsedWorkingSeconds(today.checkInAt, today.checkOutAt));
+    const tick = () =>
+      setElapsed(
+        elapsedWorkingSeconds(
+          today.checkInAt,
+          today.checkOutAt,
+          new Date(),
+          today.priorCompletedSeconds ?? 0,
+        ),
+      );
+    tick();
     if (!isRunning) return;
-    const timer = setInterval(() => {
-      setElapsed(elapsedWorkingSeconds(today.checkInAt, null));
-    }, 1000);
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [today.checkInAt, today.checkOutAt, isRunning]);
+  }, [today.checkInAt, today.checkOutAt, today.priorCompletedSeconds, isRunning]);
 
   const checkInLabel = today.checkInAt ? formatAttendanceTime(today.checkInAt) : "—";
   const checkOutLabel = today.checkOutAt ? formatAttendanceTime(today.checkOutAt) : "—";

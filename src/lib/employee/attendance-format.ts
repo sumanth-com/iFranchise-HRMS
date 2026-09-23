@@ -44,9 +44,58 @@ export function formatLateByLabel(totalMinutes: number) {
 }
 
 /**
- * Working seconds from check-in → checkout (or `now` while still checked in),
- * plus any completed prior sessions from the same day.
- * Wall-clock only — no idle / activity detection.
+ * Wall-clock seconds for one punch pair only (check-out − check-in, or now − check-in).
+ * Does not include prior sessions.
+ */
+export function sessionWorkingSeconds(
+  checkInAt: string | null | undefined,
+  checkOutAt: string | null | undefined,
+  now: Date = new Date(),
+): number {
+  if (!checkInAt) return 0;
+  const end = checkOutAt ? parseISO(checkOutAt) : now;
+  return Math.max(0, differenceInSeconds(end, parseISO(checkInAt)));
+}
+
+/**
+ * Resolve "earlier completed sessions" from `prior_work_seconds`.
+ *
+ * Column intent: seconds from finished sessions before the current open session.
+ * After checkout, writers historically store the *day total* (earlier + current).
+ * While checked in, the value is earlier-only.
+ */
+function resolveEarlierCompletedSeconds(
+  priorCompletedSeconds: number,
+  sessionSeconds: number,
+  hasCheckOut: boolean,
+): number {
+  const prior = Math.max(0, Math.floor(priorCompletedSeconds));
+  if (prior <= 0) return 0;
+  if (!hasCheckOut) return prior;
+
+  // Single-session rows corrupted by update-checkout doing prior + session twice.
+  if (sessionSeconds > 0 && Math.abs(prior - 2 * sessionSeconds) <= 120) {
+    return 0;
+  }
+
+  // Day-total write after checkout: prior already includes this session.
+  if (prior >= sessionSeconds) {
+    return prior - sessionSeconds;
+  }
+
+  // Earlier-only while checked out (forward-compatible).
+  return prior;
+}
+
+/**
+ * Canonical working seconds for an attendance day row.
+ *
+ * - Completed session: (check-out − check-in) + earlier sessions
+ * - Open session: (now − check-in) + earlier sessions
+ * - No check-in: earlier only (usually 0)
+ *
+ * `priorCompletedSeconds` is the raw `prior_work_seconds` column (or 0).
+ * Never derives duration from scheduled office hours, login, or leave.
  */
 export function elapsedWorkingSeconds(
   checkInAt: string | null,
@@ -56,13 +105,39 @@ export function elapsedWorkingSeconds(
 ) {
   const prior = Math.max(0, Math.floor(priorCompletedSeconds));
   if (!checkInAt) return prior;
-  const end = checkOutAt ? parseISO(checkOutAt) : now;
-  const current = Math.max(0, differenceInSeconds(end, parseISO(checkInAt)));
-  // When checked out, prefer prior if it already includes this session total.
-  if (checkOutAt && prior > 0) {
-    return Math.max(prior, current);
+
+  const session = sessionWorkingSeconds(checkInAt, checkOutAt, now);
+  const earlier = resolveEarlierCompletedSeconds(
+    prior,
+    session,
+    Boolean(checkOutAt),
+  );
+  return earlier + session;
+}
+
+/**
+ * Day-total seconds to persist after a checkout (or checkout update).
+ * Avoids double-counting when `prior_work_seconds` already holds a day total
+ * from a previous checkout of the same punch pair.
+ */
+export function dayTotalSecondsAfterCheckout(input: {
+  checkInAt: string;
+  checkOutAt: string;
+  priorWorkSeconds?: number | string | null;
+  previousCheckOutAt?: string | null;
+}): number {
+  const session = sessionWorkingSeconds(input.checkInAt, input.checkOutAt);
+  const prior = Math.max(0, Math.floor(Number(input.priorWorkSeconds ?? 0)));
+  const previousOut = input.previousCheckOutAt ?? null;
+
+  if (previousOut) {
+    const oldSession = sessionWorkingSeconds(input.checkInAt, previousOut);
+    const earlier = resolveEarlierCompletedSeconds(prior, oldSession, true);
+    return earlier + session;
   }
-  return prior + current;
+
+  // Open → first checkout: prior is earlier-only.
+  return prior + session;
 }
 
 /** Decimal hours from check-in → checkout. Open sessions are 0 until checkout. */
@@ -71,7 +146,7 @@ export function workHoursFromCheckInOut(
   checkOutAt: string | null | undefined,
 ) {
   if (!checkInAt || !checkOutAt) return 0;
-  const seconds = elapsedWorkingSeconds(checkInAt, checkOutAt);
+  const seconds = sessionWorkingSeconds(checkInAt, checkOutAt);
   if (seconds <= 0) return 0;
   return Math.round((seconds / 3600) * 100) / 100;
 }
@@ -80,9 +155,8 @@ export function workHoursFromCheckInOut(
  * Employee-facing completed hours from actual punch timestamps.
  *
  * - Same-day / overnight: difference of stored ISO timestamps (UTC-safe).
- * - Multi-session: use prior_work_seconds when it is an explicit day total (> 0).
- * - Never invent duration from stale stored work_hours when both punches exist
- *   and prior_work_seconds is empty (common after Excel sync / re-punch).
+ * - Multi-session: include prior_work_seconds (earlier sessions or legacy day total).
+ * - Never invent duration from stale stored work_hours when both punches exist.
  */
 export function completedWorkHoursFromPunches(
   checkInAt: string | null | undefined,
@@ -92,19 +166,9 @@ export function completedWorkHoursFromPunches(
     priorWorkSeconds?: number | null;
   },
 ): number {
-  if (!checkInAt) return 0;
-  if (!checkOutAt) {
-    const stored = Number(options?.storedWorkHours ?? 0);
-    return Number.isFinite(stored) && stored > 0 ? Math.round(stored * 100) / 100 : 0;
-  }
-
-  const sessionHours = workHoursFromCheckInOut(checkInAt, checkOutAt);
-  const priorSec = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
-  if (priorSec > 0) {
-    const priorHours = Math.round((priorSec / 3600) * 100) / 100;
-    return Math.max(priorHours, sessionHours);
-  }
-  return sessionHours;
+  const seconds = completedWorkingSecondsFromPunches(checkInAt, checkOutAt, options);
+  if (seconds <= 0) return 0;
+  return Math.round((seconds / 3600) * 100) / 100;
 }
 
 /** Seconds variant of {@link completedWorkHoursFromPunches} for duration labels. */
@@ -117,19 +181,18 @@ export function completedWorkingSecondsFromPunches(
   },
 ): number {
   if (!checkInAt) return 0;
+
+  const priorSec = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
+
   if (!checkOutAt) {
-    const prior = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
-    if (prior > 0) return prior;
-    const stored = Number(options?.storedWorkHours ?? 0);
-    return Number.isFinite(stored) && stored > 0
-      ? Math.max(0, Math.round(stored * 3600))
-      : 0;
+    // Open session: completed portion is earlier sessions only (live UI adds current).
+    if (priorSec > 0) return priorSec;
+    // Do not trust stale stored work_hours for an open session.
+    return 0;
   }
 
-  const sessionSeconds = elapsedWorkingSeconds(checkInAt, checkOutAt);
-  const priorSec = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
-  if (priorSec > 0) return Math.max(priorSec, sessionSeconds);
-  return sessionSeconds;
+  // Both punches: always derive from timestamps (+ prior), never from stored work_hours.
+  return elapsedWorkingSeconds(checkInAt, checkOutAt, new Date(), priorSec);
 }
 
 export type ApplicableWorkingDay = {
@@ -139,6 +202,7 @@ export type ApplicableWorkingDay = {
   status: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
+  priorWorkSeconds?: number | null;
 };
 
 function isApplicableWorkingDay(day: ApplicableWorkingDay) {
@@ -157,7 +221,12 @@ function secondsForApplicableDay(
   if (day.isToday && !day.checkOutAt && liveTodaySeconds != null) {
     return Math.max(0, Math.floor(liveTodaySeconds));
   }
-  return elapsedWorkingSeconds(day.checkInAt, day.checkOutAt);
+  return elapsedWorkingSeconds(
+    day.checkInAt,
+    day.checkOutAt,
+    new Date(),
+    Math.max(0, Math.floor(Number(day.priorWorkSeconds ?? 0))),
+  );
 }
 
 /**

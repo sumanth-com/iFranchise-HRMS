@@ -1,10 +1,11 @@
 import {
   averageApplicableWorkingHours,
   completedWorkHoursFromPunches,
-  completedWorkingSecondsFromPunches,
+  dayTotalSecondsAfterCheckout,
   elapsedWorkingSeconds,
   formatLiveWorkingDuration,
   formatWorkingDuration,
+  sessionWorkingSeconds,
 } from "@/lib/employee/attendance-format";
 import {
   addDays,
@@ -245,20 +246,12 @@ function buildTodayPanel(
   const checkOutAt = row?.check_out_at ?? null;
   const punchState = resolvePunchState(checkInAt, checkOutAt);
   const storedPrior = Math.max(0, Math.floor(Number(row?.prior_work_seconds ?? 0)));
-  const priorCompletedSeconds = completedWorkingSecondsFromPunches(
-    checkInAt,
-    checkOutAt,
-    {
-      storedWorkHours: row ? Number(row.work_hours ?? 0) : 0,
-      priorWorkSeconds: storedPrior,
-    },
-  );
-  // Open session: wall-clock from check-in → now (+ prior sessions). Checked out: punch total.
+  // Canonical duration from punches + prior_work_seconds (unwraps legacy day-total prior).
   const workingSeconds = elapsedWorkingSeconds(
     checkInAt,
     checkOutAt,
     new Date(),
-    checkOutAt ? priorCompletedSeconds : storedPrior,
+    storedPrior,
   );
   const workHours = checkOutAt
     ? completedWorkHoursFromPunches(checkInAt, checkOutAt, {
@@ -267,7 +260,7 @@ function buildTodayPanel(
       })
     : checkInAt
       ? Math.round((workingSeconds / 3600) * 100) / 100
-      : Number(row?.work_hours ?? 0);
+      : 0;
   const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
   const overtimeHours = row
     ? Number(row.overtime_hours ?? 0)
@@ -295,7 +288,8 @@ function buildTodayPanel(
     attendanceStatus,
     checkInAt,
     checkOutAt,
-    priorCompletedSeconds: checkOutAt ? priorCompletedSeconds : storedPrior,
+    // Raw prior_work_seconds — live timer / duration helpers unwrap day-total vs earlier-only.
+    priorCompletedSeconds: storedPrior,
     workHours,
     overtimeHours,
     lateMinutes,
@@ -1280,13 +1274,18 @@ export async function punchManagerAttendance(
     }
     // Re-check-in after checkout: roll finished session into prior_work_seconds, then open a new session.
     if (existing?.check_in_at && existing.check_out_at) {
-      const sessionSeconds = elapsedWorkingSeconds(
-        existing.check_in_at,
-        existing.check_out_at,
-      );
       const storedPrior = Math.max(0, Math.floor(Number(existing.prior_work_seconds ?? 0)));
       const fromHours = Math.max(0, Math.round(Number(existing.work_hours ?? 0) * 3600));
-      const priorTotal = Math.max(storedPrior, fromHours, sessionSeconds);
+      const priorTotal = Math.max(
+        elapsedWorkingSeconds(
+          existing.check_in_at,
+          existing.check_out_at,
+          new Date(),
+          storedPrior,
+        ),
+        fromHours,
+        sessionWorkingSeconds(existing.check_in_at, existing.check_out_at),
+      );
       const { error: priorError } = await supabase
         .schema("hrms")
         .from("attendance")
@@ -1306,9 +1305,13 @@ export async function punchManagerAttendance(
     if (parseISO(nowIso).getTime() < parseISO(existing.check_in_at).getTime()) {
       throw new Error("Checkout cannot be before check-in.");
     }
-    const prior = Math.max(0, Math.floor(Number(existing.prior_work_seconds ?? 0)));
-    const currentSeconds = elapsedWorkingSeconds(existing.check_in_at, nowIso);
-    workHours = Math.round(((prior + currentSeconds) / 3600) * 100) / 100;
+    const totalSeconds = dayTotalSecondsAfterCheckout({
+      checkInAt: existing.check_in_at,
+      checkOutAt: nowIso,
+      priorWorkSeconds: existing.prior_work_seconds,
+      previousCheckOutAt: existing.check_out_at,
+    });
+    workHours = Math.round((totalSeconds / 3600) * 100) / 100;
     overtimeHours = computeOvertimeHours(workHours, rules);
     status = resolvePunchStatus(
       existing.check_in_at,
@@ -1347,15 +1350,14 @@ export async function punchManagerAttendance(
   }
 
   // Persist multi-session day total after checkout (RPC may only store work_hours).
-  if (input.type === "out") {
-    const prior = Math.max(0, Math.floor(Number(existing?.prior_work_seconds ?? 0)));
-    const currentSeconds = existing?.check_in_at
-      ? elapsedWorkingSeconds(existing.check_in_at, result.check_out_at ?? nowIso)
-      : 0;
-    const totalSeconds = Math.max(
-      prior + currentSeconds,
-      Math.round(Number(result.work_hours ?? workHours) * 3600),
-    );
+  if (input.type === "out" && existing?.check_in_at) {
+    const checkOutAt = result.check_out_at ?? nowIso;
+    const totalSeconds = dayTotalSecondsAfterCheckout({
+      checkInAt: existing.check_in_at,
+      checkOutAt,
+      priorWorkSeconds: existing.prior_work_seconds,
+      previousCheckOutAt: existing.check_out_at,
+    });
     await supabase
       .schema("hrms")
       .from("attendance")
@@ -1573,8 +1575,12 @@ export async function updateManagerCheckout(
     profile.employee.organizationId,
   );
   const prior = Math.max(0, Math.floor(Number(existing.prior_work_seconds ?? 0)));
-  const currentSeconds = elapsedWorkingSeconds(existing.check_in_at, checkOutAt);
-  const totalSeconds = prior + currentSeconds;
+  const totalSeconds = dayTotalSecondsAfterCheckout({
+    checkInAt: existing.check_in_at,
+    checkOutAt,
+    priorWorkSeconds: prior,
+    previousCheckOutAt: existing.check_out_at,
+  });
   const workHours = Math.round((totalSeconds / 3600) * 100) / 100;
   const overtimeHours = computeOvertimeHours(workHours, rules);
   const status = resolvePunchStatus(

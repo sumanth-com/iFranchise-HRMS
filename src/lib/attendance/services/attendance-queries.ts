@@ -10,10 +10,10 @@ import type {
 } from "@/types/attendance";
 import { attendanceListParamsSchema } from "@/lib/validations/attendance";
 import {
-  computeWorkHours,
   getTodayDateString,
   isAfterOfficeCheckoutTime,
 } from "@/lib/attendance/services/attendance-utils";
+import { completedWorkHoursFromPunches } from "@/lib/employee/attendance-format";
 import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
   isExcludedFromAttendanceWorkforce,
@@ -184,6 +184,7 @@ async function loadAttendanceRoster(
             check_in_at,
             check_out_at,
             work_hours,
+            prior_work_seconds,
             overtime_hours,
             attendance_status,
             check_in_latitude,
@@ -299,10 +300,16 @@ async function loadAttendanceRoster(
       const checkOutAt = att?.check_out_at ?? null;
       const punchedWorkHours =
         checkInAt && checkOutAt
-          ? Number(att?.work_hours) > 0
-            ? Number(att?.work_hours)
-            : computeWorkHours(checkInAt, checkOutAt)
-          : Number(att?.work_hours ?? 0);
+          ? completedWorkHoursFromPunches(checkInAt, checkOutAt, {
+              storedWorkHours: Number(att?.work_hours ?? 0),
+              priorWorkSeconds: Number(att?.prior_work_seconds ?? 0),
+            })
+          : checkInAt
+            ? completedWorkHoursFromPunches(checkInAt, null, {
+                storedWorkHours: Number(att?.work_hours ?? 0),
+                priorWorkSeconds: Number(att?.prior_work_seconds ?? 0),
+              })
+            : 0;
 
       // Prefer the stored row status so HR manual Present/Absent/On Leave sticks.
       // Punch flows already write present/late/absent; re-deriving from punches
