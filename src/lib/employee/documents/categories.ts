@@ -123,6 +123,20 @@ export const PAYROLL_NESTED_FOLDERS = [
 
 export type PayrollNestedCode = (typeof PAYROLL_NESTED_FOLDERS)[number]["code"];
 
+/**
+ * Payroll & Tax slots that employees receive from HR/system — not self-upload.
+ * Official/generated rows; employees may view/download only.
+ */
+export const SYSTEM_PROVIDED_PAYROLL_TAX_CODES = new Set([
+  "PAYSLIP",
+  "FORM_16",
+  "TAX_DOCUMENT",
+]);
+
+export function isSystemProvidedPayrollTaxCode(code: string | null | undefined) {
+  return SYSTEM_PROVIDED_PAYROLL_TAX_CODES.has(String(code ?? "").toUpperCase());
+}
+
 /** Seed / ensure catalogue for explorer slots (name + code + description). */
 export const EXPLORER_DOCUMENT_TYPE_SEED: ReadonlyArray<{
   name: string;

@@ -9,6 +9,7 @@ import { SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import {
   isMultiFileDocumentCode,
   isRenameableDocumentCode,
+  isSystemProvidedPayrollTaxCode,
 } from "@/lib/employee/documents/categories";
 import {
   employeeDeleteDocument,
@@ -101,6 +102,19 @@ export async function employeeUploadDocumentAction(formData: FormData) {
 
     const typeCode = String((docType as { code?: string } | null)?.code ?? "").toUpperCase();
     const typeName = String((docType as { name?: string } | null)?.name ?? "").trim();
+
+    if (isSystemProvidedPayrollTaxCode(typeCode)) {
+      return {
+        success: false as const,
+        message:
+          typeCode === "PAYSLIP"
+            ? "Payslips are added automatically when HR releases them. You can view or download them here."
+            : typeCode === "FORM_16"
+              ? "Form 16 is provided by HR. You can view or download it here when available."
+              : "Tax documents are provided by HR. You can view or download them here when available.",
+      };
+    }
+
     const title =
       isMultiFileDocumentCode(typeCode) || isRenameableDocumentCode(typeCode)
         ? parsed.title

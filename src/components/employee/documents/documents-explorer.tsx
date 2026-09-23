@@ -26,6 +26,7 @@ import { DocumentUploadDialog } from "@/components/employee/documents/document-u
 import { useEmployeeDocumentFile } from "@/components/employee/documents/use-employee-document-file";
 import {
   isMultiFileDocumentCode,
+  isSystemProvidedPayrollTaxCode,
   PAYROLL_NESTED_FOLDERS,
   type EmployeeDocCategoryKey,
   type PayrollNestedCode,
@@ -270,6 +271,11 @@ export function DocumentsExplorer({
   const showingPayrollHub = openFolder === "payroll" && !payrollSub;
   const showingNestedList =
     Boolean(openFolder) && (openFolder !== "payroll" || Boolean(payrollSub));
+  const payrollFolderReadOnly =
+    openFolder === "payroll" &&
+    Boolean(payrollSub) &&
+    isSystemProvidedPayrollTaxCode(payrollSub);
+  const canUploadInFolder = !readOnly && !payrollFolderReadOnly;
 
   return (
     <div className="flex flex-col gap-4">
@@ -386,7 +392,7 @@ export function DocumentsExplorer({
 
       {showingNestedList ? (
         <>
-          {!readOnly && openFolder === "payroll" && activeType ? (
+          {canUploadInFolder && activeType ? (
             <div className="flex justify-end">
               <Button className="gap-1.5" onClick={() => openUpload(activeType.id)}>
                 <UploadCloud className="size-4" />
@@ -395,14 +401,14 @@ export function DocumentsExplorer({
             </div>
           ) : null}
 
-          {filteredFiles.length > 0 || (!readOnly && missingTypes.length > 0) ? (
+          {filteredFiles.length > 0 || (canUploadInFolder && missingTypes.length > 0) ? (
             <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {filteredFiles.map((file) => (
                 <DocumentFileCard
                   key={file.id}
                   file={file}
                   fileActions={fileActions}
-                  readOnly={readOnly}
+                  readOnly={readOnly || payrollFolderReadOnly}
                   onReplace={(target) => {
                     setReplaceTarget(target);
                     setUploadTypeId(target.documentTypeId);
@@ -411,7 +417,7 @@ export function DocumentsExplorer({
                   onDelete={(target) => setDeleteFile(target)}
                 />
               ))}
-              {!readOnly
+              {canUploadInFolder
                 ? missingTypes.map((type) => (
                     <DocumentMissingSlotCard
                       key={type.id}
@@ -432,12 +438,14 @@ export function DocumentsExplorer({
                   {openFolder === "payroll" ? `No ${payrollSubMeta?.name?.toLowerCase() ?? "documents"} yet` : "This folder is empty"}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {readOnly
-                    ? "No documents in this category yet."
-                    : "Upload a file to get started."}
+                  {payrollFolderReadOnly
+                    ? "Documents appear here when HR provides them."
+                    : readOnly
+                      ? "No documents in this category yet."
+                      : "Upload a file to get started."}
                 </p>
               </div>
-              {!readOnly ? (
+              {canUploadInFolder ? (
                 <Button className="gap-1.5" onClick={() => openUpload()}>
                   <UploadCloud className="size-4" />
                   Upload
@@ -448,7 +456,7 @@ export function DocumentsExplorer({
         </>
       ) : null}
 
-      {!readOnly ? (
+      {!readOnly && !payrollFolderReadOnly ? (
         <DocumentUploadDialog
           open={uploadOpen}
           onOpenChange={setUploadOpen}

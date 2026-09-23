@@ -6,6 +6,7 @@ import {
   getManagerTeamScope,
 } from "@/lib/manager/services/team-queries";
 import { hasPermission } from "@/lib/permissions/utils";
+import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
 import type { UserProfile } from "@/types/auth";
 
 export function hasHrPortalAccess(profile: UserProfile) {
@@ -20,9 +21,13 @@ export function hasManagerPortalAccess(profile: UserProfile) {
   return hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.manager);
 }
 
-/** Org-wide HR/executive visibility (not team- or self-scoped). */
+/** Org-wide HR/executive/Super Admin visibility (not team- or self-scoped). */
 export function hasOrgWidePeopleAccess(profile: UserProfile) {
-  return hasHrPortalAccess(profile) || hasCeoPortalAccess(profile);
+  return (
+    hasHrPortalAccess(profile) ||
+    hasCeoPortalAccess(profile) ||
+    hasPermission(profile.permissionCodes, SYSTEM_ADMIN_PERMISSION)
+  );
 }
 
 /** Manager portal without HR — data must stay in the reporting hierarchy. */
@@ -32,7 +37,7 @@ export function isManagerOnlyProfile(profile: UserProfile) {
 
 /**
  * Server-side employee ID scope for shared list/query APIs.
- * - HR / CEO / Super Admin with org portals: null (organization-wide)
+ * - HR / CEO / Super Admin: null (organization-wide)
  * - Manager-only: reporting-tree team IDs
  * - Everyone else (e.g. employee self-service): own employee id only
  */

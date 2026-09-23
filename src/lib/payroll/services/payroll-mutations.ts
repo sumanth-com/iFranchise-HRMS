@@ -27,6 +27,7 @@ import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
 import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
+import { upsertPayslipEmployeeDocument } from "@/lib/payroll/services/payslip-to-employee-document";
 import {
   buildEmployerContributions,
   parseStatutoryIds,
@@ -2462,7 +2463,23 @@ export async function emailPayslip(
   }
 
   if (!payslip.storagePath) {
-    await storePayslipPdf(supabase, payslip, profile.employee.organizationId);
+    await storePayslipPdf(supabase, payslip, profile.employee.organizationId, {
+      actorUserId: profile.userId,
+    });
+  } else {
+    try {
+      await upsertPayslipEmployeeDocument({
+        organizationId: profile.employee.organizationId,
+        payslip,
+        storagePath: payslip.storagePath,
+        actorUserId: profile.userId,
+      });
+    } catch (error) {
+      console.error("[payroll] payslip → employee Documents mirror failed", {
+        payslipId: payslip.id,
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
   }
 
   const emailResult = await sendPayslipReadyEmail(payslip, appOrigin);
@@ -3362,6 +3379,35 @@ export async function releaseEmployeePayslip(
     payslipId,
     actorId,
   );
+
+  // Place PDF in Documents → Payslips even if email delivery fails later.
+  try {
+    const releasedPayslip = await getPayslipById(supabase, profile, payslipId, {
+      bypassAccessCheck: true,
+    });
+    if (releasedPayslip) {
+      if (!releasedPayslip.storagePath) {
+        await storePayslipPdf(
+          supabase,
+          releasedPayslip,
+          profile.employee.organizationId,
+          { actorUserId: profile.userId },
+        );
+      } else {
+        await upsertPayslipEmployeeDocument({
+          organizationId: profile.employee.organizationId,
+          payslip: releasedPayslip,
+          storagePath: releasedPayslip.storagePath,
+          actorUserId: profile.userId,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("[payroll] payslip Documents folder sync failed", {
+      payslipId,
+      message: error instanceof Error ? error.message : "unknown",
+    });
+  }
 
   const monthLabel = formatPayrollMonthLabel(payroll.payroll_month);
   try {

@@ -11,6 +11,7 @@ import {
   parsePeriodFromNotes,
   resolveDocumentsBucket,
 } from "@/lib/documents/storage-paths";
+import { isSystemProvidedPayrollTaxCode } from "@/lib/employee/documents/categories";
 import {
   getDocumentSettings,
   nextDocumentNumber,
@@ -45,23 +46,6 @@ export async function uploadAndCreateDocument(
 ): Promise<string> {
   assertCanMutateEmployee(profile, meta.employeeId);
 
-  if (meta.replaceDocumentId) {
-    const { data: existing, error: existingError } = await fromHrms(supabase, "employee_documents")
-      .select("id, is_official, employee_id")
-      .eq("id", meta.replaceDocumentId)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (existingError) throw new Error(existingError.message);
-    if (!existing) throw new Error("Document to replace was not found");
-    if (existing.employee_id !== meta.employeeId) {
-      throw new Error("Replace target does not belong to the selected employee");
-    }
-    if (existing.is_official && isEmployeeScoped(profile)) {
-      throw new Error("Official HR letters cannot be replaced by employees");
-    }
-  }
-
   const settings = await getDocumentSettings(supabase, profile.employee.organizationId);
   const ext = (file.name.split(".").pop() ?? "").toLowerCase();
   if (!settings.allowedFileTypes.includes(ext)) {
@@ -84,6 +68,47 @@ export async function uploadAndCreateDocument(
     .maybeSingle();
   const typeCode = String((typeRow as { code?: string } | null)?.code ?? "OTHER");
   const period = parsePeriodFromNotes(meta.notes);
+  // HR re-providing the same Payroll & Tax period updates the existing official file.
+  let replaceDocumentId = meta.replaceDocumentId ?? null;
+  if (
+    !replaceDocumentId &&
+    isSystemProvidedPayrollTaxCode(typeCode) &&
+    !isEmployeeScoped(profile) &&
+    meta.notes &&
+    /^period:\d{4}(-\d{2})?$/.test(meta.notes)
+  ) {
+    const { data: existingOfficial } = await fromHrms(supabase, "employee_documents")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("employee_id", meta.employeeId)
+      .eq("document_type_id", meta.documentTypeId)
+      .eq("notes", meta.notes)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (existingOfficial?.id) {
+      replaceDocumentId = existingOfficial.id as string;
+    }
+  }
+
+  if (replaceDocumentId) {
+    const { data: existing, error: existingError } = await fromHrms(supabase, "employee_documents")
+      .select("id, is_official, employee_id")
+      .eq("id", replaceDocumentId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingError) throw new Error(existingError.message);
+    if (!existing) throw new Error("Document to replace was not found");
+    if (existing.employee_id !== meta.employeeId) {
+      throw new Error("Replace target does not belong to the selected employee");
+    }
+    if (existing.is_official && isEmployeeScoped(profile)) {
+      throw new Error("Official HR documents cannot be replaced by employees");
+    }
+  }
+
   const storagePath = buildEmployeeDocumentStoragePath({
     employeeId: meta.employeeId,
     documentTypeCode: typeCode,
@@ -117,6 +142,9 @@ export async function uploadAndCreateDocument(
   const documentStatus = settings.autoVerification ? "verified" : "pending";
   const documentYear = period.year ? Number(period.year) : null;
   const documentMonth = period.month ? Number(period.month) : null;
+  // HR/system Payroll & Tax files are official — employees view/download only.
+  const markOfficial =
+    isSystemProvidedPayrollTaxCode(typeCode) && !isEmployeeScoped(profile);
 
   const { data, error } = await fromHrms(supabase, "employee_documents")
     .insert({
@@ -129,16 +157,20 @@ export async function uploadAndCreateDocument(
       file_name: file.name,
       mime_type: file.type || "application/octet-stream",
       file_size_bytes: file.size,
-      document_status: documentStatus,
-      source: "upload",
-      is_official: false,
+      document_status: markOfficial ? "verified" : documentStatus,
+      source: markOfficial ? "system" : "upload",
+      is_official: markOfficial,
       issued_date: emptyToNull(meta.issuedDate),
       expiry_date: emptyToNull(meta.expiryDate),
       notes: emptyToNull(meta.notes),
       document_year: documentYear,
       document_month: documentMonth,
-      verified_at: settings.autoVerification ? new Date().toISOString() : null,
-      verified_by: settings.autoVerification ? profile.userId : null,
+      verified_at:
+        markOfficial || settings.autoVerification
+          ? new Date().toISOString()
+          : null,
+      verified_by:
+        markOfficial || settings.autoVerification ? profile.userId : null,
       status: "active",
       created_by: profile.userId,
       updated_by: profile.userId,
@@ -151,14 +183,14 @@ export async function uploadAndCreateDocument(
     throw new Error(error?.message ?? "Failed to save document");
   }
 
-  if (meta.replaceDocumentId) {
+  if (replaceDocumentId) {
     await fromHrms(supabase, "employee_documents")
       .update({
         archived_at: new Date().toISOString(),
         replaced_by_id: data.id,
         updated_by: profile.userId,
       })
-      .eq("id", meta.replaceDocumentId)
+      .eq("id", replaceDocumentId)
       .eq("employee_id", meta.employeeId);
   }
 
