@@ -1,6 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { hasPermission } from "@/lib/permissions/utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
@@ -27,6 +26,13 @@ import {
 } from "@/lib/leave/constants";
 import { applyLeavePolicyToBalanceSnapshot } from "@/lib/leave/leave-entitlement";
 import { isLeaveTypeAllowedForBand, resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
+import {
+  CEO_LEAVE_APPROVER_ROLE_CODES,
+  HR_LEAVE_APPROVER_ROLE_CODES,
+  canActorDecideLeaveRequest,
+  isCeoLeaveApprover,
+  isHrLeaveActor,
+} from "@/lib/leave/services/leave-approval-auth";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import {
   ensureEmployeeMonthlyLeaveAccruals,
@@ -1828,11 +1834,13 @@ export {
   isHrLeaveApplicant,
 };
 
-export const CEO_LEAVE_APPROVER_ROLE_CODES = [
-  "ceo",
-  "founder",
-  "co_founder",
-] as const;
+export {
+  CEO_LEAVE_APPROVER_ROLE_CODES,
+  HR_LEAVE_APPROVER_ROLE_CODES,
+  canActorDecideLeaveRequest,
+  isCeoLeaveApprover,
+  isHrLeaveActor,
+} from "@/lib/leave/services/leave-approval-auth";
 
 export async function listHrLeaveApplicantEmployeeIds(
   organizationId: string,
@@ -1859,65 +1867,6 @@ export async function listHrLeaveApplicantEmployeeIds(
   return Array.from(
     new Set((data ?? []).map((row) => row.employee_id).filter(Boolean)),
   );
-}
-
-export function isCeoLeaveApprover(profile: UserProfile): boolean {
-  return (
-    profile.roles.some((role) =>
-      (CEO_LEAVE_APPROVER_ROLE_CODES as readonly string[]).includes(role.code),
-    ) || hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.ceo)
-  );
-}
-
-export const HR_LEAVE_APPROVER_ROLE_CODES = [
-  "hr_admin",
-  "hr_executive",
-] as const;
-
-export function isHrLeaveActor(profile: UserProfile): boolean {
-  return (
-    profile.roles.some((role) =>
-      (HR_LEAVE_APPROVER_ROLE_CODES as readonly string[]).includes(role.code),
-    ) || profile.roles.some((role) => role.code === "super_admin")
-  );
-}
-
-/**
- * Employee leave: HR or CEO may approve; the first accept finalizes the request.
- * HR / manager leave: CEO only.
- */
-export function canActorDecideLeaveRequest(input: {
-  profile: UserProfile;
-  applicantEmployeeId: string;
-  leaveStatus: string;
-  pendingLevel: number | null;
-  pendingApproverEmployeeId?: string | null;
-  executiveApplicant: boolean;
-}): boolean {
-  if (input.leaveStatus !== "pending" || input.pendingLevel == null) {
-    return false;
-  }
-  if (input.applicantEmployeeId === input.profile.employee.id) {
-    return false;
-  }
-
-  const assignedToActor =
-    Boolean(input.pendingApproverEmployeeId) &&
-    input.pendingApproverEmployeeId === input.profile.employee.id;
-
-  if (input.executiveApplicant) {
-    return isCeoLeaveApprover(input.profile);
-  }
-
-  if (isCeoLeaveApprover(input.profile)) {
-    return true;
-  }
-
-  if (assignedToActor) {
-    return true;
-  }
-
-  return input.pendingLevel === 1 && isHrLeaveActor(input.profile);
 }
 
 export const NO_HR_APPROVER_CONFIGURED_MESSAGE =

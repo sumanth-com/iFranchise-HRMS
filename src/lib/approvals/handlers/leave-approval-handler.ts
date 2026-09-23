@@ -196,8 +196,8 @@ export const leaveApprovalHandler: ApprovalHandler = {
       approval_status: string;
     };
 
-    // Email HR, CEO, and Co-founder (all pending steps) so each can Accept/Reject
-    // from email without waiting for portal. Deduplicate by employee.
+    // Email HR, assigned Manager, CEO, and Co-founder (all pending steps) so each
+    // can Accept/Reject from email without waiting for portal. Deduplicate by employee.
     const rows = data as LeaveApprovalRow[];
     const seen = new Set<string>();
     const pending: PendingApprover[] = [];

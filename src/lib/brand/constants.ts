@@ -10,12 +10,15 @@ export const BRAND_MARK_PATH = "/images/logo-mark.png";
 export const DEFAULT_BRAND_LOGO_PATH = "/images/logo.png";
 
 /**
- * Email-optimized IF mark (same art as iF-Logo.png, sized for clients).
- * Always reference via absolute `${origin}${EMAIL_BRAND_LOGO_PATH}` in HTML emails.
+ * Compact IF mark for small tiles / payslip fallbacks.
+ * Prefer {@link BRAND_LOGO_FULL_PATH} for branded transactional email headers.
  */
 export const EMAIL_BRAND_LOGO_PATH = "/images/email-logo.png";
 
-/** Full horizontal lockup: IF mark + iFranchise + CONNECT. EXPAND. GROW. */
+/**
+ * Full horizontal lockup: IF mark + iFranchise + CONNECT. EXPAND. GROW.
+ * Used as the canonical logo in leave / approval branded emails.
+ */
 export const BRAND_LOGO_FULL_PATH = "/images/logo-horizontal.png";
 
 /** Horizontal without tagline: IF mark + iFranchise. */

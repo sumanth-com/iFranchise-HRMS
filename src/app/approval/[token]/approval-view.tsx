@@ -14,6 +14,7 @@ import { submitEmailApprovalAction } from "@/app/approval/[token]/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { LEAVE_EMAIL_DEFAULT_REJECTION_REASON } from "@/lib/approvals/email-templates";
 import { Button } from "@/components/common/button";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import type { ApprovalRequestSummary, ProcessOutcome } from "@/lib/approvals/types";
 
 type DetailRow = { label: string; value: string };
@@ -61,8 +62,10 @@ function Shell({
     <div className="flex min-h-screen items-center justify-center bg-[#f6f7fb] p-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-[#e5e7eb] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
         <div className="bg-gradient-to-br from-[#111827] to-[#334155] px-7 py-6 text-white sm:px-8 sm:py-7">
-          <div className="mb-4 inline-flex size-10 items-center justify-center rounded-xl bg-white text-sm font-bold text-[#111827]">
-            IF
+          <div className="mb-4 flex justify-center">
+            <div className="rounded-2xl bg-white px-4 py-2.5">
+              <BrandLogo variant="full" height={36} priority className="mx-auto" />
+            </div>
           </div>
           <h1 className="text-xl font-bold leading-tight tracking-tight">{heading}</h1>
           {subheading ? (

@@ -1,5 +1,8 @@
-import { EMAIL_BRAND_LOGO_PATH } from "@/lib/brand/constants";
-import { siteConfig } from "@/config/site";
+import { BRAND_LOGO_FULL_PATH, BRAND_NAME } from "@/lib/brand/constants";
+import {
+  PRODUCTION_CANONICAL_APP_URL,
+  resolveAppOrigin,
+} from "@/lib/url/app-origin";
 
 const COLORS = {
   headerFrom: "#111827",
@@ -26,6 +29,20 @@ export type EmailDetailRow = {
   label: string;
   value: string;
 };
+
+/**
+ * Absolute URL for the official iFranchise lockup in HTML emails.
+ * Never uses localhost / loopback — those break when the message is opened in Gmail.
+ */
+export function resolveEmailBrandLogoUrl(): string {
+  const origin = resolveAppOrigin();
+  const lower = origin.toLowerCase();
+  const safeOrigin =
+    lower.includes("localhost") || lower.includes("127.0.0.1")
+      ? PRODUCTION_CANONICAL_APP_URL
+      : origin;
+  return `${safeOrigin}${BRAND_LOGO_FULL_PATH}`;
+}
 
 function buttonBackground(variant: EmailButton["variant"]): string {
   switch (variant) {
@@ -99,6 +116,8 @@ export type BrandedEmailOptions = {
   subheading?: string;
   contentHtml: string;
   footerNote?: string;
+  /** Optional logo URL override (defaults to production-safe full iFranchise lockup). */
+  logoUrl?: string;
 };
 
 /** Wraps content in the shared iFranchise HRMS branded email shell. */
@@ -106,7 +125,9 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
   const preheader = options.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${options.preheader}</div>`
     : "";
-  const logoUrl = `${siteConfig.url}${EMAIL_BRAND_LOGO_PATH}`;
+  // Full horizontal lockup (IF + iFranchise), not the compact IF mark.
+  // Width-only sizing keeps aspect ratio; centered in the header.
+  const logoUrl = options.logoUrl ?? resolveEmailBrandLogoUrl();
 
   return `<!doctype html>
 <html lang="en">
@@ -121,6 +142,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
         .email-pad { padding: 22px 16px !important; }
         .email-header { padding: 28px 16px 24px !important; }
         .email-heading { font-size: 22px !important; }
+        .email-brand-logo { width: 168px !important; max-width: 78% !important; }
         .email-btn-table, .email-btn-table tbody, .email-btn-table tr { display: block !important; width: 100% !important; }
         .email-btn-cell { display: block !important; width: 100% !important; padding: 0 0 10px 0 !important; }
         .email-btn { min-height: 48px !important; padding: 16px 18px !important; font-size: 16px !important; }
@@ -138,7 +160,13 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
           <table role="presentation" class="email-shell" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;overflow:hidden;border-radius:20px;background:#ffffff;border:1px solid ${COLORS.border};box-shadow:0 12px 36px rgba(15,23,42,0.07);">
             <tr>
               <td class="email-header" align="center" style="background:linear-gradient(135deg,${COLORS.headerFrom},${COLORS.headerTo});padding:32px 28px 28px;color:#ffffff;text-align:center;">
-                <img src="${logoUrl}" width="48" alt="iFranchise" style="display:block;width:48px;height:auto;max-width:48px;border:0;border-radius:12px;margin:0 auto 16px;" />
+                <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto 16px;">
+                  <tr>
+                    <td align="center" style="background:#ffffff;border-radius:14px;padding:10px 18px;">
+                      <img class="email-brand-logo" src="${logoUrl}" width="200" alt="${BRAND_NAME}" style="display:block;width:200px;height:auto;max-width:200px;border:0;margin:0 auto;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
+                    </td>
+                  </tr>
+                </table>
                 <h1 class="email-heading" style="margin:0;font-size:24px;line-height:1.3;font-weight:700;">${options.heading}</h1>
                 ${
                   options.subheading
@@ -155,7 +183,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
             <tr>
               <td align="center" style="border-top:1px solid ${COLORS.border};padding:16px 24px;background:#fbfdff;text-align:center;">
                 <p style="margin:0;font-size:12px;line-height:1.55;color:${COLORS.faint};">
-                  ${options.footerNote ?? `${siteConfig.name} · Secure approvals`}
+                  ${options.footerNote ?? `${BRAND_NAME} HRMS · Secure approvals`}
                 </p>
               </td>
             </tr>

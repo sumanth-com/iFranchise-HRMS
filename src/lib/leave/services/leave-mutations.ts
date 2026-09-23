@@ -432,6 +432,7 @@ async function createApprovalSteps(
       steps.push({ approverId: ceoId, level: 1 });
     }
   } else {
+    const excludeIds = new Set<string>([employeeId]);
     const hrId = await getHrApproverEmployeeId(supabase, organizationId, {
       employeeId,
       excludeEmployeeIds: [employeeId],
@@ -446,11 +447,21 @@ async function createApprovalSteps(
       throw new Error(NO_HR_APPROVER_CONFIGURED_MESSAGE);
     }
     steps.push({ approverId: hrId, level: 1 });
+    excludeIds.add(hrId);
+
+    // Assigned reporting manager gets the same email Approve/Reject path as HR.
+    const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
+    if (managerId && !excludeIds.has(managerId)) {
+      steps.push({ approverId: managerId, level: 1 });
+      excludeIds.add(managerId);
+    }
+
     const ceoIds = await requireActiveCeoApproverEmployeeIds(
       supabase,
       organizationId,
     );
     for (const ceoId of ceoIds) {
+      if (excludeIds.has(ceoId)) continue;
       steps.push({ approverId: ceoId, level: 2 });
     }
   }
@@ -721,6 +732,34 @@ async function getPendingLeaveApprovalForActor(
   applicantEmployeeId: string,
   executiveApplicant: boolean,
 ) {
+  // Prefer the actor's own pending step so assigned managers (and HR) can act
+  // from email even when another level-1 approver sorts first.
+  const { data: ownStep, error: ownError } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .select("id, approver_employee_id, approval_level")
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approver_employee_id", profile.employee.id)
+    .eq("approval_status", "pending")
+    .is("deleted_at", null)
+    .order("approval_level", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (ownError) throw new Error(ownError.message);
+
+  if (ownStep) {
+    const allowedOwn = canActorDecideLeaveRequest({
+      profile,
+      applicantEmployeeId,
+      leaveStatus: "pending",
+      pendingLevel: ownStep.approval_level,
+      pendingApproverEmployeeId: ownStep.approver_employee_id,
+      executiveApplicant,
+    });
+    if (allowedOwn) return ownStep;
+  }
+
   const pending = await getPendingLeaveApproval(supabase, leaveRequestId);
   if (!pending) return null;
   const allowed = canActorDecideLeaveRequest({
@@ -1219,10 +1258,11 @@ export async function approveLeaveRequest(
     throw new Error("This approval step was already processed");
   }
 
-  const approvalActorLabel =
-    isCeoLeaveApprover(profile) || updatedStep.approval_level === 2
-      ? "CEO"
-      : "HR";
+  const approvalActorLabel = isCeoLeaveApprover(profile)
+    ? "CEO"
+    : isHrLeaveActor(profile)
+      ? "HR"
+      : "Manager";
 
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,
@@ -1233,7 +1273,8 @@ export async function approveLeaveRequest(
     metadata: { approvalLevel: updatedStep.approval_level },
   });
 
-  // First HR or CEO accept fully approves employee leave (no second wait).
+  // First authorized accept (HR, CEO, or assigned Manager) fully approves —
+  // remaining pending steps are cleared; no second wait.
   await clearRemainingPendingApprovals(supabase, leaveRequestId, profile.userId);
   await finalizeApprovalIfComplete(supabase, profile, leaveRequestId);
 }
