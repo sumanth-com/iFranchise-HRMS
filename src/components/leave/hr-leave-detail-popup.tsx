@@ -67,9 +67,14 @@ export function HrLeaveDetailPopup({
 
   useEffect(() => {
     if (!open || !leaveRequestId) {
-      setDetail(null);
       setLoadError(null);
       setActionError(null);
+      setIsFetching(false);
+      return;
+    }
+
+    // Reopening the same request: keep loaded detail — no clear/refetch flash.
+    if (detail?.id === leaveRequestId) {
       setIsFetching(false);
       return;
     }
@@ -110,7 +115,7 @@ export function HrLeaveDetailPopup({
     return () => {
       cancelled = true;
     };
-  }, [open, leaveRequestId]);
+  }, [open, leaveRequestId, detail?.id]);
 
   function refreshAndClose(
     message: string,
@@ -123,6 +128,7 @@ export function HrLeaveDetailPopup({
     setActionMode(null);
     setComments("");
     setActionError(null);
+    setDetail(null); // invalidate so next open refetches post-action state
     onOpenChange(false);
     onActionComplete?.(result);
   }

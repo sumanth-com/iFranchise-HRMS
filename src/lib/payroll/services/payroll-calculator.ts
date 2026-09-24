@@ -364,8 +364,8 @@ function resolveDailyRateWorkingDays(
  * week_off is NOT added (Saturdays/other offs stay unpaid unless reclassified).
  * Holiday includes:
  * - explicit attendance "holiday" marks
- * - Sundays in the as-of window (Excel marks Sundays as H)
- * - official company holidays (is_optional=false) in the as-of window
+ * - Sundays in the selected payroll month window (Excel marks Sundays as H)
+ * - official company holidays (is_optional=false) in the month window
  * Half-days count as 0.5 present-equivalent.
  * Paid leave (CL/EL) comes from approved leave summary (or on_leave fallback).
  */

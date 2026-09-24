@@ -7100,45 +7100,24 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
 }
 
 /* ==========================================================================
-   Phone-only notice
+   Narrow / resized desktop & tablet reflow
 
-   Tablets (768px–1023px) and desktop render the portal. Desktop (≥1024px) is
-   untouched: `.portal-desktop-only` uses `display: contents`, so the wrapper
-   generates no box and the shell lays out exactly as approved.
-   Below 768px the wrapper is hidden and this notice takes over.
+   The HRMS is desktop+tablet first. Do NOT replace the portal with a blocking
+   "Desktop Recommended" screen when a desktop browser is resized narrower.
+   Keep the existing shell; reflow grids, wrap controls, and scroll tables.
+   Desktop ≥1280px at 100% zoom stays visually unchanged.
    ========================================================================== */
 
 .portal-desktop-only {
   display: contents;
 }
 
+/* Legacy notice component — never block the portal by viewport width. */
 .desktop-notice {
-  display: none;
+  display: none !important;
 }
 
-@media (max-width: 767.98px) {
-  .portal-desktop-only {
-    display: none;
-  }
-
-  .desktop-notice {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow-y: auto;
-    padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
-    background:
-      radial-gradient(ellipse 90% 60% at 50% 0%, #eceafd 0%, transparent 60%),
-      linear-gradient(180deg, #f7f7fe 0%, #ffffff 55%, #f6f5fd 100%);
-  }
-}
-
-/* Mid-width / zoomed-desktop reflow (iPad Mini 1024px included).
-   Desktop ≥1280px at 100% zoom is unchanged visually; zoom-in often lands here. */
-@media (min-width: 768px) and (max-width: 1279.98px) {
+@media (max-width: 1279.98px) {
   .app-shell-canvas,
   .app-shell-main {
     min-width: 0;
@@ -7156,8 +7135,13 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   }
 
   /* Keep intentional horizontal scroll on data tables; do not squash columns. */
-  .app-shell-main [data-slot="table-container"] {
+  .app-shell-main [data-slot="table-container"],
+  .app-shell-main .overflow-x-auto,
+  .app-shell-main table {
     max-width: 100%;
+  }
+
+  .app-shell-main [data-slot="table-container"] {
     overflow-x: auto;
   }
 
@@ -7185,6 +7169,13 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
 
   .app-shell-main .lg\:grid-cols-\[minmax\(0\,17\.5rem\)_minmax\(0\,1fr\)\] {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Toolbar / action rows: wrap instead of overflowing the page. */
+  .app-shell-main .flex.flex-wrap,
+  .app-shell-main [data-toolbar],
+  .app-shell-main [data-page-actions] {
+    max-width: 100%;
   }
 
   [data-slot="dialog-content"] {

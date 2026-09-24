@@ -42,6 +42,8 @@ function buildAttendancePayload(
     check_out_at: checkOutAt,
     attendance_status: input.attendanceStatus,
     work_hours: workHours,
+    // HR write is a single authoritative day session — clear multi-session rollup.
+    prior_work_seconds: 0,
     overtime_hours: input.overtimeHours ?? 0,
     notes: emptyToNull(input.notes),
     status: "active" as const,
@@ -167,6 +169,7 @@ export async function updateAttendance(
       check_out_at: payload.check_out_at,
       attendance_status: payload.attendance_status,
       work_hours: payload.work_hours,
+      prior_work_seconds: payload.prior_work_seconds,
       overtime_hours: payload.overtime_hours,
       notes: payload.notes,
       updated_by: profile.userId,
@@ -323,6 +326,7 @@ export async function upsertManualAttendanceStatus(
         check_in_at: punches.check_in_at,
         check_out_at: punches.check_out_at,
         work_hours: punches.work_hours,
+        prior_work_seconds: 0,
         overtime_hours: punches.overtime_hours,
         updated_by: profile.userId,
       })
@@ -360,6 +364,7 @@ export async function upsertManualAttendanceStatus(
       check_in_at: punches.check_in_at,
       check_out_at: punches.check_out_at,
       work_hours: punches.work_hours,
+      prior_work_seconds: 0,
       overtime_hours: punches.overtime_hours,
       status: "active",
       created_by: profile.userId,
@@ -385,6 +390,7 @@ export async function upsertManualAttendanceStatus(
             check_in_at: punches.check_in_at,
             check_out_at: punches.check_out_at,
             work_hours: punches.work_hours,
+            prior_work_seconds: 0,
             overtime_hours: punches.overtime_hours,
             updated_by: profile.userId,
           })

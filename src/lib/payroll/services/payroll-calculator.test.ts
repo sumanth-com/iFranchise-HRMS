@@ -61,6 +61,37 @@ function structure(gross: number, overrides?: Partial<{
 }
 
 describe("payroll calculator — Excel source of truth", () => {
+  it("keeps Monthly Salary fixed and Gross Earning from full-month payable days mid-month", () => {
+    // Simulate Sep 24 "today": attendance facts already include all 4 Sundays as H.
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: new Date("2026-09-24"),
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(25_000),
+      attendance: {
+        presentDays: 18,
+        absentDays: 1,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 2, clDays: 1, elDays: 1 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    assert.equal(result.breakdown.attendance.monthlyGrossSalary, 25_000);
+    assert.equal(result.breakdown.attendance.workingDays, EXCEL_PAYROLL_DAY_DENOMINATOR);
+    assert.equal(result.breakdown.attendance.dailyRate, roundCurrency(25_000 / 30));
+    // Paid = 18P + 4H + 2CL/EL = 24 (Absent/LOP excluded)
+    assert.equal(result.breakdown.attendance.paidDays, 24);
+    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 24));
+  });
+
   it("always uses salary / 30 as the daily rate", () => {
     const result = calculateEmployeePayroll({
       month: 9,

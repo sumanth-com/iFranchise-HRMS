@@ -19,14 +19,14 @@ describe("payroll applicable period", () => {
     assert.equal(period.periodEnd, "2026-08-31");
   });
 
-  it("caps the current month at today", () => {
+  it("uses the complete current month (not capped at today)", () => {
     const period = resolvePayrollApplicablePeriod(9, 2026, {
       today: new Date("2026-09-04"),
     });
     assert.equal(period.kind, "current");
     assert.equal(period.isClosed, false);
     assert.equal(period.periodStart, "2026-09-01");
-    assert.equal(period.periodEnd, "2026-09-04");
+    assert.equal(period.periodEnd, "2026-09-30");
   });
 
   it("treats a future month as not started", () => {
@@ -39,13 +39,29 @@ describe("payroll applicable period", () => {
     assert.equal(period.periodEnd, "2026-10-01");
   });
 
-  it("starts mid-month employees on their joining date", () => {
+  it("starts mid-month employees on their joining date within the full month", () => {
     const period = resolvePayrollApplicablePeriod(9, 2026, {
       today: new Date("2026-09-04"),
       joiningDate: "2026-09-10",
     });
     assert.equal(period.periodStart, "2026-09-10");
-    assert.equal(period.periodEnd, "2026-09-04");
+    assert.equal(period.periodEnd, "2026-09-30");
+  });
+
+  it("marks the current month closed only after the calendar month ends", () => {
+    const mid = resolvePayrollApplicablePeriod(9, 2026, {
+      today: new Date("2026-09-24"),
+    });
+    assert.equal(mid.kind, "current");
+    assert.equal(mid.isClosed, false);
+    assert.equal(mid.periodEnd, "2026-09-30");
+
+    const after = resolvePayrollApplicablePeriod(9, 2026, {
+      today: new Date("2026-10-01"),
+    });
+    assert.equal(after.kind, "past");
+    assert.equal(after.isClosed, true);
+    assert.equal(after.periodEnd, "2026-09-30");
   });
 });
 

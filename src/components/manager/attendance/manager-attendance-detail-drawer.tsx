@@ -77,6 +77,8 @@ export function ManagerAttendanceDetailDrawer({
 
   useEffect(() => {
     if (!open || !attendanceId) return;
+    // Reopening the same record: keep loaded detail — no clear/refetch flash.
+    if (detail?.id === attendanceId) return;
     setDetail(null);
     setReviewNotes("");
     startLoading(async () => {
@@ -88,7 +90,7 @@ export function ManagerAttendanceDetailDrawer({
         setDetail(null);
       }
     });
-  }, [open, attendanceId]);
+  }, [open, attendanceId, detail?.id]);
 
   const historyColumns: DataTableColumn<TeamAttendanceDetailBundle["history"][number]>[] = [
     {

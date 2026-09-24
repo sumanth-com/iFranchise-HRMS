@@ -2,9 +2,9 @@
  * Holiday credits for payroll attendance facts (Excel-aligned).
  *
  * - Official company holidays (hrms.holidays, is_optional = false) count as H
- *   within the applicable as-of window.
- * - Sundays count as H for payroll (Excel sheet marks Sundays as Holiday), also
- *   only within the as-of window — never invent future Sunday/holiday credits.
+ *   within the applicable payroll month window.
+ * - Sundays count as H for payroll (Excel sheet marks Sundays as Holiday) for
+ *   every Sunday in the selected month window.
  * - Optional holidays are not auto-credited; they count only when the employee
  *   has an applicable attendance/leave mark.
  * - Saturdays stay normal working days unless marked/configured otherwise.
@@ -131,8 +131,7 @@ export function listSundaysInRange(periodStart: string, periodEnd: string): stri
 
 /**
  * Excel payroll: Sundays are Holiday (H), paid in Total Working Days.
- * Credits each Sunday in the as-of window once — does not write attendance rows
- * and does not credit Sundays after periodEnd (open-month as-of).
+ * Credits each Sunday in [periodStart, periodEnd] once — does not write attendance rows.
  */
 export function applySundayHolidaysToAttendanceSummary(
   summary: AttendanceHolidayCounters,

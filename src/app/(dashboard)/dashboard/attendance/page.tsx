@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { PageSkeleton } from "@/components/common/page-skeleton";
 import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { legacyHubTabRedirectUrl } from "@/lib/dashboard/hub-paths";
 import { AttendanceHubSection } from "@/lib/dashboard/self-service/attendance-hub-section";
@@ -16,7 +15,7 @@ export default async function AttendanceSelfServicePage({ searchParams }: PagePr
   if (legacy) redirect(legacy);
 
   return (
-    <Suspense fallback={<PageSkeleton />}>
+    <Suspense fallback={null}>
       <AttendanceHubSection section="my" searchParams={searchParams} />
     </Suspense>
   );

@@ -193,6 +193,12 @@ function resolveSelfAttendanceDayStatus(input: {
     return "on_request";
   }
 
+  // Prefer the stored row status so HR create/edit/manual Present/Absent/On Leave
+  // stays identical on the employee Attendance module and dashboard.
+  if (input.attendance?.attendance_status) {
+    return input.attendance.attendance_status;
+  }
+
   const checkInAt = input.attendance?.check_in_at ?? null;
   const checkOutAt = input.attendance?.check_out_at ?? null;
 
@@ -266,12 +272,15 @@ function buildTodayPanel(
     ? Number(row.overtime_hours ?? 0)
     : computeOvertimeHours(workHours, rules);
 
-  // Live punch status so checkout hours map to half day / present without waiting on stored row.
-  const attendanceStatus = checkInAt
-    ? resolvePunchStatus(checkInAt, checkOutAt, attendanceDate, rules)
-    : attendanceDate === getTodayDateString()
-      ? null
-      : row?.attendance_status ?? null;
+  // Prefer stored status (HR edit / punch write) so portals stay consistent.
+  // Fall back to live punch derivation only when the row has no status yet.
+  const attendanceStatus = row?.attendance_status
+    ? row.attendance_status
+    : checkInAt
+      ? resolvePunchStatus(checkInAt, checkOutAt, attendanceDate, rules)
+      : attendanceDate === getTodayDateString()
+        ? null
+        : null;
 
   const locationFlags = resolveAttendanceLocationFlags({
     checkInLatitude: row?.check_in_latitude,

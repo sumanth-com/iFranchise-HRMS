@@ -1,17 +1,12 @@
 import { type ReactNode } from "react";
 
-import { DesktopOnlyNotice } from "@/components/layout/desktop-only-notice";
-
 /**
- * Shows {@link DesktopOnlyNotice} instead of `children` on phones.
- * Tablets and desktop render `children`. Desktop (≥1024px) is `display: contents`
- * so the approved desktop layout is unchanged.
+ * Portal shell wrapper. The HRMS UI is desktop/tablet-first and must remain
+ * usable when a desktop browser window is resized narrower — never replace
+ * the app with a blocking "Desktop Recommended" screen based on viewport width.
+ *
+ * Phone UA tablet-access policy is enforced separately (server-side).
  */
 export function DesktopOnlyGate({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <DesktopOnlyNotice />
-      <div className="portal-desktop-only">{children}</div>
-    </>
-  );
+  return <>{children}</>;
 }

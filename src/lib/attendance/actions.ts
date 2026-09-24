@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { reviewOrganizationAttendanceCorrection } from "@/lib/manager/services/attendance-correction-service";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
-import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { refreshDraftPayrollItemsForEmployee } from "@/lib/payroll/services/payroll-mutations";
@@ -150,9 +150,7 @@ export async function createAttendanceAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = attendanceFormSchema.parse(input);
     const id = await createAttendance(supabase, profile, parsed);
-    revalidatePath(ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
+    revalidateSelfAttendancePaths();
     return { success: true, data: { id } };
   } catch (error) {
     return {
@@ -172,11 +170,9 @@ export async function updateAttendanceAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = attendanceFormSchema.parse(input);
     await updateAttendance(supabase, profile, attendanceId, parsed);
-    revalidatePath(ATTENDANCE_ROUTES.list);
     revalidatePath(ATTENDANCE_ROUTES.detail(attendanceId));
     revalidatePath(ATTENDANCE_ROUTES.edit(attendanceId));
-    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
+    revalidateSelfAttendancePaths();
     return { success: true, data: null };
   } catch (error) {
     return {
@@ -214,9 +210,6 @@ export async function setManualAttendanceStatusAction(
       console.error("[setManualAttendanceStatusAction] payroll refresh failed", payrollError);
     }
 
-    revalidatePath(ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
     revalidateSelfAttendancePaths();
     revalidatePath(EMPLOYEE_ROUTES.payroll);
     revalidatePath(PAYROLL_ROUTES.run);
@@ -247,9 +240,7 @@ export async function deleteAttendanceAction(
     const profile = await requireServerPermission("attendance.delete");
     const supabase = await getAuthenticatedSupabase();
     await softDeleteAttendance(supabase, profile, attendanceId);
-    revalidatePath(ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
-    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
+    revalidateSelfAttendancePaths();
     return { success: true, data: null };
   } catch (error) {
     return {
@@ -309,9 +300,6 @@ export async function getAttendanceCorrectionDetailAction(
 
 function revalidateTeamAttendancePaths() {
   revalidateSelfAttendancePaths();
-  revalidatePath(SELF_ATTENDANCE_ROUTES.team);
-  revalidatePath(SELF_ATTENDANCE_ROUTES.list);
-  revalidatePath(ATTENDANCE_ROUTES.list);
 }
 
 export async function approveAttendanceCorrectionAction(input: unknown) {

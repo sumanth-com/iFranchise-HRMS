@@ -117,11 +117,12 @@ export async function getAttendanceById(
 ): Promise<AttendanceDetail | null> {
   const organizationId = profile.employee.organizationId;
 
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("attendance")
-    .select(
-      `
+  const [attendanceResult, rules] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("attendance")
+      .select(
+        `
         id,
         organization_id,
         branch_id,
@@ -154,11 +155,15 @@ export async function getAttendanceById(
           designations:designation_id (title)
         )
       `,
-    )
-    .eq("id", attendanceId)
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
+      )
+      .eq("id", attendanceId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    getOrganizationAttendanceRules(supabase, organizationId),
+  ]);
+
+  const { data, error } = attendanceResult;
 
   if (error) {
     throw new Error(error.message);
@@ -171,7 +176,6 @@ export async function getAttendanceById(
   const branch = unwrapRelation(row.branches);
   const department = unwrapRelation(employee?.departments ?? null);
   const designation = unwrapRelation(employee?.designations ?? null);
-  const rules = await getOrganizationAttendanceRules(supabase, organizationId);
 
   const [createdBy, updatedBy] = await Promise.all([
     resolveAuditActor(supabase, organizationId, row.created_by),

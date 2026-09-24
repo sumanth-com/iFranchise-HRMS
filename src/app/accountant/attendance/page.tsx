@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
-import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
@@ -48,7 +47,7 @@ async function AccountantAttendanceContent({
 
 export default function AccountantAttendancePage({ searchParams }: PageProps) {
   return (
-    <Suspense fallback={<ModulePageSkeleton />}>
+    <Suspense fallback={null}>
       <AccountantAttendanceContent searchParams={searchParams} />
     </Suspense>
   );

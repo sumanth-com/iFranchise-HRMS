@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 
-import { PageSkeleton } from "@/components/common/page-skeleton";
 import { LeaveHubSection } from "@/lib/dashboard/self-service/leave-hub-section";
 
 type PageProps = {
@@ -9,7 +8,7 @@ type PageProps = {
 
 export default function LeaveTeamPage({ searchParams }: PageProps) {
   return (
-    <Suspense fallback={<PageSkeleton />}>
+    <Suspense fallback={null}>
       <LeaveHubSection section="team" searchParams={searchParams} />
     </Suspense>
   );

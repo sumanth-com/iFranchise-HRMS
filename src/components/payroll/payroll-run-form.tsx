@@ -29,7 +29,6 @@ import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/se
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { fetchPayrollDetailAction } from "@/lib/payroll/actions";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
-import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
 import {
   formatCurrency,
   formatPayrollMonth,
@@ -110,19 +109,11 @@ function formatOptionalPayrollAmount(value: number): string {
   return value > 0 ? formatCurrency(value) : "—";
 }
 
-/** Open current-month as-of label for Team Payroll (no hardcoded month dates). */
+/** Open current-month banner — Team Payroll uses the full month, so no as-of cutoff. */
 function resolveOpenPayrollAsOfLabel(month: number, year: number): string | null {
-  if (!(month >= 1 && month <= 12) || !Number.isFinite(year)) return null;
-  const period = resolvePayrollApplicablePeriod(month, year);
-  if (period.kind !== "current" || period.isClosed) return null;
-  const [y, m, d] = period.periodEnd.split("-").map(Number);
-  const formatted = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  return `As of ${formatted} · today`;
+  void month;
+  void year;
+  return null;
 }
 
 function attendanceFactsFromBreakdown(breakdown: PayrollBreakdown) {

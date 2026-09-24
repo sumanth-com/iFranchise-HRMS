@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
-import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
+import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES, PUBLIC_ROUTES, IDLE_ACTIVITY_COOKIE_REFRESH_MS } from "@/lib/auth/constants";
 import { logoutAction } from "@/lib/auth/actions";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
@@ -171,13 +171,14 @@ export function AuthProvider({
     }
   }, [router]);
 
-  // Re-resolve portal.*.access after role grants without waiting for cookie TTL
-  // or requiring the portal switcher (which stays hidden when only one portal is cached).
+  // Re-resolve portal.*.access after role grants. Avoid window `focus` (fires often)
+  // and avoid a post-mount sync — layout already resolved permissions. Visibility
+  // checks are throttled to the idle-cookie window so soft-nav cache stays warm.
   const lastPermissionSyncAt = useRef(0);
   useEffect(() => {
     const syncIfStale = () => {
       const now = Date.now();
-      if (now - lastPermissionSyncAt.current < 45_000) return;
+      if (now - lastPermissionSyncAt.current < IDLE_ACTIVITY_COOKIE_REFRESH_MS) return;
       lastPermissionSyncAt.current = now;
       void refreshProfile();
     };
@@ -186,13 +187,9 @@ export function AuthProvider({
       if (document.visibilityState === "visible") syncIfStale();
     };
 
-    const initial = window.setTimeout(syncIfStale, 2_000);
     document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", syncIfStale);
     return () => {
-      window.clearTimeout(initial);
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", syncIfStale);
     };
   }, [refreshProfile]);
 

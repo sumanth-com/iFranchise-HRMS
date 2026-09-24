@@ -40,7 +40,6 @@ import {
   rejectReimbursement,
   releaseEmployeePayslip,
   ensureUnpublishedPayslipForPayrollItem,
-  syncActiveEmployeesIntoPayrollRun,
   updatePendingReimbursement,
   updatePayrollItemAdjustments,
 } from "@/lib/payroll/services/payroll-mutations";
@@ -949,7 +948,7 @@ export async function fetchPayrollDetailAction(
   try {
     const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
     const supabase = await getAuthenticatedSupabase();
-    await syncActiveEmployeesIntoPayrollRun(supabase, profile, payrollId);
+    // Sync runs once inside getPayrollRunById — do not double-sync on open.
     return getPayrollRunById(supabase, profile, payrollId);
   } catch (error) {
     throw new Error(toUserFriendlyError(error, "Failed to load payroll details"));

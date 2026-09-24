@@ -8,11 +8,9 @@ import { BrandLockup } from "@/components/brand/brand-logo";
 const RESET_DELAY_MS = 2600;
 
 /**
- * Shown instead of the portal on phones.
- *
- * Visibility is decided purely in CSS (see `.desktop-notice` in globals.css) so this
- * renders identically on the server and the client — no viewport probing, no layout
- * flash, and no effect at all on the desktop shell.
+ * Legacy phone notice UI. Not mounted by the portal shell — viewport width must
+ * never replace the HRMS with a blocking screen. Kept for reference; CSS also
+ * forces `.desktop-notice { display: none }` so it cannot block if remounted.
  */
 export function DesktopOnlyNotice() {
   const [copied, setCopied] = useState(false);

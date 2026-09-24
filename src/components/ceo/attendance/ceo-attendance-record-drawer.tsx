@@ -31,10 +31,11 @@ export function CeoAttendanceRecordDrawer({
 
   useEffect(() => {
     if (!open || !attendanceId) {
-      setDetail(null);
-      setError(null);
       return;
     }
+
+    // Reopening the same record: keep loaded detail — no refetch spinner.
+    if (detail?.id === attendanceId) return;
 
     startTransition(async () => {
       const result = await getAttendanceDetailAction(attendanceId);
@@ -46,7 +47,7 @@ export function CeoAttendanceRecordDrawer({
       setError(null);
       setDetail(result.data);
     });
-  }, [open, attendanceId]);
+  }, [open, attendanceId, detail?.id]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

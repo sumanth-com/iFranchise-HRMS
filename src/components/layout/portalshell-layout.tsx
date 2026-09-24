@@ -5,7 +5,6 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
 import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
-import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { TabletAccessDenied } from "@/components/layout/tablet-access-denied";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
@@ -108,12 +107,13 @@ async function ResolvedPortalShell({
       portalLabel={portalLabel}
     >
       <DeviceKindReporter />
-      {/* Phones get the desktop notice. Tablets render the portal (or a grant notice). */}
+      {/* Viewport width never blocks the shell; tablet UA grant is separate. */}
       <DesktopOnlyGate>
         {tabletAllowed ? (
           <DashboardShell>
-            {/* Stream page RSC after shell chrome so soft-nav is not blank while module data loads. */}
-            <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
+            {/* Soft-nav: keep prior module visible while the next RSC streams.
+                Do not swap the main pane to a full skeleton (loading.tsx removed). */}
+            <Suspense fallback={null}>{children}</Suspense>
           </DashboardShell>
         ) : (
           <TabletAccessDenied />

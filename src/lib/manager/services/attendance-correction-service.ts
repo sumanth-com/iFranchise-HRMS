@@ -308,14 +308,16 @@ export async function getTeamAttendanceDetailBundle(
   attendanceId: string,
 ) {
   const organizationId = profile.employee.organizationId;
-  const rules = await getOrganizationAttendanceRules(supabase, organizationId);
-  const breakMinutes = await getDefaultBreakMinutes(supabase, organizationId);
 
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("attendance")
-    .select(
-      `
+  // Parallelize independent setup + attendance row — sequential awaits delayed drawer open.
+  const [rules, breakMinutes, attendanceResult] = await Promise.all([
+    getOrganizationAttendanceRules(supabase, organizationId),
+    getDefaultBreakMinutes(supabase, organizationId),
+    supabase
+      .schema("hrms")
+      .from("attendance")
+      .select(
+        `
         id,
         employee_id,
         attendance_date,
@@ -339,11 +341,14 @@ export async function getTeamAttendanceDetailBundle(
           employment_types:employment_type_id (name)
         )
       `,
-    )
-    .eq("id", attendanceId)
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
+      )
+      .eq("id", attendanceId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
+
+  const { data, error } = attendanceResult;
 
   if (error) throw new Error(error.message);
   if (!data) return null;

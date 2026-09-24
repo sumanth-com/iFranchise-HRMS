@@ -631,8 +631,8 @@ async function getAttendanceSummary(
       : null;
   }
 
-  // Official holidays credit only through the applicable as-of window (open month =
-  // through today). Punch-based statuses already stop at queryEnd above.
+  // Official holidays + Sundays credit for the COMPLETE applicable month window
+  // (open months use month end — not capped at today).
   const holidayCreditEnd = queryEnd;
 
   const [leaveSummary, officialHolidays] = await Promise.all([
@@ -653,7 +653,7 @@ async function getAttendanceSummary(
     periodStart: holidayPeriodStart,
     periodEnd: holidayCreditEnd,
   });
-  // Excel: Sundays are paid Holiday (H). Credit only through as-of; no future Sundays.
+  // Excel: Sundays are paid Holiday (H) for every Sunday in the selected month.
   applySundayHolidaysToAttendanceSummary(summary, {
     statusByDate,
     periodStart: holidayPeriodStart,
