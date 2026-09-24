@@ -27,7 +27,7 @@ export function isRowLevelSecurityError(error: unknown): boolean {
 
 export function toUserFriendlyError(
   error: unknown,
-  fallback = "Something went wrong. Please try again or contact support if the issue persists.",
+  fallback = "We couldn't complete that request. Please try again.",
 ): string {
   if (typeof error === "string") {
     error = new Error(error);
@@ -76,11 +76,11 @@ export function toUserFriendlyError(
     return raw;
   }
 
-  if (/not authenticated/i.test(raw)) {
+  if (/not authenticated|auth session missing|jwt expired/i.test(raw)) {
     return "Your session has expired. Please sign in again.";
   }
 
-  if (/network error|failed to fetch|load failed|fetch failed/i.test(raw)) {
+  if (/network error|failed to fetch|load failed|fetch failed|econnreset|etimedout/i.test(raw)) {
     return "Connection lost. Refresh the page and try again.";
   }
 
@@ -108,13 +108,21 @@ export function toUserFriendlyError(
     return raw;
   }
 
+  // Never surface database, PostgREST, stack-like, or opaque technical messages.
   if (
-    /postgres|supabase|pgrst|schema cache|SQLSTATE|relation .* does not exist/i.test(raw)
+    /postgres|supabase|pgrst|schema cache|SQLSTATE|relation .* does not exist|column .* does not exist|permission denied for|function .* does not exist|timeout|ECONN|ENOTFOUND|TypeError|ReferenceError|Cannot read propert|is not a function|Unexpected token|Internal Server Error|status code|code:\s*['"]?[A-Z0-9_]+/i.test(
+      raw,
+    )
   ) {
     return fallback;
   }
 
-  if (raw.length > 180) {
+  if (raw.length > 160) {
+    return fallback;
+  }
+
+  // Hex/UUID-heavy or JSON-looking payloads are developer diagnostics.
+  if (/[{}\[\]]/.test(raw) || /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i.test(raw)) {
     return fallback;
   }
 

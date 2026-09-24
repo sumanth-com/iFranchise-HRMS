@@ -18,14 +18,19 @@ export function EmployeeAnnouncementGate() {
     if (loaded.current) return;
     loaded.current = true;
 
-    void listPendingMandatoryAnnouncementsAction().then((result) => {
-      if (!result.success) return;
-      setRemaining(
-        result.data.filter(
-          (item) => !wasAnnouncementAckedLocally(item.id, item.versionId),
-        ),
-      );
-    });
+    void listPendingMandatoryAnnouncementsAction()
+      .then((result) => {
+        if (!result.success) return;
+        setRemaining(
+          result.data.filter(
+            (item) => !wasAnnouncementAckedLocally(item.id, item.versionId),
+          ),
+        );
+      })
+      .catch((error) => {
+        // Non-critical gate — never crash the portal shell.
+        console.error("[employee-announcement-gate] load failed", error);
+      });
   }, []);
 
   const current = useMemo(() => remaining[0] ?? null, [remaining]);

@@ -4,13 +4,17 @@ import { format } from "date-fns";
 import { useState } from "react";
 
 import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
-import { ErrorState } from "@/components/common";
+import { SoftLoadError } from "@/components/common/soft-load-error";
 import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
 import { CeoDashboardKpis } from "@/components/ceo/ceo-dashboard-kpis";
 import { CeoDashboardPipeline } from "@/components/ceo/ceo-dashboard-pipeline";
 import { CeoDashboardToday } from "@/components/ceo/ceo-dashboard-today";
 import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
 import { EmployeeUpcomingEvents } from "@/components/employee/dashboard/employee-upcoming-events";
+import {
+  SECTION_LOAD_ERROR_DESCRIPTION,
+  SECTION_LOAD_ERROR_TITLE,
+} from "@/lib/errors/employee-facing";
 import type { CeoDashboardData } from "@/types/ceo-dashboard";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -24,11 +28,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
   const [referenceDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
   if (error) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
-        <ErrorState title="Unable to load executive dashboard" description={error} />
-      </div>
-    );
+    return <SoftLoadError variant="page" />;
   }
 
   const firstName = profile?.employee?.firstName ?? "there";
@@ -38,8 +38,8 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
 
   return (
     <ClientSectionBoundary
-      title="Unable to load executive dashboard"
-      description="Please try again. If this keeps happening, refresh the page or contact your administrator."
+      title={SECTION_LOAD_ERROR_TITLE}
+      description={SECTION_LOAD_ERROR_DESCRIPTION}
       contentClassName="flex min-h-0 flex-1 flex-col"
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">

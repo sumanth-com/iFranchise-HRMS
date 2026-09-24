@@ -96,6 +96,7 @@ export async function AttendanceHubSection({
       attendanceDate: today,
       punchState: "not_checked_in" as const,
       attendanceStatus: null,
+      statusNotes: null,
       checkInAt: null,
       checkOutAt: null,
       priorCompletedSeconds: 0,

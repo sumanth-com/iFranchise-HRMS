@@ -14,6 +14,8 @@ export type ManagerTodayAttendance = {
   attendanceDate: string;
   punchState: ManagerAttendancePunchState;
   attendanceStatus: AttendanceStatus | null;
+  /** Raw notes for sheet-aligned status display. */
+  statusNotes: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
   /** Completed seconds from earlier sessions today (before the current open session). */
@@ -35,6 +37,8 @@ export type ManagerAttendanceCalendarDay = {
   isToday: boolean;
   isFuture: boolean;
   status: AttendanceDisplayStatus | null;
+  /** Raw notes for sheet-aligned status display. */
+  statusNotes: string | null;
   attendanceId: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
@@ -83,6 +87,8 @@ export type ManagerAttendanceHistoryRow = {
   id: string | null;
   attendanceDate: string;
   attendanceStatus: AttendanceDisplayStatus;
+  /** Raw notes for sheet-aligned status display (CL/EL/LOP/H). */
+  statusNotes: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
   workHours: number;

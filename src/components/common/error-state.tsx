@@ -14,10 +14,10 @@ type ErrorStateProps = {
 };
 
 export function ErrorState({
-  title = "Something went wrong",
-  description = "An unexpected error occurred. Please try again.",
+  title = "We couldn't load this section",
+  description = "Please try again. If the problem continues, contact your HR administrator.",
   icon,
-  retryLabel = "Try again",
+  retryLabel = "Retry",
   onRetry,
   className,
 }: ErrorStateProps) {

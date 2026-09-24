@@ -7,6 +7,7 @@ import {
   formatAttendanceTime,
   getTodayDateString,
 } from "@/lib/attendance/services/attendance-utils";
+import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import {
   computeMonitoringFlags,
   isWorkFromHomeBranch,
@@ -611,6 +612,7 @@ export async function listCeoAttendanceEmployees(
         ? formatEmployeeName(manager.first_name, manager.last_name)
         : null,
       todayStatus: status as AttendanceStatus | "no_record",
+      todayStatusNotes: (today?.notes as string | null) ?? null,
       checkInAt: today?.check_in_at ?? null,
       checkOutAt: today?.check_out_at ?? null,
       workingHours: Number(today?.work_hours ?? 0),
@@ -621,13 +623,13 @@ export async function listCeoAttendanceEmployees(
   });
 
   if (parsed.attendanceStatus) {
-    if (parsed.attendanceStatus === "absent") {
-      mapped = mapped.filter(
-        (row) => row.todayStatus === "absent" || row.todayStatus === "on_leave",
-      );
-    } else {
-      mapped = mapped.filter((row) => row.todayStatus === parsed.attendanceStatus);
-    }
+    mapped = mapped.filter((row) =>
+      matchesAttendanceUiStatusFilter(
+        row.todayStatus === "no_record" ? null : row.todayStatus,
+        row.todayStatusNotes,
+        parsed.attendanceStatus,
+      ),
+    );
   }
 
   const total = mapped.length;
@@ -1079,29 +1081,29 @@ export async function getCeoAttendanceEmployeeDetail(
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
 
-  const { data: employee, error } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select(
-      `id, employee_code, first_name, last_name, email,
+  const [employeeResult, monthRows, yearRows] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        `id, employee_code, first_name, last_name, email,
       departments:department_id(name),
       designations:designation_id(title, code),
       managers:reporting_manager_id(first_name, last_name),
       employee_profiles(profile_image_storage_path)`,
-    )
-    .eq("id", input.employeeId)
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  if (!employee) return null;
-
-  const [monthRows, yearRows] = await Promise.all([
+      )
+      .eq("id", input.employeeId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
     loadAttendanceRows(supabase, organizationId, monthStart, monthEnd, [input.employeeId]),
     loadAttendanceRows(supabase, organizationId, yearStart, yearEnd, [input.employeeId]),
   ]);
 
+  const { data: employee, error } = employeeResult;
+
+  if (error) throw new Error(error.message);
+  if (!employee) return null;
   const presentDays = monthRows.filter((row) => row.attendance_status === "present").length;
   const absentDays = monthRows.filter((row) => row.attendance_status === "absent").length;
   const lateDays = monthRows.filter((row) => row.attendance_status === "late").length;
@@ -1196,6 +1198,7 @@ export async function getCeoAttendanceEmployeeDetail(
         id: row.id as string,
         date: row.attendance_date as string,
         status: row.attendance_status as AttendanceStatus,
+        notes: (row.notes as string | null) ?? null,
         checkInAt: row.check_in_at as string | null,
         checkOutAt: row.check_out_at as string | null,
         workHours: Number(row.work_hours ?? 0),

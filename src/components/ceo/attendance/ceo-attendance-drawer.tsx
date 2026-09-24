@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
@@ -46,27 +46,41 @@ export function CeoAttendanceDrawer({
   const [detail, setDetail] = useState<CeoAttendanceEmployeeDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !employeeId) {
-      setDetail(null);
       setError(null);
       return;
     }
 
+    const key = `${employeeId}:${month ?? ""}:${year ?? ""}`;
+    if (loadedKeyRef.current === key) {
+      return;
+    }
+
     startTransition(async () => {
-      const result = await fetchCeoAttendanceEmployeeDetailAction({
-        employeeId,
-        month,
-        year,
-      });
-      if (!result.success) {
+      try {
+        const result = await fetchCeoAttendanceEmployeeDetailAction({
+          employeeId,
+          month,
+          year,
+        });
+        if (!result.success) {
+          setDetail(null);
+          loadedKeyRef.current = null;
+          setError("We couldn't load this section. Please try again.");
+          return;
+        }
+        loadedKeyRef.current = key;
+        setError(null);
+        setDetail(result.data);
+      } catch (loadError) {
+        console.error("[ceo-attendance-drawer] load failed", loadError);
         setDetail(null);
-        setError(result.message);
-        return;
+        loadedKeyRef.current = null;
+        setError("We couldn't load this section. Please try again.");
       }
-      setError(null);
-      setDetail(result.data);
     });
   }, [open, employeeId, month, year]);
 
@@ -223,7 +237,7 @@ export function CeoAttendanceDrawer({
                             : ""}
                         </p>
                       </div>
-                      <AttendanceStatusBadge status={item.status} />
+                      <AttendanceStatusBadge status={item.status} notes={item.notes} />
                     </li>
                   ))}
                 </ul>

@@ -30,7 +30,7 @@ import {
 } from "@/lib/attendance/services/attendance-utils";
 import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { getHrmsYears } from "@/lib/date/hrms-year";
-import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
+import { ATTENDANCE_STATUS_FILTER_ITEMS, ATTENDANCE_UI_DISPLAY_LABELS, resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
 import { updateCheckoutWithFreshGps } from "@/lib/attendance/self-attendance-punch-with-gps";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { formatHoursLabel, formatLateByLabel } from "@/lib/employee/attendance-format";
@@ -47,27 +47,20 @@ type Props = {
   history: ManagerAttendanceHistoryResult;
   month: number;
   year: number;
-  status?: AttendanceStatus;
+  status?: string;
   searchDate?: string;
   /** Portal attendance base path used for location deep-links. */
   attendanceBasePath?: string;
   onFilterChange: (filters: {
     month: number;
     year: number;
-    status?: AttendanceStatus;
+    status?: string;
     searchDate?: string;
     page: number;
   }) => void;
 };
 
-const STATUS_OPTIONS: AttendanceStatus[] = [
-  "present",
-  "absent",
-  "late",
-  "on_leave",
-  "holiday",
-  "week_off",
-];
+const STATUS_OPTIONS = ATTENDANCE_STATUS_FILTER_ITEMS;
 
 export function EmployeeAttendanceHistoryTable({
   history,
@@ -184,7 +177,7 @@ export function EmployeeAttendanceHistoryTable({
                 month,
                 year,
                 status:
-                  value === "all" ? undefined : (value as AttendanceStatus),
+                  value === "all" ? undefined : value,
                 searchDate,
                 page: 1,
               });
@@ -196,8 +189,8 @@ export function EmployeeAttendanceHistoryTable({
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {ATTENDANCE_STATUS_LABELS[option]}
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -226,7 +219,7 @@ export function EmployeeAttendanceHistoryTable({
                   {format(parseISO(row.attendanceDate), "dd MMM yyyy")}
                 </td>
                 <td className="px-4 py-3">
-                  <AttendanceHistoryStatusCell status={row.attendanceStatus} />
+                  <AttendanceHistoryStatusCell status={row.attendanceStatus} notes={row.statusNotes} />
                 </td>
                 <td className="px-4 py-3">
                   <AttendancePunchTimeCell
@@ -348,7 +341,7 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <AttendanceHistoryStatusCell status={row.attendanceStatus} />
+        <AttendanceHistoryStatusCell status={row.attendanceStatus} notes={row.statusNotes} />
         {isComplete ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
             <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500 text-white">

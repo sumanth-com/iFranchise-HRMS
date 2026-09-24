@@ -1,5 +1,6 @@
 import type { LookupOption } from "@/types/employee";
 import type { CorrectionStatus } from "@/types/manager-attendance";
+import type { ManualAttendanceUiStatus } from "@/lib/attendance/manual-status";
 
 export type AttendanceStatus =
   | "present"
@@ -30,6 +31,8 @@ export type AttendanceListItem = {
   workHours: number;
   overtimeHours: number;
   attendanceStatus: AttendanceDisplayStatus;
+  /** Raw notes (`src:CL|…`) for sheet-aligned status display. */
+  notes: string | null;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;
   hasCheckInLocation: boolean;
@@ -67,7 +70,7 @@ export type AttendanceListParams = {
   dateTo?: string;
   branchId?: string;
   departmentId?: string;
-  attendanceStatus?: AttendanceStatus;
+  attendanceStatus?: AttendanceStatus | ManualAttendanceUiStatus;
   employeeId?: string;
 };
 
@@ -116,7 +119,10 @@ export type AttendanceDetail = {
   workHours: number;
   overtimeHours: number;
   lateMinutes: number;
+  /** Human-facing remarks (internal `src:` tags stripped). */
   notes: string | null;
+  /** Raw notes for CL/EL/LOP/H status display. */
+  statusNotes: string | null;
   hasCheckInLocation: boolean;
   hasCheckOutLocation: boolean;
   createdAt: string;

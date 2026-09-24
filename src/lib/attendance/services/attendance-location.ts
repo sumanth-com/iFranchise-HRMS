@@ -18,6 +18,8 @@ export type AttendanceLocationDetails = {
   employeeCode: string;
   attendanceDate: string;
   attendanceStatus: AttendanceDisplayStatus;
+  /** Raw notes for sheet-aligned status display. */
+  notes: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
   checkIn: AttendanceGpsPoint | null;

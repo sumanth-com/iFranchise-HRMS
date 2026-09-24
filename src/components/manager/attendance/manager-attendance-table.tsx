@@ -188,7 +188,7 @@ export function ManagerAttendanceTable({
         header: "Status",
         cell: ({ row }) => (
           <div className="flex flex-col gap-1">
-            <AttendanceStatusBadge status={row.original.attendanceStatus} />
+            <AttendanceStatusBadge status={row.original.attendanceStatus} notes={row.original.notes} />
             {row.original.isWorkFromHome ? (
               <span className="inline-flex w-fit items-center gap-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 dark:bg-sky-950 dark:text-sky-300">
                 <Home className="size-2.5" />

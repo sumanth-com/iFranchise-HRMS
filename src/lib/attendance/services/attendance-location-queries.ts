@@ -171,6 +171,7 @@ export async function getAuthorizedAttendanceLocation(
       employeeCode: employee?.employee_code ?? "",
       attendanceDate: row.attendance_date,
       attendanceStatus: row.attendance_status,
+      notes: row.notes ?? null,
       checkInAt: row.check_in_at,
       checkOutAt: row.check_out_at,
       checkIn,

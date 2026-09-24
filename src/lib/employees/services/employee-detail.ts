@@ -61,6 +61,7 @@ type EmployeeAttendanceRow = {
   check_out_at: string | null;
   attendance_status: string;
   work_hours: number | null;
+  notes?: string | null;
 };
 
 function isWeekendDate(dateStr: string) {
@@ -157,6 +158,7 @@ function fillMonthAttendanceRows(
           check_out_at: null,
           attendance_status: "upcoming",
           work_hours: 0,
+          notes: null,
         };
       }
 
@@ -168,6 +170,7 @@ function fillMonthAttendanceRows(
           check_out_at: null,
           attendance_status: "upcoming",
           work_hours: 0,
+          notes: null,
         };
       }
 
@@ -179,6 +182,7 @@ function fillMonthAttendanceRows(
           check_out_at: null,
           attendance_status: "week_off",
           work_hours: 0,
+          notes: null,
         };
       }
 
@@ -189,6 +193,7 @@ function fillMonthAttendanceRows(
         check_out_at: null,
         attendance_status: "absent",
         work_hours: 0,
+        notes: null,
       };
     })
     .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date));
@@ -453,7 +458,7 @@ export async function getEmployeeAttendance(
     .schema("hrms")
     .from("attendance")
     .select(
-      "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours",
+      "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, notes",
     )
     .eq("employee_id", employeeId)
     .is("deleted_at", null)

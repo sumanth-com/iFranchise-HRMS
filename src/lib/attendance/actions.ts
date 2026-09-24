@@ -63,7 +63,7 @@ export async function fetchAttendanceAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load attendance records",
+        toUserFriendlyError(error, "Failed to load attendance records"),
     };
   }
 }
@@ -100,7 +100,7 @@ export async function getAttendanceDetailAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load attendance record",
+        toUserFriendlyError(error, "Failed to load attendance record"),
     };
   }
 }
@@ -120,7 +120,7 @@ export async function getAttendanceLookupsAction(): Promise<
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load attendance lookups",
+        toUserFriendlyError(error, "Failed to load attendance lookups"),
     };
   }
 }
@@ -137,7 +137,7 @@ export async function getAttendanceSummaryAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load attendance summary",
+        toUserFriendlyError(error, "Failed to load attendance summary"),
     };
   }
 }
@@ -156,7 +156,7 @@ export async function createAttendanceAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to create attendance",
+        toUserFriendlyError(error, "Failed to create attendance"),
     };
   }
 }
@@ -178,7 +178,7 @@ export async function updateAttendanceAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to update attendance",
+        toUserFriendlyError(error, "Failed to update attendance"),
     };
   }
 }
@@ -191,7 +191,7 @@ export async function setManualAttendanceStatusAction(
     checkInAt: string | null;
     checkOutAt: string | null;
     workHours: number;
-    attendanceStatus: "present" | "absent" | "on_leave";
+    attendanceStatus: "present" | "absent" | "on_leave" | "holiday";
   }>
 > {
   try {
@@ -219,16 +219,13 @@ export async function setManualAttendanceStatusAction(
 
     return {
       success: true,
-      data: {
-        ...saved,
-        attendanceStatus: parsed.attendanceStatus,
-      },
+      data: saved,
     };
   } catch (error) {
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to update attendance",
+        toUserFriendlyError(error, "Failed to update attendance"),
     };
   }
 }
@@ -319,7 +316,7 @@ export async function approveAttendanceCorrectionAction(input: unknown) {
     return {
       success: false as const,
       message:
-        error instanceof Error ? error.message : "Failed to approve regularization.",
+        toUserFriendlyError(error, "Failed to approve regularization."),
     };
   }
 }
@@ -341,7 +338,7 @@ export async function rejectAttendanceCorrectionAction(input: unknown) {
     return {
       success: false as const,
       message:
-        error instanceof Error ? error.message : "Failed to reject regularization.",
+        toUserFriendlyError(error, "Failed to reject regularization."),
     };
   }
 }
@@ -374,7 +371,7 @@ export async function bulkApproveAttendanceCorrectionAction(input: unknown) {
         failed += 1;
         if (errors.length < 3) {
           errors.push(
-            error instanceof Error ? error.message : "Approve failed",
+            toUserFriendlyError(error, "Approve failed"),
           );
         }
       }
@@ -421,7 +418,7 @@ export async function bulkRejectAttendanceCorrectionAction(input: unknown) {
         failed += 1;
         if (errors.length < 3) {
           errors.push(
-            error instanceof Error ? error.message : "Reject failed",
+            toUserFriendlyError(error, "Reject failed"),
           );
         }
       }

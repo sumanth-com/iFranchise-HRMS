@@ -7,6 +7,7 @@ import {
   getTodayDateString,
   isAfterOfficeCheckoutTime,
 } from "@/lib/attendance/services/attendance-utils";
+import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
 import {
   computeMonitoringFlags,
@@ -337,6 +338,7 @@ export async function listTeamAttendance(
         breakMinutes,
         overtimeHours: Number(att?.overtime_hours ?? 0),
         attendanceStatus: status,
+        notes: (att?.notes as string | null) ?? null,
         lateMinutes,
         correctionId: correction?.id ?? null,
         correctionStatus: (correction?.status as TeamAttendanceListResult["data"][number]["correctionStatus"]) ?? null,
@@ -351,13 +353,13 @@ export async function listTeamAttendance(
       };
     });
 
-    const filteredRecords = allRecords.filter((record) => {
-      if (!parsed.attendanceStatus) return true;
-      if (parsed.attendanceStatus === "absent") {
-        return record.attendanceStatus === "absent" || record.attendanceStatus === "on_leave";
-      }
-      return record.attendanceStatus === parsed.attendanceStatus;
-    });
+    const filteredRecords = allRecords.filter((record) =>
+      matchesAttendanceUiStatusFilter(
+        record.attendanceStatus,
+        record.notes,
+        parsed.attendanceStatus,
+      ),
+    );
 
     const ascending = parsed.sortOrder === "asc";
     filteredRecords.sort((a, b) => {
@@ -429,10 +431,19 @@ export async function listTeamAttendance(
     query = query.eq("employees.employment_type_id", parsed.employmentTypeId);
   }
   if (parsed.attendanceStatus) {
-    if (parsed.attendanceStatus === "absent") {
-      query = query.in("attendance_status", ["absent", "on_leave"]);
+    const filter = parsed.attendanceStatus;
+    if (filter === "casual_leave" || filter === "earned_leave" || filter === "on_leave") {
+      query = query.eq("attendance_status", "on_leave");
+    } else if (filter === "lop") {
+      query = query.eq("attendance_status", "absent");
+    } else if (filter === "absent") {
+      query = query.eq("attendance_status", "absent");
+    } else if (filter === "present") {
+      query = query.in("attendance_status", ["present", "late", "half_day"]);
+    } else if (filter === "holiday") {
+      query = query.in("attendance_status", ["holiday", "week_off"]);
     } else {
-      query = query.eq("attendance_status", parsed.attendanceStatus);
+      query = query.eq("attendance_status", filter);
     }
   }
   if (parsed.employeeId) query = query.eq("employee_id", parsed.employeeId);
@@ -492,8 +503,7 @@ export async function listTeamAttendance(
     }
   }
 
-  return {
-    data: rows.map((row) => {
+  const mapped = rows.map((row) => {
       const employee = unwrap(row.employees);
       const branch = unwrap(row.branches);
       const department = unwrap(employee?.departments ?? null);
@@ -528,6 +538,7 @@ export async function listTeamAttendance(
         breakMinutes,
         overtimeHours: Number(row.overtime_hours ?? 0),
         attendanceStatus,
+        notes: (row.notes as string | null) ?? null,
         lateMinutes,
         correctionId: correction?.id ?? null,
         correctionStatus: (correction?.status as TeamAttendanceListResult["data"][number]["correctionStatus"]) ?? null,
@@ -540,8 +551,19 @@ export async function listTeamAttendance(
         ),
         isWorkFromHome: isWorkFromHomeBranch(branch?.name, row.notes),
       };
-    }),
-    total: count ?? 0,
+    });
+
+  const dataRows = mapped.filter((record) =>
+    matchesAttendanceUiStatusFilter(
+      record.attendanceStatus,
+      record.notes,
+      parsed.attendanceStatus,
+    ),
+  );
+
+  return {
+    data: dataRows,
+    total: parsed.attendanceStatus ? dataRows.length : (count ?? 0),
     page: parsed.page,
     pageSize: parsed.pageSize,
   };

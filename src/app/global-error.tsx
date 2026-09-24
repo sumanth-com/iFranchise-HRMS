@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 import { ErrorState } from "@/components/common/error-state";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import {
+  PAGE_LOAD_ERROR_DESCRIPTION,
+  PAGE_LOAD_ERROR_TITLE,
+  SECTION_LOAD_RETRY_LABEL,
+} from "@/lib/errors/employee-facing";
+import {
   isRecoverableRouteError,
   recoverFromChunkLoadError,
 } from "@/lib/next/chunk-load-recovery";
@@ -44,8 +49,8 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             </div>
           ) : (
             <ErrorState
-              title="Something went wrong"
-              description="We couldn't load this page. Please refresh or try again in a moment."
+              title={PAGE_LOAD_ERROR_TITLE}
+              description={PAGE_LOAD_ERROR_DESCRIPTION}
               onRetry={() => {
                 if (isRecoverable) {
                   recoverFromChunkLoadError({ force: true, cause: error });
@@ -53,7 +58,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 }
                 reset();
               }}
-              retryLabel="Try again"
+              retryLabel={SECTION_LOAD_RETRY_LABEL}
             />
           )}
         </div>

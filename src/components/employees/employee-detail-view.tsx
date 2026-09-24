@@ -24,10 +24,7 @@ import {
 } from "@/components/common/data-table";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { SECTION_HEADING_ROW_CLASS } from "@/components/common/table-header-classes";
-import {
-  ATTENDANCE_DISPLAY_STATUS_LABELS,
-  ATTENDANCE_STATUS_LABELS,
-} from "@/lib/attendance/constants";
+import { resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
 import { type EmployeeTab } from "@/lib/employees/constants";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
@@ -757,15 +754,10 @@ function EmployeeAttendanceTab({
                   header: "Status",
                   render: (row) => {
                     const status = String(row.attendance_status ?? "");
-                    return (
-                      ATTENDANCE_DISPLAY_STATUS_LABELS[
-                        status as keyof typeof ATTENDANCE_DISPLAY_STATUS_LABELS
-                      ] ??
-                      ATTENDANCE_STATUS_LABELS[
-                        status as keyof typeof ATTENDANCE_STATUS_LABELS
-                      ] ??
-                      status
-                    );
+                    return resolveAttendanceUiDisplay(
+                      status,
+                      row.notes as string | null | undefined,
+                    ).label;
                   },
                 },
                 {

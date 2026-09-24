@@ -14,7 +14,7 @@ import {
   UserX,
 } from "lucide-react";
 
-import { ErrorState } from "@/components/common";
+import { SoftLoadError } from "@/components/common/soft-load-error";
 import {
   EmployeeSectionCard,
   EmployeeStatCard,
@@ -49,11 +49,7 @@ export function ManagerDashboard({ data, error }: ManagerDashboardProps) {
   const recruitmentTask = focusById.get("offers-pending");
 
   if (error) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:p-5">
-        <ErrorState title="Unable to load manager overview" description={error} />
-      </div>
-    );
+    return <SoftLoadError variant="page" />;
   }
 
   const { todayPulse, kpis } = data;

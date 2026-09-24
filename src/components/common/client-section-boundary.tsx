@@ -3,6 +3,11 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
+import {
+  SECTION_LOAD_ERROR_DESCRIPTION,
+  SECTION_LOAD_ERROR_TITLE,
+  SECTION_LOAD_RETRY_LABEL,
+} from "@/lib/errors/employee-facing";
 
 type Props = {
   children: ReactNode;
@@ -45,13 +50,10 @@ export class ClientSectionBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <ErrorState
-          title={this.props.title ?? "Couldn't load this section"}
-          description={
-            this.props.description ??
-            "Something went wrong while loading this content. Please try again or refresh the page."
-          }
+          title={this.props.title ?? SECTION_LOAD_ERROR_TITLE}
+          description={this.props.description ?? SECTION_LOAD_ERROR_DESCRIPTION}
           onRetry={this.handleRetry}
-          retryLabel={this.props.retryLabel ?? "Try again"}
+          retryLabel={this.props.retryLabel ?? SECTION_LOAD_RETRY_LABEL}
           className={this.props.className}
         />
       );

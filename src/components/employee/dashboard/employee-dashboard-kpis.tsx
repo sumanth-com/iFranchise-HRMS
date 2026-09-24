@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
-import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
+import { resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
 import {
   formatLiveWorkingDuration,
   formatWorkingDuration,
@@ -26,9 +26,13 @@ import {
 import type { EmployeeDashboardKpis } from "@/types/employee-dashboard";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
-function attendanceLabel(kpis: EmployeeDashboardKpis) {
-  if (kpis.attendanceStatus) {
-    return ATTENDANCE_STATUS_LABELS[kpis.attendanceStatus] ?? kpis.attendanceStatus;
+function attendanceLabel(
+  kpis: EmployeeDashboardKpis,
+  today?: Pick<ManagerTodayAttendance, "attendanceStatus" | "statusNotes"> | null,
+) {
+  const status = today?.attendanceStatus ?? kpis.attendanceStatus;
+  if (status) {
+    return resolveAttendanceUiDisplay(status, today?.statusNotes).label;
   }
   switch (kpis.attendancePunchState) {
     case "checked_in":
@@ -66,7 +70,11 @@ export function EmployeeDashboardKpiCards({
   kpis: EmployeeDashboardKpis;
   today: Pick<
     ManagerTodayAttendance,
-    "checkInAt" | "checkOutAt" | "priorCompletedSeconds"
+    | "checkInAt"
+    | "checkOutAt"
+    | "priorCompletedSeconds"
+    | "attendanceStatus"
+    | "statusNotes"
   >;
   hideLeaveBalance?: boolean;
 }) {
@@ -103,7 +111,7 @@ export function EmployeeDashboardKpiCards({
     >
       <EmployeeStatCard
         label="Today's Attendance"
-        value={attendanceLabel(kpisForLabel)}
+        value={attendanceLabel(kpisForLabel, todayPunch)}
         hint="Status"
         icon={CalendarClock}
         accent="text-emerald-600 dark:text-emerald-400"

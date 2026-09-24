@@ -1,4 +1,4 @@
-import { ErrorState } from "@/components/common/error-state";
+import { SoftLoadError } from "@/components/common/soft-load-error";
 import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
 import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
 import { createClient } from "@/lib/supabase/server";
@@ -35,17 +35,6 @@ export async function EmployeeDashboardPageBody({
     );
   } catch (error) {
     console.error("[employee-dashboard] page load failed", error);
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-        <ErrorState
-          title="Dashboard unavailable"
-          description={
-            error instanceof Error
-              ? error.message
-              : "We couldn't load this dashboard right now. Try another module or refresh."
-          }
-        />
-      </div>
-    );
+    return <SoftLoadError variant="page" />;
   }
 }

@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { SidebarBrand } from "@/components/layout/sidebar-brand";
@@ -12,7 +12,6 @@ import { resolveActiveNavHref } from "@/lib/layout/sidebar-active";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const {
@@ -48,19 +47,6 @@ export function Sidebar() {
       ensureSectionOpenIfUnset(activeItem.section);
     }
   }, [activeHref, ensureSectionOpenIfUnset, navigation, navPaintReady]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !navigation.length) return;
-    for (const item of navigation) {
-      if (typeof item.href === "string" && item.href.startsWith("/") && !item.href.startsWith("//")) {
-        try {
-          router.prefetch(item.href.split("#")[0]);
-        } catch {
-          // Best effort
-        }
-      }
-    }
-  }, [navigation, router]);
 
   return (
     <aside

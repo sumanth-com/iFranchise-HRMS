@@ -2,6 +2,9 @@
  * Runs a server operation and returns a fallback instead of throwing.
  * Use in page loaders to avoid white-screen application errors.
  */
+import { SECTION_LOAD_ERROR_DESCRIPTION } from "@/lib/errors/employee-facing";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
+
 export async function safeServerCall<T>(
   operation: () => Promise<T>,
   fallback: T,
@@ -20,7 +23,7 @@ export type SafeServerResult<T> = {
   error: string | null;
 };
 
-/** Like safeServerCall but also returns a user-facing error message when the call fails. */
+/** Like safeServerCall but also returns a sanitized user-facing error when the call fails. */
 export async function safeServerCallWithError<T>(
   operation: () => Promise<T>,
   fallback: T,
@@ -32,7 +35,7 @@ export async function safeServerCallWithError<T>(
     console.error(label ?? "[safe-server-call]", error);
     return {
       data: fallback,
-      error: error instanceof Error ? error.message : "Something went wrong",
+      error: toUserFriendlyError(error, SECTION_LOAD_ERROR_DESCRIPTION),
     };
   }
 }

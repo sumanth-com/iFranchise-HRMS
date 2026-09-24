@@ -145,7 +145,7 @@ export function AttendanceLocationDialog({
               <InfoCell label="Employee ID" value={data.employeeCode || "—"} />
               <InfoCell
                 label="Status"
-                value={<AttendanceStatusBadge status={data.attendanceStatus} />}
+                value={<AttendanceStatusBadge status={data.attendanceStatus} notes={data.notes} />}
               />
               <InfoCell label="Punch type" value={punchLabel} />
             </div>

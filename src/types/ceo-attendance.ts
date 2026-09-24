@@ -10,7 +10,7 @@ export type CeoAttendanceListParams = {
   managerId?: string;
   branchId?: string;
   employmentTypeId?: string;
-  attendanceStatus?: AttendanceStatus;
+  attendanceStatus?: AttendanceStatus | import("@/lib/attendance/manual-status").ManualAttendanceUiStatus;
   month?: number;
   year?: number;
   dateFrom?: string;
@@ -64,6 +64,8 @@ export type CeoAttendanceEmployeeRow = {
   departmentName: string | null;
   managerName: string | null;
   todayStatus: AttendanceStatus | "no_record";
+  /** Raw notes for sheet-aligned status display. */
+  todayStatusNotes: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
   workingHours: number;
@@ -146,6 +148,7 @@ export type CeoAttendanceEmployeeDetail = {
     id: string;
     date: string;
     status: AttendanceStatus;
+    notes: string | null;
     checkInAt: string | null;
     checkOutAt: string | null;
     workHours: number;

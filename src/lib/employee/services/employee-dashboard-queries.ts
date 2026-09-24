@@ -40,6 +40,7 @@ function buildFallbackToday(today: string): ManagerTodayAttendance {
     attendanceDate: today,
     punchState: "not_checked_in",
     attendanceStatus: null,
+    statusNotes: null,
     checkInAt: null,
     checkOutAt: null,
     priorCompletedSeconds: 0,

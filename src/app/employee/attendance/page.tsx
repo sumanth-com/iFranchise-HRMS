@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 
+import { SoftLoadError } from "@/components/common/soft-load-error";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { safeServerCallWithError } from "@/lib/errors/safe-server";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +26,7 @@ async function EmployeeAttendanceContent({
   const supabase = await createClient();
   const raw = await searchParams;
 
-  const params = managerProfilePageParamsSchema.parse({
+  const parsed = managerProfilePageParamsSchema.safeParse({
     month: typeof raw.month === "string" ? raw.month : undefined,
     year: typeof raw.year === "string" ? raw.year : undefined,
     date: typeof raw.date === "string" ? raw.date : undefined,
@@ -33,7 +35,21 @@ async function EmployeeAttendanceContent({
     page: typeof raw.page === "string" ? raw.page : undefined,
   });
 
-  const data = await getManagerProfilePageData(supabase, profile, params);
+  if (!parsed.success) {
+    console.error("[employee-attendance] invalid search params", parsed.error);
+    return <SoftLoadError variant="page" />;
+  }
+
+  const params = parsed.data;
+  const { data, error } = await safeServerCallWithError(
+    () => getManagerProfilePageData(supabase, profile, params),
+    null,
+    "[employee-attendance] page load",
+  );
+
+  if (error || !data) {
+    return <SoftLoadError variant="page" />;
+  }
 
   return (
     <EmployeeAttendanceView
@@ -46,6 +62,7 @@ async function EmployeeAttendanceContent({
 }
 
 export default function EmployeeAttendancePage({ searchParams }: PageProps) {
+  // Soft-nav: keep prior content when possible; null avoids a full-page skeleton.
   return (
     <Suspense fallback={null}>
       <EmployeeAttendanceContent searchParams={searchParams} />

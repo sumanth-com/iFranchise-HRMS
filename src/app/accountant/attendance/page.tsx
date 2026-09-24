@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 
+import { SoftLoadError } from "@/components/common/soft-load-error";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { safeServerCallWithError } from "@/lib/errors/safe-server";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +26,7 @@ async function AccountantAttendanceContent({
   const supabase = await createClient();
   const raw = await searchParams;
 
-  const params = managerProfilePageParamsSchema.parse({
+  const parsed = managerProfilePageParamsSchema.safeParse({
     month: typeof raw.month === "string" ? raw.month : undefined,
     year: typeof raw.year === "string" ? raw.year : undefined,
     date: typeof raw.date === "string" ? raw.date : undefined,
@@ -33,7 +35,21 @@ async function AccountantAttendanceContent({
     page: typeof raw.page === "string" ? raw.page : undefined,
   });
 
-  const data = await getManagerProfilePageData(supabase, profile, params);
+  if (!parsed.success) {
+    console.error("[accountant-attendance] invalid search params", parsed.error);
+    return <SoftLoadError variant="page" />;
+  }
+
+  const params = parsed.data;
+  const { data, error } = await safeServerCallWithError(
+    () => getManagerProfilePageData(supabase, profile, params),
+    null,
+    "[accountant-attendance] page load",
+  );
+
+  if (error || !data) {
+    return <SoftLoadError variant="page" />;
+  }
 
   return (
     <EmployeeAttendanceView

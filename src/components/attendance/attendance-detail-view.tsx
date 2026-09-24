@@ -63,7 +63,10 @@ export function AttendanceDetailView({
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold tracking-tight">{attendance.employeeName}</h2>
-          <AttendanceStatusBadge status={attendance.attendanceStatus} />
+          <AttendanceStatusBadge
+            status={attendance.attendanceStatus}
+            notes={attendance.statusNotes}
+          />
         </div>
         <p className="text-sm text-muted-foreground">
           {attendance.employeeCode} · {format(parseISO(attendance.attendanceDate), "dd MMM yyyy")}
@@ -81,7 +84,10 @@ export function AttendanceDetailView({
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">{attendance.employeeName}</h1>
-          <AttendanceStatusBadge status={attendance.attendanceStatus} />
+          <AttendanceStatusBadge
+            status={attendance.attendanceStatus}
+            notes={attendance.statusNotes}
+          />
         </div>
         <p className="text-sm text-muted-foreground">
           {attendance.employeeCode} · {format(parseISO(attendance.attendanceDate), "dd MMM yyyy")}
@@ -142,7 +148,10 @@ export function AttendanceDetailView({
             <DetailRow
               label="Status"
               value={
-                <AttendanceStatusBadge status={attendance.attendanceStatus} />
+                <AttendanceStatusBadge
+            status={attendance.attendanceStatus}
+            notes={attendance.statusNotes}
+          />
               }
             />
             <DetailRow

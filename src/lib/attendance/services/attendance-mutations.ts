@@ -15,6 +15,12 @@ import {
   attendanceExistsForEmployeeDate,
   getEmployeeBranchId,
 } from "@/lib/attendance/services/attendance-queries";
+import {
+  buildManualAttendanceNotes,
+  mapManualUiStatusToStored,
+  type ManualAttendanceUiStatus,
+  type StoredManualAttendanceStatus,
+} from "@/lib/attendance/manual-status";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
 
 function emptyToNull(value?: string | null) {
@@ -210,16 +216,13 @@ export async function softDeleteAttendance(
   }
 }
 
-const MANUAL_ATTENDANCE_STATUSES = ["present", "absent", "on_leave"] as const;
-
-export type ManualAttendanceStatus = (typeof MANUAL_ATTENDANCE_STATUSES)[number];
-
 type ExistingAttendanceRow = {
   id: string;
   check_in_at: string | null;
   check_out_at: string | null;
   work_hours: number | string | null;
   overtime_hours: number | string | null;
+  notes: string | null;
 };
 
 async function getActiveAttendanceForEmployeeDate(
@@ -230,7 +233,7 @@ async function getActiveAttendanceForEmployeeDate(
   const { data, error } = await supabase
     .schema("hrms")
     .from("attendance")
-    .select("id, check_in_at, check_out_at, work_hours, overtime_hours")
+    .select("id, check_in_at, check_out_at, work_hours, overtime_hours, notes")
     .eq("employee_id", employeeId)
     .eq("attendance_date", attendanceDate)
     .is("deleted_at", null)
@@ -247,7 +250,7 @@ async function getActiveAttendanceForEmployeeDate(
 const NEGLIGIBLE_WORK_HOURS = 0.25;
 
 function punchFieldsForManualStatus(
-  status: ManualAttendanceStatus,
+  status: StoredManualAttendanceStatus,
   attendanceDate: string,
   existing: ExistingAttendanceRow | null,
 ) {
@@ -289,6 +292,7 @@ function punchFieldsForManualStatus(
 /**
  * Create or update a single attendance row for an employee+date.
  * Used by HR Team Attendance manual status updates. Does not create duplicates.
+ * UI statuses (EL/LOP) map onto existing attendance_status + src: note markers.
  */
 export async function upsertManualAttendanceStatus(
   supabase: AuthSupabaseClient,
@@ -296,14 +300,21 @@ export async function upsertManualAttendanceStatus(
   input: {
     employeeId: string;
     attendanceDate: string;
-    attendanceStatus: ManualAttendanceStatus;
+    attendanceStatus: ManualAttendanceUiStatus;
   },
-): Promise<{ id: string; checkInAt: string | null; checkOutAt: string | null; workHours: number }> {
+): Promise<{
+  id: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  workHours: number;
+  attendanceStatus: StoredManualAttendanceStatus;
+}> {
   const today = getTodayDateString();
   if (input.attendanceDate > today) {
     throw new Error("Attendance cannot be set for a future date.");
   }
 
+  const mapped = mapManualUiStatusToStored(input.attendanceStatus);
   const existing = await getActiveAttendanceForEmployeeDate(
     supabase,
     input.employeeId,
@@ -311,10 +322,11 @@ export async function upsertManualAttendanceStatus(
   );
   const branchId = await getEmployeeBranchId(supabase, input.employeeId);
   const punches = punchFieldsForManualStatus(
-    input.attendanceStatus,
+    mapped.attendanceStatus,
     input.attendanceDate,
     existing,
   );
+  const notes = buildManualAttendanceNotes(mapped.sourceCode, existing?.notes);
 
   if (existing) {
     const { error } = await supabase
@@ -322,12 +334,13 @@ export async function upsertManualAttendanceStatus(
       .from("attendance")
       .update({
         branch_id: branchId,
-        attendance_status: input.attendanceStatus,
+        attendance_status: mapped.attendanceStatus,
         check_in_at: punches.check_in_at,
         check_out_at: punches.check_out_at,
         work_hours: punches.work_hours,
         prior_work_seconds: 0,
         overtime_hours: punches.overtime_hours,
+        notes,
         updated_by: profile.userId,
       })
       .eq("id", existing.id)
@@ -349,6 +362,7 @@ export async function upsertManualAttendanceStatus(
       checkInAt: punches.check_in_at,
       checkOutAt: punches.check_out_at,
       workHours: punches.work_hours,
+      attendanceStatus: mapped.attendanceStatus,
     };
   }
 
@@ -360,12 +374,13 @@ export async function upsertManualAttendanceStatus(
       branch_id: branchId,
       employee_id: input.employeeId,
       attendance_date: input.attendanceDate,
-      attendance_status: input.attendanceStatus,
+      attendance_status: mapped.attendanceStatus,
       check_in_at: punches.check_in_at,
       check_out_at: punches.check_out_at,
       work_hours: punches.work_hours,
       prior_work_seconds: 0,
       overtime_hours: punches.overtime_hours,
+      notes,
       status: "active",
       created_by: profile.userId,
       updated_by: profile.userId,
@@ -386,12 +401,13 @@ export async function upsertManualAttendanceStatus(
           .from("attendance")
           .update({
             branch_id: branchId,
-            attendance_status: input.attendanceStatus,
+            attendance_status: mapped.attendanceStatus,
             check_in_at: punches.check_in_at,
             check_out_at: punches.check_out_at,
             work_hours: punches.work_hours,
             prior_work_seconds: 0,
             overtime_hours: punches.overtime_hours,
+            notes,
             updated_by: profile.userId,
           })
           .eq("id", raced.id)
@@ -402,11 +418,18 @@ export async function upsertManualAttendanceStatus(
           throw new Error(updateError.message);
         }
 
+        emitHrmsWebhook(profile.employee.organizationId, "attendance.updated", {
+          id: raced.id,
+          employeeId: input.employeeId,
+          date: input.attendanceDate,
+        });
+
         return {
           id: raced.id,
           checkInAt: punches.check_in_at,
           checkOutAt: punches.check_out_at,
           workHours: punches.work_hours,
+          attendanceStatus: mapped.attendanceStatus,
         };
       }
     }
@@ -424,5 +447,6 @@ export async function upsertManualAttendanceStatus(
     checkInAt: punches.check_in_at,
     checkOutAt: punches.check_out_at,
     workHours: punches.work_hours,
+    attendanceStatus: mapped.attendanceStatus,
   };
 }

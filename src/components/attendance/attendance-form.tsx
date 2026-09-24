@@ -21,7 +21,14 @@ import {
   fetchEmployeeDepartmentLabelAction,
   updateAttendanceAction,
 } from "@/lib/attendance/actions";
-import { ATTENDANCE_ROUTES, ATTENDANCE_STATUS_LABELS, attendanceTeamListUrl } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, attendanceTeamListUrl } from "@/lib/attendance/constants";
+import {
+  MANUAL_ATTENDANCE_STATUS_ITEMS,
+  buildManualAttendanceNotes,
+  mapManualUiStatusToStored,
+  mapStoredAttendanceToManualUi,
+  type ManualAttendanceUiStatus,
+} from "@/lib/attendance/manual-status";
 import {
   extractTimeFromTimestamp,
   OFFICE_CHECK_IN_TIME,
@@ -29,8 +36,9 @@ import {
   toDisplayAttendanceNotes,
 } from "@/lib/attendance/services/attendance-utils";
 import {
-  attendanceFormSchema,
+  manualAttendanceFormSchema,
   type AttendanceFormInput,
+  type ManualAttendanceFormInput,
 } from "@/lib/validations/attendance";
 import type { AttendanceDetail, AttendanceLookups } from "@/types/attendance";
 
@@ -60,12 +68,8 @@ export function AttendanceForm({
       : employee.label,
   }));
 
-  const statusItems = Object.entries(ATTENDANCE_STATUS_LABELS).map(
-    ([value, label]) => ({ value, label }),
-  );
-
-  const form = useForm<AttendanceFormInput>({
-    resolver: zodResolver(attendanceFormSchema),
+  const form = useForm<ManualAttendanceFormInput>({
+    resolver: zodResolver(manualAttendanceFormSchema),
     defaultValues: {
       employeeId: attendance?.employeeId ?? "",
       attendanceDate:
@@ -73,7 +77,11 @@ export function AttendanceForm({
       checkInAt: extractTimeFromTimestamp(attendance?.checkInAt) || OFFICE_CHECK_IN_TIME,
       checkOutAt:
         extractTimeFromTimestamp(attendance?.checkOutAt) || OFFICE_CHECK_OUT_TIME,
-      attendanceStatus: attendance?.attendanceStatus ?? "present",
+        attendanceStatus:
+        mapStoredAttendanceToManualUi(
+          attendance?.attendanceStatus,
+          attendance?.statusNotes ?? attendance?.notes,
+        ) || "present",
       overtimeHours: attendance?.overtimeHours ?? 0,
       notes: toDisplayAttendanceNotes(attendance?.notes) ?? "",
     },
@@ -99,10 +107,17 @@ export function AttendanceForm({
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
+      const mapped = mapManualUiStatusToStored(values.attendanceStatus);
+      const payload: AttendanceFormInput = {
+        ...values,
+        attendanceStatus: mapped.attendanceStatus,
+        notes: buildManualAttendanceNotes(mapped.sourceCode, values.notes),
+      };
+
       const result =
         mode === "create"
-          ? await createAttendanceAction(values)
-          : await updateAttendanceAction(attendance!.id, values);
+          ? await createAttendanceAction(payload)
+          : await updateAttendanceAction(attendance!.id, payload);
 
       if (!result.success) {
         toast.error(result.message);
@@ -223,13 +238,13 @@ export function AttendanceForm({
         <div className="space-y-2">
           <Label htmlFor="attendanceStatus">Status</Label>
           <Select
-            items={statusItems}
+            items={[...MANUAL_ATTENDANCE_STATUS_ITEMS]}
             value={form.watch("attendanceStatus")}
             onValueChange={(value) => {
               if (!value) return;
               form.setValue(
                 "attendanceStatus",
-                value as AttendanceFormInput["attendanceStatus"],
+                value as ManualAttendanceUiStatus,
                 { shouldValidate: true },
               );
             }}
@@ -239,7 +254,7 @@ export function AttendanceForm({
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
-              {statusItems.map((item) => (
+              {MANUAL_ATTENDANCE_STATUS_ITEMS.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>

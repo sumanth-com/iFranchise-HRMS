@@ -13,12 +13,11 @@ import { ManagerAttendanceCalendar } from "@/components/manager/profile/manager-
 import { ManagerProfileSummaryCards } from "@/components/manager/profile/manager-profile-summary-cards";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { cn } from "@/lib/utils";
-import type { AttendanceStatus } from "@/types/attendance";
 import type { ManagerProfilePageData } from "@/types/manager-self-attendance";
 
 type Props = {
   data: ManagerProfilePageData;
-  status?: AttendanceStatus;
+  status?: string;
   searchDate?: string;
   /** Base path for calendar/history filters. Defaults to employee portal attendance. */
   basePath?: string;
@@ -54,7 +53,7 @@ export function EmployeeAttendanceView({
     month: number;
     year: number;
     date?: string | null;
-    status?: AttendanceStatus;
+    status?: string;
     searchDate?: string;
     page?: number;
   }) {
@@ -164,14 +163,14 @@ function AttendanceLiveBody({
   data: ManagerProfilePageData;
   basePath: string;
   selectedDate: string | null;
-  status?: AttendanceStatus;
+  status?: string;
   searchDate?: string;
   onMonthChange: (month: number, year: number) => void;
   onSelectDate: (date: string) => void;
   onHistoryFilterChange: (filters: {
     month: number;
     year: number;
-    status?: AttendanceStatus;
+    status?: string;
     searchDate?: string;
     page: number;
   }) => void;

@@ -220,6 +220,7 @@ export async function getAttendanceById(
       rules.lateAfter,
     ),
     notes: toDisplayAttendanceNotes(row.notes),
+    statusNotes: row.notes,
     hasCheckInLocation: locationFlags.hasCheckInLocation,
     hasCheckOutLocation: locationFlags.hasCheckOutLocation,
     createdAt: row.created_at,

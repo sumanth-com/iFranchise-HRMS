@@ -26,9 +26,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ATTENDANCE_DISPLAY_STATUS_LABELS } from "@/lib/attendance/constants";
+import { resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
 import { getHrmsYears, HRMS_YEAR_MAX, HRMS_YEAR_MIN } from "@/lib/date/hrms-year";
-import type { AttendanceDisplayStatus } from "@/types/attendance";
 import type { ManagerAttendanceCalendarDay } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
 
@@ -37,33 +36,32 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** Number-only pills for attendance status (today / Sunday use full cell instead). */
 const PILL_STYLES: Record<string, string> = {
   present: "bg-emerald-500 text-white",
-  late: "bg-orange-400 text-white",
+  casual_leave: "bg-violet-500 text-white",
+  earned_leave: "bg-indigo-500 text-white",
+  lop: "bg-rose-500 text-white",
   absent: "bg-red-500 text-white",
-  half_day: "bg-emerald-500 text-white",
-  on_leave: "bg-violet-400 text-white",
   holiday: "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:text-slate-200",
-  week_off: "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:text-slate-200",
   on_request: "bg-amber-400 text-white",
 };
 
 const TOOLTIP_STYLES: Record<string, string> = {
   present: "border-emerald-600/30 bg-emerald-600 text-white",
-  late: "border-orange-500/30 bg-orange-500 text-white",
+  casual_leave: "border-violet-500/30 bg-violet-500 text-white",
+  earned_leave: "border-indigo-500/30 bg-indigo-500 text-white",
+  lop: "border-rose-500/30 bg-rose-500 text-white",
   absent: "border-red-600/30 bg-red-600 text-white",
-  half_day: "border-emerald-600/30 bg-emerald-600 text-white",
-  on_leave: "border-violet-500/30 bg-violet-500 text-white",
   holiday: "border-border bg-muted-foreground text-white",
-  week_off: "border-border bg-muted-foreground text-white",
   on_request: "border-amber-500/30 bg-amber-500 text-white",
   today: "border-border bg-muted-foreground text-white",
 };
 
 const LEGEND = [
   { key: "present", label: "Present", className: "bg-emerald-500" },
-  { key: "late", label: "Late", className: "bg-orange-400" },
   { key: "absent", label: "Absent", className: "bg-red-500" },
-  { key: "on_leave", label: "Leave", className: "bg-violet-400" },
-  { key: "holiday_weekend", label: "Holiday & Weekend Off", className: "bg-muted/80 dark:bg-white/15" },
+  { key: "casual_leave", label: "Casual Leave", className: "bg-violet-500" },
+  { key: "earned_leave", label: "Earned Leave", className: "bg-indigo-500" },
+  { key: "lop", label: "LOP", className: "bg-rose-500" },
+  { key: "holiday", label: "Holiday", className: "bg-muted/80 dark:bg-white/15" },
 ];
 
 type Props = {
@@ -79,28 +77,29 @@ type Props = {
 
 function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
   label: string;
-  tone: keyof typeof TOOLTIP_STYLES;
+  tone: string;
 } | null {
+  if (day.status === "on_request") {
+    return { label: day.isToday ? "On Request · Today" : "On Request", tone: "on_request" };
+  }
+  if (day.status) {
+    const display = resolveAttendanceUiDisplay(day.status, day.statusNotes);
+    return {
+      label: day.isToday ? `${display.label} · Today` : display.label,
+      tone: display.key,
+    };
+  }
   if (day.holidayName) {
     return { label: day.holidayName, tone: "holiday" };
   }
   if (day.leaveTypeName) {
-    return { label: day.leaveTypeName, tone: "on_leave" };
-  }
-  if (day.status) {
-    const label = ATTENDANCE_DISPLAY_STATUS_LABELS[day.status as AttendanceDisplayStatus];
-    if (label && label !== "—") {
-      return {
-        label: day.isToday ? `${label} · Today` : label,
-        tone: day.status,
-      };
-    }
+    return { label: day.leaveTypeName, tone: "casual_leave" };
   }
   if (day.isToday) {
     return { label: "Today", tone: "today" };
   }
   if (day.inMonth && getDay(parseISO(day.date)) === 0) {
-    return { label: "Weekend", tone: "week_off" };
+    return { label: "Holiday", tone: "holiday" };
   }
   return null;
 }
@@ -173,6 +172,7 @@ export function ManagerAttendanceCalendar({
       isToday: false,
       isFuture: false,
       status: null,
+      statusNotes: null,
       attendanceId: null,
       checkInAt: null,
       checkOutAt: null,
@@ -305,14 +305,22 @@ export function ManagerAttendanceCalendar({
           {gridDays.map((day) => {
             const live = dayMap.get(day.date) ?? day;
             const isSelected = selectedDate === live.date;
+            const uiStatus =
+              live.status && live.status !== "on_request" && live.status !== "upcoming"
+                ? resolveAttendanceUiDisplay(live.status, live.statusNotes)
+                : null;
             const isHolidayOrWeekend =
-              live.status === "holiday" || live.status === "week_off";
+              uiStatus?.key === "holiday" ||
+              live.status === "holiday" ||
+              live.status === "week_off";
             // Status pill for any in-month day with a punch/leave status — including today.
             // Do not force Present green on today; unmarked days stay neutral.
             const pillClass =
-              live.inMonth && live.status && !isHolidayOrWeekend
-                ? PILL_STYLES[live.status]
-                : null;
+              live.inMonth && live.status === "on_request"
+                ? PILL_STYLES.on_request
+                : live.inMonth && uiStatus && !isHolidayOrWeekend
+                  ? PILL_STYLES[uiStatus.key]
+                  : null;
             const tooltip = live.inMonth ? getCalendarDayTooltip(live) : null;
 
             const dayButton = (
@@ -330,16 +338,17 @@ export function ManagerAttendanceCalendar({
                   live.isToday &&
                     "attendance-day-today shadow-sm ring-2 ring-offset-2 ring-offset-background dark:ring-offset-[#060914]",
                   live.isToday &&
-                    live.status === "late" &&
-                    "ring-orange-600",
-                  live.isToday &&
-                    (live.status === "present" || live.status === "half_day") &&
+                    uiStatus?.key === "present" &&
                     "ring-emerald-700",
                   live.isToday &&
-                    live.status === "absent" &&
+                    uiStatus?.key === "absent" &&
                     "ring-red-600",
                   live.isToday &&
-                    live.status === "on_leave" &&
+                    uiStatus?.key === "lop" &&
+                    "ring-rose-600",
+                  live.isToday &&
+                    (uiStatus?.key === "casual_leave" ||
+                      uiStatus?.key === "earned_leave") &&
                     "ring-violet-600",
                   live.isToday &&
                     !pillClass &&

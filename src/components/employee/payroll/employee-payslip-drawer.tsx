@@ -64,11 +64,19 @@ export function EmployeePayslipDrawer({
     let cancelled = false;
     setLoading(true);
     setDetail(null);
-    void getEmployeePayslipDetailAction(payslipId).then((result) => {
-      if (cancelled) return;
-      setDetail(result);
-      setLoading(false);
-    });
+    void getEmployeePayslipDetailAction(payslipId)
+      .then((result) => {
+        if (cancelled) return;
+        setDetail(result);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("[employee-payslip-drawer] load failed", error);
+        if (!cancelled) {
+          setDetail(null);
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };

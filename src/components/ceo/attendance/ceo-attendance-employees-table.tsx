@@ -78,6 +78,7 @@ export function CeoAttendanceEmployeesTable({
           ) : (
             <AttendanceStatusBadge
               status={row.original.todayStatus as AttendanceStatus}
+              notes={row.original.todayStatusNotes}
             />
           ),
       },

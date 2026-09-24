@@ -27,14 +27,18 @@ export function attendanceTeamListUrl(
   return hubTeamListUrl(SELF_ATTENDANCE_ROUTES.list, searchParams);
 }
 
+/**
+ * Coarse DB-status labels. Prefer `resolveAttendanceUiDisplay(status, notes)`
+ * wherever CL / EL / LOP / Holiday must stay distinct.
+ */
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: "Present",
   absent: "Absent",
-  late: "Late",
+  late: "Present",
   half_day: "Present",
-  on_leave: "On Leave",
+  on_leave: "Casual Leave",
   holiday: "Holiday",
-  week_off: "Weekend",
+  week_off: "Holiday",
 };
 
 export const ATTENDANCE_DISPLAY_STATUS_LABELS: Record<AttendanceDisplayStatus, string> = {

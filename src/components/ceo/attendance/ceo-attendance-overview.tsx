@@ -206,6 +206,7 @@ function EmployeeRosterRow({
         ) : (
           <AttendanceStatusBadge
             status={employee.todayStatus as AttendanceStatus}
+            notes={employee.todayStatusNotes}
             className="mt-0.5 scale-90"
           />
         )}

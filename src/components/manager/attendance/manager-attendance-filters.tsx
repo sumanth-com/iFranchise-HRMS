@@ -11,11 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
+import { ATTENDANCE_STATUS_FILTER_ITEMS, ATTENDANCE_UI_DISPLAY_LABELS } from "@/lib/attendance/manual-status";
 import {
   FILTER_ANY_VALUE,
   filterSelectLabel,
-  filterSelectLabelFromMap,
   MANAGER_FILTER_SELECT_CONTENT_CLASS,
   MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS,
 } from "@/lib/manager/filter-select";
@@ -141,7 +140,11 @@ export function ManagerAttendanceFilters({
           >
             <SelectTrigger id="attendance-status" className="w-full">
               <SelectValue placeholder={STATUS_LABEL}>
-                {filterSelectLabelFromMap(statusValue, STATUS_LABEL, ATTENDANCE_STATUS_LABELS)}
+                {statusValue
+                  ? ATTENDANCE_UI_DISPLAY_LABELS[
+                      statusValue as keyof typeof ATTENDANCE_UI_DISPLAY_LABELS
+                    ] ?? STATUS_LABEL
+                  : STATUS_LABEL}
               </SelectValue>
             </SelectTrigger>
             <SelectContent
@@ -149,9 +152,9 @@ export function ManagerAttendanceFilters({
               className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
             >
               <SelectItem value={FILTER_ANY_VALUE}>{STATUS_LABEL}</SelectItem>
-              {Object.entries(ATTENDANCE_STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
+              {ATTENDANCE_STATUS_FILTER_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>

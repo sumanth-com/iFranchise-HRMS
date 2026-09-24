@@ -81,7 +81,10 @@ export function EmployeeAttendanceWidget({ today }: { today: ManagerTodayAttenda
             Late by {formatLateByLabel(today.lateMinutes)}
           </span>
         ) : today.attendanceStatus ? (
-          <AttendanceStatusBadge status={today.attendanceStatus} />
+          <AttendanceStatusBadge
+            status={today.attendanceStatus}
+            notes={today.statusNotes}
+          />
         ) : null
       }
     >

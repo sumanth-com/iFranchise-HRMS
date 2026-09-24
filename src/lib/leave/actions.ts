@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { createClient } from "@/lib/supabase/server";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
   requireServerAnyPermission,
   requireServerPermission,
@@ -91,7 +92,7 @@ export async function createLeaveRequestAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to submit leave request",
+      message: toUserFriendlyError(error, "Failed to submit leave request"),
     };
   }
 }
@@ -114,7 +115,7 @@ export async function updateLeaveRequestAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to update leave request",
+      message: toUserFriendlyError(error, "Failed to update leave request"),
     };
   }
 }
@@ -137,7 +138,7 @@ export async function approveLeaveRequestAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to approve leave request",
+      message: toUserFriendlyError(error, "Failed to approve leave request"),
     };
   }
 }
@@ -160,7 +161,7 @@ export async function rejectLeaveRequestAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to reject leave request",
+      message: toUserFriendlyError(error, "Failed to reject leave request"),
     };
   }
 }
@@ -193,7 +194,7 @@ export async function bulkApproveLeaveRequestAction(
         failed += 1;
         if (errors.length < 3) {
           errors.push(
-            error instanceof Error ? error.message : "Approve failed",
+            toUserFriendlyError(error, "Approve failed"),
           );
         }
       }
@@ -239,7 +240,7 @@ export async function bulkRejectLeaveRequestAction(
         failed += 1;
         if (errors.length < 3) {
           errors.push(
-            error instanceof Error ? error.message : "Reject failed",
+            toUserFriendlyError(error, "Reject failed"),
           );
         }
       }
@@ -281,7 +282,7 @@ export async function decideHrLeaveReviewAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to complete HR review",
+      message: toUserFriendlyError(error, "Failed to complete HR review"),
     };
   }
 }
@@ -301,7 +302,7 @@ export async function cancelLeaveRequestAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to cancel leave request",
+      message: toUserFriendlyError(error, "Failed to cancel leave request"),
     };
   }
 }
@@ -322,7 +323,7 @@ export async function deleteLeaveRequestAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to delete leave request",
+      message: toUserFriendlyError(error, "Failed to delete leave request"),
     };
   }
 }
@@ -343,7 +344,7 @@ export async function fetchLeaveRequestsAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load leave requests",
+      message: toUserFriendlyError(error, "Failed to load leave requests"),
     };
   }
 }
@@ -373,7 +374,7 @@ export async function getLeaveDetailAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load leave request",
+      message: toUserFriendlyError(error, "Failed to load leave request"),
     };
   }
 }
@@ -387,7 +388,7 @@ export async function getLeaveLookupsAction(): Promise<LeaveActionResult<LeaveLo
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load leave lookups",
+      message: toUserFriendlyError(error, "Failed to load leave lookups"),
     };
   }
 }
@@ -403,7 +404,7 @@ export async function getLeaveBalancesAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load leave balances",
+      message: toUserFriendlyError(error, "Failed to load leave balances"),
     };
   }
 }
@@ -420,7 +421,7 @@ export async function getLeaveCalendarAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load leave calendar",
+      message: toUserFriendlyError(error, "Failed to load leave calendar"),
     };
   }
 }
@@ -436,7 +437,7 @@ export async function getLeaveSummaryAction(): Promise<LeaveActionResult<LeaveSu
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load leave summary",
+      message: toUserFriendlyError(error, "Failed to load leave summary"),
     };
   }
 }
@@ -454,7 +455,7 @@ export async function getEmployeeLeaveBalanceSnapshotAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load employee leave balances",
+        toUserFriendlyError(error, "Failed to load employee leave balances"),
     };
   }
 }
@@ -529,7 +530,7 @@ export async function getLeaveApplyContextAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load leave policy context",
+        toUserFriendlyError(error, "Failed to load leave policy context"),
     };
   }
 }

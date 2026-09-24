@@ -30,6 +30,7 @@ function toAttendanceListItem(row: TeamAttendanceListItem): AttendanceListItem {
     workHours: row.workHours,
     overtimeHours: row.overtimeHours,
     attendanceStatus: row.attendanceStatus,
+    notes: row.notes,
     correctionId: row.correctionId,
     correctionStatus: row.correctionStatus,
     // Manager team list does not load GPS flags here; location stays on self-history / detail paths.

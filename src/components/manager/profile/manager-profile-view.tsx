@@ -9,12 +9,11 @@ import { ManagerProfileHistoryTable } from "@/components/manager/profile/manager
 import { ManagerProfileIdCard } from "@/components/manager/profile/manager-profile-id-card";
 import { ManagerProfileSummaryCards } from "@/components/manager/profile/manager-profile-summary-cards";
 import { ManagerProfileTodayCard } from "@/components/manager/profile/manager-profile-today-card";
-import type { AttendanceStatus } from "@/types/attendance";
 import type { ManagerProfilePageData } from "@/types/manager-self-attendance";
 
 type Props = {
   data: ManagerProfilePageData;
-  status?: AttendanceStatus;
+  status?: string;
   searchDate?: string;
 };
 
@@ -28,7 +27,7 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
     month: number;
     year: number;
     date?: string | null;
-    status?: AttendanceStatus;
+    status?: string;
     searchDate?: string;
     page?: number;
   }) {

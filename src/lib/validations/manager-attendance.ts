@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { attendanceStatusSchema } from "@/lib/validations/attendance";
+import { attendanceListStatusFilterSchema } from "@/lib/validations/attendance";
 
 export const teamAttendanceListParamsSchema = z
   .object({
@@ -29,7 +29,7 @@ export const teamAttendanceListParamsSchema = z
       .optional(),
     departmentId: z.string().uuid().optional(),
     employmentTypeId: z.string().uuid().optional(),
-    attendanceStatus: attendanceStatusSchema.optional(),
+    attendanceStatus: attendanceListStatusFilterSchema.optional(),
     employeeId: z.string().uuid().optional(),
   })
   .transform((value) => {

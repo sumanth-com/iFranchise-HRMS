@@ -8,33 +8,22 @@ import { Modal } from "@/components/common/modal";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { Label } from "@/components/ui/label";
 import { setManualAttendanceStatusAction } from "@/lib/attendance/actions";
-import type { AttendanceDisplayStatus, AttendanceListItem } from "@/types/attendance";
-
-const STATUS_ITEMS = [
-  { value: "present", label: "Present" },
-  { value: "absent", label: "Absent" },
-  { value: "on_leave", label: "On Leave" },
-] as const;
-
-type ManualStatus = (typeof STATUS_ITEMS)[number]["value"];
+import {
+  MANUAL_ATTENDANCE_STATUS_ITEMS,
+  mapStoredAttendanceToManualUi,
+  type ManualAttendanceUiStatus,
+  type StoredManualAttendanceStatus,
+} from "@/lib/attendance/manual-status";
+import type { AttendanceListItem } from "@/types/attendance";
 
 export type ManualAttendanceStatusSaveResult = {
   previousId: string;
   id: string;
-  attendanceStatus: ManualStatus;
+  attendanceStatus: StoredManualAttendanceStatus;
   checkInAt: string | null;
   checkOutAt: string | null;
   workHours: number;
 };
-
-function toManualStatus(status: AttendanceDisplayStatus): ManualStatus | "" {
-  if (status === "absent") return "absent";
-  if (status === "on_leave") return "on_leave";
-  if (status === "present" || status === "late" || status === "half_day") {
-    return "present";
-  }
-  return "";
-}
 
 type ManualAttendanceStatusDialogProps = {
   /** One or more attendance rows to update with the same status. */
@@ -50,7 +39,7 @@ export function ManualAttendanceStatusDialog({
   onOpenChange,
   onSaved,
 }: ManualAttendanceStatusDialogProps) {
-  const [status, setStatus] = useState<ManualStatus | "">("");
+  const [status, setStatus] = useState<ManualAttendanceUiStatus | "">("");
   const [isPending, startTransition] = useTransition();
   const isBulk = records.length > 1;
   const primary = records[0] ?? null;
@@ -64,7 +53,7 @@ export function ManualAttendanceStatusDialog({
       setStatus("");
       return;
     }
-    setStatus(toManualStatus(primary.attendanceStatus));
+    setStatus(mapStoredAttendanceToManualUi(primary.attendanceStatus, primary.notes));
   }, [open, primary, isBulk]);
 
   const canSave = Boolean(records.length > 0 && status) && !isPending;
@@ -187,9 +176,9 @@ export function ManualAttendanceStatusDialog({
             <Label htmlFor="manual-attendance-status">Attendance Status</Label>
             <LabeledSelect
               id="manual-attendance-status"
-              items={[...STATUS_ITEMS]}
+              items={[...MANUAL_ATTENDANCE_STATUS_ITEMS]}
               value={status}
-              onValueChange={(value) => setStatus(value as ManualStatus)}
+              onValueChange={(value) => setStatus(value as ManualAttendanceUiStatus)}
               placeholder="Select status"
               triggerClassName="h-10 w-full min-w-0 bg-white dark:bg-input"
             />

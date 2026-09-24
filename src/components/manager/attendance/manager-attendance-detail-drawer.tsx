@@ -117,7 +117,7 @@ export function ManagerAttendanceDetailDrawer({
       key: "attendanceStatus",
       header: "Status",
       render: (row) => (
-        <AttendanceStatusBadge status={row.attendanceStatus as AttendanceStatus} />
+        <AttendanceStatusBadge status={row.attendanceStatus as AttendanceStatus} notes={(row as { notes?: string | null }).notes} />
       ),
     },
   ];
@@ -230,7 +230,7 @@ export function ManagerAttendanceDetailDrawer({
               <DetailField label="Overtime" value={formatHours(detail.overtimeHours)} />
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>
-                <AttendanceStatusBadge status={detail.attendanceStatus} />
+                <AttendanceStatusBadge status={detail.attendanceStatus} notes={detail.notes} />
               </div>
               {detail.locationLabel ? (
                 <DetailField label="GPS / Location" value={detail.locationLabel} />

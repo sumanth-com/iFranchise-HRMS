@@ -18,6 +18,7 @@ import {
 } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
   isValidLatLng,
@@ -295,6 +296,7 @@ function buildTodayPanel(
     attendanceDate,
     punchState,
     attendanceStatus,
+    statusNotes: row?.notes ?? null,
     checkInAt,
     checkOutAt,
     // Raw prior_work_seconds — live timer / duration helpers unwrap day-total vs earlier-only.
@@ -572,6 +574,7 @@ function buildCalendarDays(input: {
       isToday,
       isFuture,
       status,
+      statusNotes: attendance?.notes ?? null,
       attendanceId: attendance?.id ?? null,
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
@@ -758,6 +761,7 @@ function buildHistoryRows(input: {
       id: attendance?.id ?? null,
       attendanceDate: date,
       attendanceStatus: status,
+      statusNotes: attendance?.notes ?? null,
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
       workHours: attendance
@@ -780,7 +784,13 @@ function buildHistoryRows(input: {
 
   let filtered = rows;
   if (input.status) {
-    filtered = filtered.filter((row) => row.attendanceStatus === input.status);
+    filtered = filtered.filter((row) =>
+      matchesAttendanceUiStatusFilter(
+        row.attendanceStatus,
+        row.statusNotes,
+        input.status,
+      ),
+    );
   }
   if (input.searchDate) {
     filtered = filtered.filter((row) => row.attendanceDate === input.searchDate);

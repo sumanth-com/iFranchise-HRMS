@@ -6,13 +6,13 @@ type Props = {
   message: string;
 };
 
-export function DocumentsLoadError({ message }: Props) {
+export function DocumentsLoadError({ message: _message }: Props) {
   return (
     <ErrorState
-      title="Couldn't load your documents"
-      description={message}
+      title="We couldn't load this section"
+      description="Please try again. If the problem continues, contact your HR administrator."
       onRetry={() => window.location.reload()}
-      retryLabel="Refresh page"
+      retryLabel="Retry"
       className="py-8"
     />
   );

@@ -19,7 +19,7 @@ export type TeamAttendanceListParams = {
   dateTo?: string;
   departmentId?: string;
   employmentTypeId?: string;
-  attendanceStatus?: AttendanceStatus;
+  attendanceStatus?: AttendanceStatus | import("@/lib/attendance/manual-status").ManualAttendanceUiStatus;
   employeeId?: string;
 };
 
@@ -49,6 +49,8 @@ export type TeamAttendanceListItem = {
   breakMinutes: number;
   overtimeHours: number;
   attendanceStatus: AttendanceDisplayStatus;
+  /** Raw notes for sheet-aligned status display. */
+  notes: string | null;
   lateMinutes: number;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;

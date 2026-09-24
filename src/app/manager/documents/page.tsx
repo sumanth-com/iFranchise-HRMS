@@ -35,7 +35,7 @@ export default async function ManagerDocumentsPage() {
         {error ? <DocumentsLoadError message={error} /> : (
           <ClientSectionBoundary
             title="Couldn't load your documents"
-            description="Something went wrong while loading your documents. Please try again."
+            description="We couldn't load this section. Please try again."
           >
             <DocumentsExplorer data={data} />
           </ClientSectionBoundary>

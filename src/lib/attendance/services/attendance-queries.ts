@@ -13,6 +13,7 @@ import {
   getTodayDateString,
   isAfterOfficeCheckoutTime,
 } from "@/lib/attendance/services/attendance-utils";
+import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { completedWorkHoursFromPunches } from "@/lib/employee/attendance-format";
 import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
@@ -88,16 +89,10 @@ function leaveCoversDate(
 
 function matchesAttendanceStatusFilter(
   status: AttendanceDisplayStatus,
-  filter?: AttendanceStatus,
+  notes: string | null | undefined,
+  filter?: AttendanceStatus | string,
 ) {
-  if (!filter) return true;
-  if (filter === "absent") {
-    return status === "absent" || status === "on_leave";
-  }
-  if (filter === "present") {
-    return status === "present" || status === "half_day";
-  }
-  return status === filter;
+  return matchesAttendanceUiStatusFilter(status, notes, filter);
 }
 
 async function loadAttendanceRoster(
@@ -311,7 +306,7 @@ async function loadAttendanceRoster(
               })
             : 0;
 
-      // Prefer the stored row status so HR manual Present/Absent/On Leave sticks.
+      // Prefer the stored row status so HR manual overrides stick.
       // Punch flows already write present/late/absent; re-deriving from punches
       // (e.g. <15m work → absent) was snapping HR overrides back after refresh.
       let status: AttendanceDisplayStatus;
@@ -330,12 +325,13 @@ async function loadAttendanceRoster(
       }
 
       const correction = att ? correctionByAttendance.get(att.id) : undefined;
+      const rowNotes = att?.notes ?? null;
       const locationFlags = resolveAttendanceLocationFlags({
         checkInLatitude: att?.check_in_latitude,
         checkInLongitude: att?.check_in_longitude,
         checkOutLatitude: att?.check_out_latitude,
         checkOutLongitude: att?.check_out_longitude,
-        notes: att?.notes ?? null,
+        notes: rowNotes,
       });
 
       records.push({
@@ -355,6 +351,7 @@ async function loadAttendanceRoster(
         workHours: punchedWorkHours,
         overtimeHours: Number(att?.overtime_hours ?? 0),
         attendanceStatus: status,
+        notes: rowNotes,
         correctionId: correction?.id ?? null,
         correctionStatus:
           (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??
@@ -421,7 +418,11 @@ export async function listAttendance(
   });
 
   const filteredRecords = allRecords.filter((record) =>
-    matchesAttendanceStatusFilter(record.attendanceStatus, attendanceStatus),
+    matchesAttendanceStatusFilter(
+      record.attendanceStatus,
+      record.notes,
+      attendanceStatus,
+    ),
   );
 
   const ascending = sortOrder === "asc";

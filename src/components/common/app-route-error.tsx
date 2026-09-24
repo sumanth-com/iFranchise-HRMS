@@ -6,6 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { ErrorState } from "@/components/common/error-state";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import {
+  PAGE_LOAD_ERROR_DESCRIPTION,
+  PAGE_LOAD_ERROR_TITLE,
+  SECTION_LOAD_RETRY_LABEL,
+} from "@/lib/errors/employee-facing";
+import {
   isRecoverableRouteError,
   recoverFromChunkLoadError,
 } from "@/lib/next/chunk-load-recovery";
@@ -90,11 +95,11 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
   return (
     <div className="flex min-h-[50vh] items-center justify-center p-6">
       <ErrorState
-        title={isAuthUnavailable ? "Temporarily unavailable" : "Something went wrong"}
+        title={isAuthUnavailable ? "Temporarily unavailable" : PAGE_LOAD_ERROR_TITLE}
         description={
           isAuthUnavailable
             ? "We couldn't verify your session with the auth service. Your login was not cleared — please try again."
-            : "We couldn't load this page. Please try again, or contact your HR administrator if the problem continues."
+            : PAGE_LOAD_ERROR_DESCRIPTION
         }
         onRetry={() => {
           if (isRecoverable) {
@@ -105,7 +110,7 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
           setAuthRetrying(false);
           reset();
         }}
-        retryLabel="Try again"
+        retryLabel={SECTION_LOAD_RETRY_LABEL}
       />
     </div>
   );

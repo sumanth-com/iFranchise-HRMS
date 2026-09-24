@@ -57,9 +57,13 @@ import {
 } from "@/lib/attendance/actions";
 import {
   ATTENDANCE_ROUTES,
-  ATTENDANCE_STATUS_LABELS,
   SELF_ATTENDANCE_ROUTES,
 } from "@/lib/attendance/constants";
+import {
+  ATTENDANCE_STATUS_FILTER_ITEMS,
+  ATTENDANCE_UI_DISPLAY_LABELS,
+  type ManualAttendanceUiStatus,
+} from "@/lib/attendance/manual-status";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
@@ -359,12 +363,10 @@ export function AttendanceTable({
   const statusItems = useMemo(
     () => [
       { value: FILTER_ANY_VALUE, label: "All statuses" },
-      ...Object.entries(ATTENDANCE_STATUS_LABELS)
-        .filter(([value]) => value !== "half_day")
-        .map(([value, label]) => ({
-          value,
-          label,
-        })),
+      ...ATTENDANCE_STATUS_FILTER_ITEMS.map((item) => ({
+        value: item.value,
+        label: item.label,
+      })),
     ],
     [],
   );
@@ -555,7 +557,10 @@ export function AttendanceTable({
         header: "Status",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <AttendanceStatusBadge status={row.original.attendanceStatus} />
+          <AttendanceStatusBadge
+            status={row.original.attendanceStatus}
+            notes={row.original.notes}
+          />
         ),
       },
       {
@@ -888,7 +893,11 @@ export function AttendanceTable({
         <p className="text-sm font-bold text-foreground">
           Showing attendance history for {selectedEmployeeLabel}
           {attendanceStatus
-            ? ` · ${ATTENDANCE_STATUS_LABELS[attendanceStatus as keyof typeof ATTENDANCE_STATUS_LABELS]}`
+            ? ` · ${
+                ATTENDANCE_UI_DISPLAY_LABELS[
+                  attendanceStatus as ManualAttendanceUiStatus
+                ] ?? attendanceStatus
+              }`
             : " · All statuses"}
           {formatDateRangeLabel(dateFrom, dateTo, today)}
           {historyCounts && dateFrom && dateTo
