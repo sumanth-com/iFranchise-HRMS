@@ -4,6 +4,7 @@ import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { getPayslipById } from "@/lib/payroll/services/payroll-mutations";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
+import { upsertPayslipEmployeeDocument } from "@/lib/payroll/services/payslip-to-employee-document";
 import { isPayslipPublishedToEmployee } from "@/lib/payroll/services/payslip-publication";
 import { formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
@@ -65,6 +66,17 @@ export async function processDuePayslipPublications(
     try {
       if (!payslip.storagePath) {
         await storePayslipPdf(supabase, payslip, scopedOrganizationId);
+      } else {
+        try {
+          await upsertPayslipEmployeeDocument({
+            organizationId: scopedOrganizationId,
+            payslip,
+            storagePath: payslip.storagePath,
+            actorUserId: profile.userId,
+          });
+        } catch (mirrorError) {
+          console.error("[payslip-publication] Documents mirror failed", row.id, mirrorError);
+        }
       }
 
       const monthLabel = formatPayrollMonthLabel(payslip.payrollMonth);

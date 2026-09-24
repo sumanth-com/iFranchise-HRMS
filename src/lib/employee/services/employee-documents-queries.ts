@@ -14,6 +14,7 @@ import {
   EMPLOYEE_DOCUMENT_STORAGE_LIMIT_BYTES,
 } from "@/lib/documents/storage-paths";
 import { DocRow, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
+import { extractPayslipIdFromDocumentNotes } from "@/lib/payroll/services/payslip-employee-document-identity";
 import type { UserProfile } from "@/types/auth";
 import type { DocumentSource, DocumentStatus } from "@/types/documents";
 import type {
@@ -29,8 +30,18 @@ export const SOFT_STORAGE_LIMIT_BYTES = EMPLOYEE_DOCUMENT_STORAGE_LIMIT_BYTES;
 const EXPLORER_SELECT = `
   id, document_type_id, title, storage_path, file_name, mime_type, file_size_bytes,
   document_status, source, is_official, archived_at, replaced_by_id, created_at,
+  issued_date, document_year, document_month, notes, document_number,
   document_types:document_type_id(name, code)
 `;
+
+/** Card date: issued_date (payroll month for payslips) when present, else created_at. */
+function documentCardDate(row: DocRow): string {
+  const issued = typeof row.issued_date === "string" ? row.issued_date.trim() : "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(issued)) {
+    return issued.length === 10 ? `${issued}T00:00:00.000Z` : issued;
+  }
+  return String(row.created_at ?? new Date().toISOString());
+}
 
 /**
  * Aggregates document explorer data for a specific employee in the organization.
@@ -47,6 +58,7 @@ export async function getEmployeeDocumentsExplorerForEmployee(
  * Aggregates everything the Employee Self-Service document explorer needs, scoped
  * strictly to the signed-in employee. Includes archived rows so version history can
  * be reconstructed from the `replaced_by_id` chain without exposing them as folders.
+ * Syncs released payslips into Documents → Payslips before loading.
  */
 export async function getEmployeeDocumentsExplorer(
   supabase: AuthSupabaseClient,
@@ -56,6 +68,7 @@ export async function getEmployeeDocumentsExplorer(
     supabase,
     profile.employee.organizationId,
     profile.employee.id,
+    { profile },
   );
 }
 
@@ -63,8 +76,27 @@ async function buildEmployeeDocumentsExplorer(
   supabase: AuthSupabaseClient,
   organizationId: string,
   employeeId: string,
+  options?: { profile?: UserProfile | null },
 ): Promise<EmployeeDocumentsExplorerData> {
   const explorerStartedAt = performance.now();
+
+  // Mirror released payslips into Documents → Payslips (same storage_path; idempotent).
+  try {
+    const { syncReleasedPayslipsToEmployeeDocuments } = await import(
+      "@/lib/payroll/services/payslip-documents-sync"
+    );
+    await syncReleasedPayslipsToEmployeeDocuments(supabase, {
+      organizationId,
+      employeeId,
+      actorUserId: options?.profile?.userId ?? null,
+      profile: options?.profile ?? null,
+    });
+  } catch (error) {
+    console.warn("[documents] payslip Documents sync failed", {
+      employeeId,
+      message: error instanceof Error ? error.message : "unknown",
+    });
+  }
 
   await ensureExplorerDocumentTypes(supabase, organizationId);
 
@@ -151,9 +183,14 @@ async function buildEmployeeDocumentsExplorer(
       status: row.document_status as DocumentStatus,
       source: (row.source ?? "upload") as DocumentSource,
       isReadOnly: Boolean(row.is_official) || (row.source ?? "upload") !== "upload",
-      createdAt: row.created_at,
+      // Prefer issued_date (payroll month for payslips) over sync/upload created_at.
+      createdAt: documentCardDate(row),
       versionCount: versions.length,
       versions,
+      payslipId:
+        code === "PAYSLIP" ? extractPayslipIdFromDocumentNotes(row.notes) : null,
+      documentNumber:
+        typeof row.document_number === "string" ? row.document_number : null,
     };
   });
 

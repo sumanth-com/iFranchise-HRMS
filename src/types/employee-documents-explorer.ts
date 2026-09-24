@@ -30,6 +30,13 @@ export type EmployeeDocFile = {
   createdAt: string;
   versionCount: number;
   versions: EmployeeDocVersion[];
+  /**
+   * Authoritative `payslips.id` when this row is a PAYSLIP Documents mirror
+   * (from notes `payslip_id:{uuid}`). Used to open Payroll's Payslip preview.
+   */
+  payslipId?: string | null;
+  /** Payslip number / document_number — fallback identity when payslipId is missing. */
+  documentNumber?: string | null;
 };
 
 export type EmployeeDocFolder = {

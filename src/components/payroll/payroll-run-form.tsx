@@ -392,6 +392,14 @@ export function PayrollRunForm({
     return [];
   }, [panel]);
 
+  const totalFinalPayable = useMemo(
+    () =>
+      roundCurrency(
+        tableRows.reduce((sum, row) => sum + Number(row.finalPayable ?? 0), 0),
+      ),
+    [tableRows],
+  );
+
   const editDialogTarget = useMemo(() => {
     if (!editTarget?.payrollItemId) return null;
     return {
@@ -505,7 +513,7 @@ export function PayrollRunForm({
             employeeCount={panel.data.items?.length ?? panel.data.employeeCount ?? 0}
             totalGross={panel.data.totalGross}
             totalDeductions={panel.data.totalDeductions}
-            totalNet={panel.data.totalNet}
+            totalFinalPayable={totalFinalPayable}
           />
 
           <EmployeePayrollTable
@@ -543,7 +551,7 @@ export function PayrollRunForm({
             employeeCount={panel.data.items?.length ?? 0}
             totalGross={panel.data.totalGross}
             totalDeductions={panel.data.totalDeductions}
-            totalNet={panel.data.totalNet}
+            totalFinalPayable={totalFinalPayable}
           />
 
           <EmployeePayrollTable
@@ -586,11 +594,23 @@ export function PayrollRunForm({
                 const nextAllowances = roundCurrency(structuralAllowances + saved.reimbursement);
                 const earnings = (item.breakdown.earnings ?? []).filter((line) => {
                   const code = line.code.toLowerCase();
-                  return (
-                    code !== "hr_bonus" &&
-                    code !== "hr_incentive" &&
-                    code !== "hr_reimbursement"
-                  );
+                  const label = (line.label ?? "").toLowerCase();
+                  if (
+                    code === "hr_bonus" ||
+                    code === "hr_incentive" ||
+                    code === "hr_reimbursement"
+                  ) {
+                    return false;
+                  }
+                  // Explicit HR reimbursement (including 0) replaces claim lines.
+                  if (
+                    code === "reimbursement" ||
+                    code.startsWith("reimb") ||
+                    label.includes("reimbursement")
+                  ) {
+                    return false;
+                  }
+                  return true;
                 });
                 if (saved.bonus > 0) {
                   earnings.push({
@@ -622,6 +642,10 @@ export function PayrollRunForm({
                   breakdown: {
                     ...item.breakdown,
                     earnings,
+                    excel: {
+                      ...item.breakdown.excel,
+                      reimbursement: saved.reimbursement,
+                    },
                     hrAdjustments: {
                       ...item.breakdown.hrAdjustments,
                       bonus: saved.bonus,
@@ -679,12 +703,12 @@ function PayrollTotals({
   employeeCount,
   totalGross,
   totalDeductions,
-  totalNet,
+  totalFinalPayable,
 }: {
   employeeCount: number;
   totalGross: number;
   totalDeductions: number;
-  totalNet: number;
+  totalFinalPayable: number;
 }) {
   return (
     <div className="grid w-full grid-cols-4 gap-3">
@@ -712,10 +736,10 @@ function PayrollTotals({
       </div>
       <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Net salary
+          Final Payable
         </p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums">
-          {formatCurrency(totalNet)}
+          {formatCurrency(totalFinalPayable)}
         </p>
       </div>
     </div>

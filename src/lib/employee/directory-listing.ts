@@ -2,7 +2,6 @@ export const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set([
   // IT system operator — authenticates / portal-switches, never a workforce employee.
   "IF2026000",
   "IF-MGR-001",
-  "IF2026016",
 ]);
 
 export const DIRECTORY_INCLUDED_EMPLOYEE_CODES = ["IF2026009", "IF-PENDING-SA"] as const;
@@ -61,13 +60,7 @@ export function isHiddenFromEmployeeDirectory(
     return true;
   }
 
-  const isGore = fullName.includes("gore");
-  const isAbhisek =
-    fullName.includes("abhisek") ||
-    fullName.includes("abhishake") ||
-    fullName.includes("abhishek");
-
-  return isGore && isAbhisek;
+  return false;
 }
 
 /** Hidden from employee/department filter dropdowns across HRMS modules. */

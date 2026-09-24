@@ -12,7 +12,6 @@ import {
   compareProvisioningPeopleByName,
   isExcludedFromProvisioningManagerLookup,
   isExcludedFromUserProvisioningDirectory,
-  isHrPortalProvisioningRole,
   isProvisioningDirectoryRoleCode,
   isProvisioningHrRole,
   isProvisioningManagerLookupCandidate,
@@ -732,8 +731,10 @@ export function summarizeExecutiveUsers(
         isActive(user) &&
         ["ceo", "co_founder", "founder"].includes(user.roleCode.toLowerCase()),
     ).length,
+    // Match Portal Users card classification: HR Admin / HR Executive only.
+    // Do not count super_admin (shown as Super Admin), CEO, managers, or employees.
     hrUsers: users.filter(
-      (user) => isActive(user) && isHrPortalProvisioningRole(user.roleCode),
+      (user) => isActive(user) && isProvisioningHrRole(user.roleCode),
     ).length,
     managers: users.filter(
       (user) => isActive(user) && user.roleCode.toLowerCase() === "manager",

@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   isExcludedFromProvisioningManagerLookup,
+  isHrPortalProvisioningRole,
+  isProvisioningHrRole,
   isProvisioningManagerLookupCandidate,
   isProvisioningManagerRole,
 } from "@/lib/ceo/provisioning-directory-filters";
@@ -62,5 +64,22 @@ describe("provisioning manager lookup eligibility", () => {
       }),
       true,
     );
+  });
+});
+
+describe("provisioning HR role classification for KPI / Portal Users", () => {
+  it("treats only hr_admin and hr_executive as HR provisioning roles", () => {
+    assert.equal(isProvisioningHrRole("hr_admin"), true);
+    assert.equal(isProvisioningHrRole("hr_executive"), true);
+    assert.equal(isProvisioningHrRole("super_admin"), false);
+    assert.equal(isProvisioningHrRole("ceo"), false);
+    assert.equal(isProvisioningHrRole("manager"), false);
+    assert.equal(isProvisioningHrRole("employee"), false);
+  });
+
+  it("keeps portal-filter helper including super_admin separately from HR KPI roles", () => {
+    assert.equal(isHrPortalProvisioningRole("super_admin"), true);
+    assert.equal(isHrPortalProvisioningRole("hr_admin"), true);
+    assert.equal(isProvisioningHrRole("super_admin"), false);
   });
 });

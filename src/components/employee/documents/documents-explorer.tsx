@@ -24,6 +24,7 @@ import { DocumentMissingSlotCard } from "@/components/employee/documents/documen
 import { DocumentPreviewDialog } from "@/components/employee/documents/document-preview-dialog";
 import { DocumentUploadDialog } from "@/components/employee/documents/document-upload-dialog";
 import { useEmployeeDocumentFile } from "@/components/employee/documents/use-employee-document-file";
+import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import {
   isMultiFileDocumentCode,
   isSystemProvidedPayrollTaxCode,
@@ -31,7 +32,10 @@ import {
   type EmployeeDocCategoryKey,
   type PayrollNestedCode,
 } from "@/lib/employee/documents/categories";
-import { employeeDeleteDocumentAction } from "@/lib/employee/actions/employee-documents-actions";
+import {
+  employeeDeleteDocumentAction,
+  resolveEmployeeDocumentPayslipIdAction,
+} from "@/lib/employee/actions/employee-documents-actions";
 import type {
   EmployeeDocFile,
   EmployeeDocFolder,
@@ -149,6 +153,28 @@ export function DocumentsExplorer({
   const [uploadTypeId, setUploadTypeId] = useState<string | undefined>();
 
   const [deleteFile, setDeleteFile] = useState<EmployeeDocFile | null>(null);
+  const [payslipPreviewId, setPayslipPreviewId] = useState<string | null>(null);
+  const [payslipPreviewOpen, setPayslipPreviewOpen] = useState(false);
+  const [payslipPreviewBusy, setPayslipPreviewBusy] = useState(false);
+
+  async function openPayslipPreview(file: EmployeeDocFile) {
+    setPayslipPreviewBusy(true);
+    try {
+      let payslipId = file.payslipId?.trim() || null;
+      if (!payslipId) {
+        const result = await resolveEmployeeDocumentPayslipIdAction(file.id);
+        if (!result.success || !result.data) {
+          toast.error(result.message ?? "Unable to open payslip preview");
+          return;
+        }
+        payslipId = result.data;
+      }
+      setPayslipPreviewId(payslipId);
+      setPayslipPreviewOpen(true);
+    } finally {
+      setPayslipPreviewBusy(false);
+    }
+  }
 
   const storagePct =
     data.storage.softLimitBytes > 0
@@ -407,8 +433,12 @@ export function DocumentsExplorer({
                 <DocumentFileCard
                   key={file.id}
                   file={file}
-                  fileActions={fileActions}
+                  fileActions={{
+                    ...fileActions,
+                    isBusy: fileActions.isBusy || payslipPreviewBusy,
+                  }}
                   readOnly={readOnly || payrollFolderReadOnly}
+                  onPayslipPreview={(target) => void openPayslipPreview(target)}
                   onReplace={(target) => {
                     setReplaceTarget(target);
                     setUploadTypeId(target.documentTypeId);
@@ -480,6 +510,15 @@ export function DocumentsExplorer({
       <DocumentPreviewDialog
         target={fileActions.previewTarget}
         onOpenChange={(next) => !next && fileActions.setPreviewTarget(null)}
+      />
+
+      <EmployeePayslipDrawer
+        payslipId={payslipPreviewId}
+        open={payslipPreviewOpen}
+        onOpenChange={(next) => {
+          setPayslipPreviewOpen(next);
+          if (!next) setPayslipPreviewId(null);
+        }}
       />
 
       {!readOnly ? (

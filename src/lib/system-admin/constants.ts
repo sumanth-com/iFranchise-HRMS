@@ -17,7 +17,6 @@ export const SYSTEM_ADMIN_ROUTES = {
   notificationsHistory: "/dashboard/system/notifications/history",
   settings: "/dashboard/system/settings",
   reports: "/dashboard/system/reports",
-  hrOverview: "/dashboard/system/hr-overview",
   employees: "/dashboard/system/employees",
   organization: "/dashboard/system/organization",
   roles: "/dashboard/system/roles",

@@ -13,9 +13,6 @@ import {
 import type { UserProfile } from "@/types/auth";
 import type { PayrollBreakdown } from "@/types/payroll";
 
-/** Unlocked Team Payroll runs that still follow live attendance / leave. */
-const OPEN_PAYROLL_STATUSES = new Set(["draft", "processing", "processed"]);
-
 const CLOSED_PAYROLL_ITEM_SELECT = `
   employee_id,
   basic_salary,
@@ -84,20 +81,13 @@ function employeeFromPayrollItemJoin(
   };
 }
 
-function isOpenPayrollRun(payroll: {
-  payroll_status: string;
-  is_locked?: boolean | null;
-}) {
-  if (payroll.is_locked) return false;
-  return OPEN_PAYROLL_STATUSES.has(String(payroll.payroll_status ?? ""));
-}
-
 /**
  * CEO Dashboard Payroll Cost — same employee population and Final Payable formula
  * as Team Payroll (attendance-driven calculator + approved extras).
  *
- * Open month: live `buildPayrollPreview` (as-of today; no future dates inventing).
- * Closed/locked month: finalized payroll_items Final Payable sum.
+ * When a Team Payroll run already exists for the month, use persisted payroll_items
+ * Final Payable (same values Team Payroll / payslips show). Live preview is only
+ * used when no run has been created yet.
  */
 export async function getCeoDashboardPayrollCost(
   supabase: AuthSupabaseClient,
@@ -122,49 +112,20 @@ export async function getCeoDashboardPayrollCost(
 
   if (payrollError) throw new Error(payrollError.message);
 
-  const useLiveCalculator =
-    !currentPayroll || isOpenPayrollRun(currentPayroll);
-
-  if (useLiveCalculator) {
+  if (!currentPayroll) {
     const preview = await buildPayrollPreview(supabase, profile, {
       month: targetMonth,
       year: targetYear,
     });
 
-    const hrByEmployee = new Map<
-      string,
-      NonNullable<PayrollBreakdown["hrAdjustments"]>
-    >();
-    if (currentPayroll?.id) {
-      const { data: existingItems, error: itemsError } = await supabase
-        .schema("hrms")
-        .from("payroll_items")
-        .select("employee_id, breakdown")
-        .eq("payroll_id", currentPayroll.id)
-        .is("deleted_at", null);
-      if (itemsError) throw new Error(itemsError.message);
-
-      for (const row of existingItems ?? []) {
-        const adj = (row.breakdown as PayrollBreakdown | null)?.hrAdjustments;
-        if (!adj) continue;
-        hrByEmployee.set(String(row.employee_id), adj);
-      }
-    }
-
-    const payableItems = preview.items.map((item) => {
-      const preservedHr = hrByEmployee.get(item.employeeId);
-      const breakdown = preservedHr
-        ? { ...item.breakdown, hrAdjustments: preservedHr }
-        : item.breakdown;
-      return {
-        basicSalary: item.basicSalary,
-        grossSalary: item.grossSalary,
-        netSalary: item.netSalary,
-        totalDeductions: item.totalDeductions,
-        totalAllowances: item.totalAllowances,
-        breakdown,
-      };
-    });
+    const payableItems = preview.items.map((item) => ({
+      basicSalary: item.basicSalary,
+      grossSalary: item.grossSalary,
+      netSalary: item.netSalary,
+      totalDeductions: item.totalDeductions,
+      totalAllowances: item.totalAllowances,
+      breakdown: item.breakdown,
+    }));
 
     return sumPayrollFinalPayableTotals(payableItems).totalFinalPayable;
   }

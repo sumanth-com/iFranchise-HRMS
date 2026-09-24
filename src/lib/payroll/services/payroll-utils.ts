@@ -469,15 +469,26 @@ export function toPayslipDisplayLines(
     .map((line) => toPayslipLine(line));
 }
 
-function isReimbursementEarningLine(line: PayrollBreakdownLine): boolean {
+export function isReimbursementEarningLine(line: PayrollBreakdownLine): boolean {
   const code = line.code.toLowerCase();
-  const label = line.label.toLowerCase();
+  const label = (line.label ?? "").toLowerCase();
   return (
     code === "reimbursement" ||
     code.startsWith("reimb_") ||
     code === "hr_reimbursement" ||
     label.includes("reimbursement")
   );
+}
+
+/**
+ * True when HR explicitly saved a reimbursement adjustment (including 0).
+ * `0` is a valid value — do not treat it as "missing" and fall back to claims/excel.
+ */
+export function hasExplicitHrReimbursementAdjustment(
+  breakdown: PayrollBreakdown | null | undefined,
+): boolean {
+  const value = breakdown?.hrAdjustments?.reimbursements;
+  return value != null && Number.isFinite(Number(value));
 }
 
 /**
@@ -565,6 +576,11 @@ export function resolvePayrollReimbursement(
   breakdown: PayrollBreakdown | null | undefined,
   totalAllowances = 0,
 ): number {
+  // Explicit HR edit (including 0) wins over claim lines / stale excel.reimbursement.
+  if (hasExplicitHrReimbursementAdjustment(breakdown)) {
+    return roundCurrency(Math.max(0, Number(breakdown?.hrAdjustments?.reimbursements)));
+  }
+
   if (breakdown?.excel?.reimbursement != null) {
     return roundCurrency(Number(breakdown.excel.reimbursement));
   }
@@ -580,9 +596,6 @@ export function resolvePayrollReimbursement(
   if (breakdown?.source === "excel_historical_option_1" && totalAllowances > 0) {
     return roundCurrency(totalAllowances);
   }
-
-  const hrReimb = breakdown?.hrAdjustments?.reimbursements;
-  if (hrReimb != null && hrReimb > 0) return roundCurrency(hrReimb);
 
   return 0;
 }

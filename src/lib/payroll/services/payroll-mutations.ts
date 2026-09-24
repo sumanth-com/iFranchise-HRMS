@@ -89,6 +89,8 @@ import {
   parsePayrollMonthFromPayslipNumber,
   roundCurrency,
   resolvePayrollReimbursement,
+  hasExplicitHrReimbursementAdjustment,
+  isReimbursementEarningLine,
   sumPayrollEmployeeRowTotals,
 } from "@/lib/payroll/services/payroll-utils";
 import { isRowLevelSecurityError } from "@/lib/errors/user-messages";
@@ -2580,13 +2582,23 @@ export async function archivePayslip(
 
 const MANUAL_HR_EARNING_CODES = new Set(["hr_bonus", "hr_incentive", "hr_reimbursement"]);
 
+/**
+ * Sync manual HR bonus/incentive/reimbursement lines.
+ * When `replaceAllReimbursements` is true (HR explicitly saved reimbursement,
+ * including 0), strip claim reimbursement lines too so 0 stays 0 after reload.
+ */
 function syncManualHrEarningLines(
   earnings: PayrollBreakdownLine[] | undefined,
   bonus: number,
   incentive: number,
   reimbursement: number,
+  options?: { replaceAllReimbursements?: boolean },
 ): PayrollBreakdownLine[] {
-  const base = (earnings ?? []).filter((line) => !MANUAL_HR_EARNING_CODES.has(line.code));
+  const base = (earnings ?? []).filter((line) => {
+    if (MANUAL_HR_EARNING_CODES.has(line.code)) return false;
+    if (options?.replaceAllReimbursements && isReimbursementEarningLine(line)) return false;
+    return true;
+  });
   const next = [...base];
   if (bonus > 0) {
     next.push({
@@ -2639,6 +2651,8 @@ function applyPreservedHrAdjustmentsToItem(
       total_allowances: amounts.total_allowances,
       breakdown: {
         ...amounts.breakdown,
+        // Keep Excel-authoritative stamps across attendance refresh.
+        excel: existingBreakdown?.excel ?? amounts.breakdown.excel,
         payrollLifecycle: lifecycle,
       },
     };
@@ -2646,33 +2660,36 @@ function applyPreservedHrAdjustmentsToItem(
 
   const bonus = roundCurrency(Math.max(0, adj.bonus ?? 0));
   const incentive = roundCurrency(Math.max(0, adj.incentive ?? 0));
-  const reimbursements = roundCurrency(Math.max(0, adj.reimbursements ?? 0));
+  const hrReimbursementExplicit = hasExplicitHrReimbursementAdjustment({
+    ...amounts.breakdown,
+    hrAdjustments: adj,
+  });
+  const reimbursements = roundCurrency(Math.max(0, Number(adj.reimbursements ?? 0)));
 
-  // Keep approved claim reimbursements (code reimbursement / reimb_*) in allowances.
-  // Only replace the manual HR reimbursement adjustment portion.
-  const claimReimbursement = roundCurrency(
+  const calcEmbeddedReimb = roundCurrency(
     (amounts.breakdown.earnings ?? [])
-      .filter((line) => {
-        const code = line.code.toLowerCase();
-        return (
-          code === "reimbursement" ||
-          code.startsWith("reimb_") ||
-          (line.label.toLowerCase().includes("reimbursement") &&
-            !MANUAL_HR_EARNING_CODES.has(line.code))
-        );
-      })
+      .filter((line) => isReimbursementEarningLine(line))
       .reduce((sum, line) => sum + Number(line.amount || 0), 0),
   );
-  const previousTotalReimb = resolvePayrollReimbursement(
-    amounts.breakdown,
-    amounts.total_allowances,
+  const claimReimbursement = roundCurrency(
+    (amounts.breakdown.earnings ?? [])
+      .filter((line) => isReimbursementEarningLine(line) && !MANUAL_HR_EARNING_CODES.has(line.code))
+      .reduce((sum, line) => sum + Number(line.amount || 0), 0),
   );
+
+  // Strip whatever reimbursement is already in the calculated allowances, then
+  // re-add either HR override (including 0) or claim + HR portions.
   const structuralAllowances = roundCurrency(
-    Math.max(0, amounts.total_allowances - previousTotalReimb),
+    Math.max(0, amounts.total_allowances - calcEmbeddedReimb),
   );
-  const nextTotalAllowances = roundCurrency(
-    structuralAllowances + claimReimbursement + reimbursements,
-  );
+  const nextTotalAllowances = hrReimbursementExplicit
+    ? roundCurrency(structuralAllowances + reimbursements)
+    : roundCurrency(structuralAllowances + claimReimbursement + reimbursements);
+
+  const preservedExcel = existingBreakdown?.excel ?? amounts.breakdown.excel;
+  const nextExcel = hrReimbursementExplicit
+    ? { ...(preservedExcel ?? {}), reimbursement: reimbursements, finalPayout: preservedExcel?.finalPayout }
+    : preservedExcel;
 
   return {
     total_allowances: nextTotalAllowances,
@@ -2683,8 +2700,10 @@ function applyPreservedHrAdjustmentsToItem(
         bonus,
         incentive,
         reimbursements,
+        { replaceAllReimbursements: hrReimbursementExplicit },
       ),
       hrAdjustments: adj,
+      excel: nextExcel,
       payrollLifecycle: lifecycle,
     },
   };
@@ -2779,13 +2798,18 @@ export async function updatePayrollItemAdjustments(
 
   const bonus = roundCurrency(Math.max(0, input.bonus));
   const incentive = roundCurrency(Math.max(0, input.incentive));
-  const reimbursements = roundCurrency(Math.max(0, input.reimbursements));
+  // `0` is a valid explicit reimbursement — persist exactly as entered.
+  const reimbursements = roundCurrency(Math.max(0, Number(input.reimbursements) || 0));
   const previousAllowances = roundCurrency(Number(item.total_allowances ?? 0));
   const previousReimbursement = resolvePayrollReimbursement(existingBreakdown, previousAllowances);
   const structuralAllowances = roundCurrency(
     Math.max(0, previousAllowances - previousReimbursement),
   );
   const nextTotalAllowances = roundCurrency(structuralAllowances + reimbursements);
+
+  const nextExcel = existingBreakdown.excel
+    ? { ...existingBreakdown.excel, reimbursement: reimbursements }
+    : { reimbursement: reimbursements };
 
   const nextBreakdown: PayrollBreakdown = {
     ...existingBreakdown,
@@ -2794,7 +2818,9 @@ export async function updatePayrollItemAdjustments(
       bonus,
       incentive,
       reimbursements,
+      { replaceAllReimbursements: true },
     ),
+    excel: nextExcel,
     hrAdjustments: {
       ...existingBreakdown.hrAdjustments,
       bonus,

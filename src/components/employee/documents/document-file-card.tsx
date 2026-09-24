@@ -64,6 +64,8 @@ type Props = {
   onReplace: (file: EmployeeDocFile) => void;
   onDelete: (file: EmployeeDocFile) => void;
   readOnly?: boolean;
+  /** When set, PAYSLIP Preview opens Payroll's designed payslip drawer instead of the PDF iframe. */
+  onPayslipPreview?: (file: EmployeeDocFile) => void;
 };
 
 export function DocumentFileCard({
@@ -72,6 +74,7 @@ export function DocumentFileCard({
   onReplace,
   onDelete,
   readOnly = false,
+  onPayslipPreview,
 }: Props) {
   const router = useRouter();
   const [renameOpen, setRenameOpen] = useState(false);
@@ -197,9 +200,13 @@ export function DocumentFileCard({
               size="sm"
               className="h-6 gap-1 px-2 text-[11px]"
               disabled={isBusy}
-              onClick={() =>
-                preview(file.storagePath, file.fileName, file.mimeType, previewTitle)
-              }
+              onClick={() => {
+                if (file.documentTypeCode === "PAYSLIP" && onPayslipPreview) {
+                  onPayslipPreview(file);
+                  return;
+                }
+                void preview(file.storagePath, file.fileName, file.mimeType, previewTitle);
+              }}
             >
               <Eye className="size-3" />
               Preview

@@ -57,9 +57,11 @@ function highlightTabClass(active: boolean) {
     "h-7 shrink-0 gap-1 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-semibold shadow-none",
     "transition-[color,background-color,border-color,box-shadow] duration-150 ease-out",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1",
+    // Ghost variant sets dark:text-white/90 — inactive light pills must override that
+    // so Team Updates / Announcements stay readable in dark mode.
     active
-      ? "border-violet-600 bg-violet-600 text-white hover:border-violet-600 hover:bg-violet-600 hover:text-white"
-      : "border-violet-500/30 bg-white text-violet-800 hover:border-violet-500/55 hover:bg-violet-500/10 hover:text-violet-900",
+      ? "border-violet-600 bg-violet-600 text-white hover:border-violet-600 hover:bg-violet-600 hover:text-white dark:border-violet-500 dark:bg-violet-600 dark:text-white dark:hover:border-violet-500 dark:hover:bg-violet-600 dark:hover:text-white"
+      : "border-violet-500/30 bg-white text-violet-800 hover:border-violet-500/55 hover:bg-violet-500/10 hover:text-violet-900 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-100 dark:hover:border-violet-400/60 dark:hover:bg-violet-500/25 dark:hover:text-white",
   );
 }
 

@@ -253,15 +253,16 @@ export async function employeeGetDocumentUrlAction(storagePath: string) {
     ]);
     const supabase = await createClient();
 
-    assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
-
-    const { data: doc, error } = await fromHrms(supabase, "employee_documents")
+    // Ownership first, then path assert — legacy payslip paths need owned employee_id.
+    const { data: docs, error } = await fromHrms(supabase, "employee_documents")
       .select("id, storage_path, employee_id, employees:employee_id!inner(organization_id)")
       .eq("storage_path", storagePath)
       .is("deleted_at", null)
-      .maybeSingle();
+      .order("created_at", { ascending: true })
+      .limit(1);
 
     if (error) throw new Error(error.message);
+    const doc = docs?.[0];
     if (!doc) {
       return { success: false as const, message: "Document not found" };
     }
@@ -276,6 +277,10 @@ export async function employeeGetDocumentUrlAction(storagePath: string) {
     ) {
       return { success: false as const, message: "Document not found" };
     }
+
+    assertOrganizationStoragePath(storagePath, profile.employee.organizationId, {
+      employeeId: doc.employee_id as string,
+    });
 
     const admin = createAdminClient();
     const url = await createSignedDocumentUrl(admin, storagePath);
@@ -298,17 +303,17 @@ export async function employeeDownloadDocumentAction(storagePath: string, fileNa
     ]);
     const supabase = await createClient();
 
-    assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
-
-    const { data: doc, error } = await fromHrms(supabase, "employee_documents")
+    const { data: docs, error } = await fromHrms(supabase, "employee_documents")
       .select(
         "id, storage_path, file_name, employee_id, employees:employee_id!inner(organization_id)",
       )
       .eq("storage_path", storagePath)
       .is("deleted_at", null)
-      .maybeSingle();
+      .order("created_at", { ascending: true })
+      .limit(1);
 
     if (error) throw new Error(error.message);
+    const doc = docs?.[0];
     if (!doc) {
       return { success: false as const, message: "Document not found" };
     }
@@ -324,6 +329,10 @@ export async function employeeDownloadDocumentAction(storagePath: string, fileNa
       return { success: false as const, message: "Document not found" };
     }
 
+    assertOrganizationStoragePath(storagePath, profile.employee.organizationId, {
+      employeeId: doc.employee_id as string,
+    });
+
     const admin = createAdminClient();
     const downloadName = fileName.trim() || (doc.file_name as string) || "document";
     const url = await createSignedDocumentUrl(admin, storagePath, { download: downloadName });
@@ -333,6 +342,106 @@ export async function employeeDownloadDocumentAction(storagePath: string, fileNa
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to download file",
+    };
+  }
+}
+
+/**
+ * Resolve the authoritative `payslips.id` for a PAYSLIP employee_document so Documents
+ * Preview can open the same Payroll payslip drawer (not the raw PDF iframe).
+ */
+export async function resolveEmployeeDocumentPayslipIdAction(documentId: string) {
+  try {
+    const profile = await requireServerAnyPermission([
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
+      "documents.view",
+    ]);
+    const supabase = await createClient();
+
+    const { data: docs, error } = await fromHrms(supabase, "employee_documents")
+      .select(
+        `
+        id, notes, document_number, storage_path, employee_id,
+        document_types:document_type_id(code),
+        employees:employee_id!inner(organization_id)
+      `,
+      )
+      .eq("id", documentId)
+      .is("deleted_at", null)
+      .limit(1);
+
+    if (error) throw new Error(error.message);
+    const doc = docs?.[0];
+    if (!doc) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const employee = unwrapRelation(doc.employees);
+    if (
+      !canAccessEmployeeDocument(
+        profile,
+        doc.employee_id as string,
+        employee?.organization_id as string | undefined,
+      )
+    ) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const docType = unwrapRelation(doc.document_types);
+    if (docType?.code !== "PAYSLIP") {
+      return { success: false as const, message: "Not a payslip document" };
+    }
+
+    const { extractPayslipIdFromDocumentNotes } = await import(
+      "@/lib/payroll/services/payslip-employee-document-identity"
+    );
+    const fromNotes = extractPayslipIdFromDocumentNotes(doc.notes as string | null);
+    if (fromNotes) {
+      return { success: true as const, data: fromNotes };
+    }
+
+    const organizationId = employee?.organization_id as string;
+    const employeeId = doc.employee_id as string;
+    const documentNumber =
+      typeof doc.document_number === "string" ? doc.document_number.trim() : "";
+    const storagePath =
+      typeof doc.storage_path === "string" ? doc.storage_path.trim() : "";
+
+    const admin = createAdminClient();
+    let query = admin
+      .schema("hrms")
+      .from("payslips")
+      .select("id, payslip_number, storage_path, employee_id, payrolls!inner(organization_id)")
+      .eq("employee_id", employeeId)
+      .eq("is_current", true)
+      .is("deleted_at", null);
+
+    if (documentNumber) {
+      query = query.eq("payslip_number", documentNumber);
+    } else if (storagePath) {
+      query = query.eq("storage_path", storagePath);
+    } else {
+      return { success: false as const, message: "Payslip reference not found" };
+    }
+
+    const { data: payslips, error: payslipError } = await query.limit(5);
+    if (payslipError) throw new Error(payslipError.message);
+
+    const match = (payslips ?? []).find((row) => {
+      const payroll = unwrapRelation(row.payrolls);
+      return payroll?.organization_id === organizationId;
+    });
+
+    if (!match?.id) {
+      return { success: false as const, message: "Payslip not found" };
+    }
+
+    return { success: true as const, data: match.id as string };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to resolve payslip",
     };
   }
 }

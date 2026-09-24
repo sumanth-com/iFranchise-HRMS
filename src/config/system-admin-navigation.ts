@@ -4,7 +4,6 @@ import {
   Building2,
   CalendarCheck,
   CalendarDays,
-  ClipboardList,
   FileText,
   LaptopMinimal,
   LayoutDashboard,
@@ -132,14 +131,6 @@ export const SYSTEM_ADMIN_NAV_ITEMS: NavigationItem[] = [
     section: "System Administration",
     roles: ["super_admin"],
     permissions: ["system.admin.access"],
-  },
-  {
-    title: "HR Overview",
-    href: SYSTEM_ADMIN_ROUTES.hrOverview,
-    icon: ClipboardList,
-    section: "System Administration",
-    roles: ["super_admin"],
-    permissions: ["system.admin.access", "employee.view"],
   },
   {
     title: "Employees",
