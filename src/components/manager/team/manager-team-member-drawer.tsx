@@ -173,6 +173,13 @@ export function ManagerTeamMemberDrawer({
     } else {
       setInternalActiveTab(nextTab);
     }
+
+    // Same member already loaded — only sync tab; skip wipe + refetch.
+    if (detail?.employee.id === employeeId) {
+      setLoadError(null);
+      return;
+    }
+
     setDetail(null);
     setLoadError(null);
     startLoading(async () => {
@@ -187,6 +194,7 @@ export function ManagerTeamMemberDrawer({
         );
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid refetch on tab-only changes when same employee
   }, [open, embedded, employeeId, initialTab, isControlled, onActiveTabChange, readOnly]);
 
   const employee = detail?.employee;

@@ -76,13 +76,18 @@ export function AttendanceLocationDialog({
 
   useEffect(() => {
     if (!open || !attendanceId) {
-      setData(null);
+      // Keep last location for fast reopen of the same punch.
       setError(null);
       setPoint(preferredPoint);
       return;
     }
 
     setPoint(preferredPoint);
+    if (data?.attendanceId === attendanceId) {
+      // Same record already loaded — only retarget check-in/out; no refetch.
+      return;
+    }
+
     startTransition(async () => {
       const result = await getAttendanceLocationAction(
         attendanceId,
@@ -96,6 +101,7 @@ export function AttendanceLocationDialog({
       setError(null);
       setData(result.data);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reuse cached data for same attendanceId
   }, [open, attendanceId, preferredPoint]);
 
   const activePoint = useMemo(() => {

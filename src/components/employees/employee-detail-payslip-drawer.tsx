@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Download, Loader2, Mail } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { PayslipView, usePayslipActions } from "@/components/payroll/payslip-view";
 import { fetchPayslipDetailAction } from "@/lib/payroll/actions";
+import {
+  hrPayslipDetailCache,
+  hrPayslipDetailInflight,
+} from "@/lib/payroll/payslip-detail-client-cache";
+import { useCachedModalDetail } from "@/lib/ui/use-cached-modal-detail";
 import type { PayslipDetail } from "@/types/payroll";
 
 type EmployeeDetailPayslipDrawerProps = {
@@ -72,27 +76,17 @@ export function EmployeeDetailPayslipDrawer({
   onOpenChange,
   canEmail = false,
 }: EmployeeDetailPayslipDrawerProps) {
-  const [detail, setDetail] = useState<PayslipDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { detail, loading } = useCachedModalDetail<PayslipDetail>({
+    id: payslipId,
+    open,
+    fetchDetail: fetchPayslipDetailAction,
+    cache: hrPayslipDetailCache,
+    inflight: hrPayslipDetailInflight,
+  });
 
   function handleClose() {
     onOpenChange(false);
   }
-
-  useEffect(() => {
-    if (!open || !payslipId) return;
-    let cancelled = false;
-    setLoading(true);
-    setDetail(null);
-    void fetchPayslipDetailAction(payslipId).then((result) => {
-      if (cancelled) return;
-      setDetail(result);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, payslipId]);
 
   return (
     <Modal

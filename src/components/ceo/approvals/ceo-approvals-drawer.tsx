@@ -171,11 +171,15 @@ export function CeoApprovalsDrawer({
 
   useEffect(() => {
     if (!open || !requestId) {
-      setDetail(null);
+      // Keep detail for fast reopen of the same request.
       setLoadError(null);
       setActionMode(null);
       setNotes("");
       setIsFetching(false);
+      return;
+    }
+
+    if (detail?.id === requestId) {
       return;
     }
 
@@ -184,6 +188,7 @@ export function CeoApprovalsDrawer({
     setLoadError(null);
     setActionMode(null);
     setNotes("");
+    setDetail(null);
 
     void fetchCeoApprovalsDetailAction({ requestId }).then((result) => {
       if (cancelled) return;
@@ -200,6 +205,7 @@ export function CeoApprovalsDrawer({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- same-id reopen skips refetch via detail?.id check
   }, [open, requestId]);
 
   function closePopup() {

@@ -58,10 +58,11 @@ export function AttendanceViewDialog({
 
   useEffect(() => {
     if (!open || !attendanceId) {
-      setDetail(null);
       setError(null);
       return;
     }
+
+    if (detail?.id === attendanceId) return;
 
     startTransition(async () => {
       const result = await getAttendanceDetailAction(attendanceId);
@@ -73,7 +74,7 @@ export function AttendanceViewDialog({
       setError(null);
       setDetail(result.data);
     });
-  }, [open, attendanceId]);
+  }, [open, attendanceId, detail?.id]);
 
   return (
     <Modal
@@ -126,8 +127,11 @@ export function AttendanceRegularizationViewDialog({
 
   useEffect(() => {
     if (!open || !attendanceId) {
-      setDetail(null);
       setError(null);
+      return;
+    }
+
+    if (detail && (detail.id === attendanceId || detail.attendanceId === attendanceId)) {
       return;
     }
 
@@ -141,7 +145,7 @@ export function AttendanceRegularizationViewDialog({
       setError(null);
       setDetail(result.data);
     });
-  }, [open, attendanceId]);
+  }, [open, attendanceId, detail?.id, detail?.attendanceId]);
 
   return (
     <Modal
@@ -207,10 +211,11 @@ export function AttendanceEditDialog({
 
   useEffect(() => {
     if (!open || !attendanceId) {
-      setDetail(null);
       setError(null);
       return;
     }
+
+    if (detail?.id === attendanceId) return;
 
     startTransition(async () => {
       const result = await getAttendanceDetailAction(attendanceId);
@@ -222,7 +227,7 @@ export function AttendanceEditDialog({
       setError(null);
       setDetail(result.data);
     });
-  }, [open, attendanceId]);
+  }, [open, attendanceId, detail?.id]);
 
   return (
     <Modal

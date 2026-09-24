@@ -61,10 +61,13 @@ export function CeoProvisioningDrawer({
 
   useEffect(() => {
     if (!open || !employeeId) {
-      setDetail(null);
       setError(null);
       return;
     }
+    if (detail?.user.employeeId === employeeId) {
+      return;
+    }
+    setDetail(null);
     startTransition(async () => {
       const result = await fetchCeoProvisioningUserDetailAction(employeeId);
       if (!result.success) {
@@ -75,6 +78,7 @@ export function CeoProvisioningDrawer({
       setError(null);
       setDetail(result.data);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- same-id skip via detail check above
   }, [open, employeeId]);
 
   const user = detail?.user;

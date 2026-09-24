@@ -4920,15 +4920,6 @@ export async function getPayslipById(
     employee.employment_types as { name: string } | { name: string }[] | null,
   );
 
-  const { data: bankAccount } = await supabase
-    .schema("hrms")
-    .from("bank_accounts")
-    .select("bank_name, account_number, ifsc_code, account_holder_name, branch_name")
-    .eq("employee_id", payslip.employee_id)
-    .eq("is_primary", true)
-    .is("deleted_at", null)
-    .maybeSingle();
-
   // Prefer payroll_item.breakdown snapshot — never recompute historical amounts from live salary.
   const breakdown = (payrollItem?.breakdown as PayrollBreakdown) ?? {
     earnings: [],
@@ -4943,22 +4934,6 @@ export async function getPayslipById(
     },
   };
 
-  const components = await resolvePayslipSalaryComponents(
-    supabase,
-    payslip.employee_id,
-    payroll.payroll_month,
-    payrollItem?.salary_structure_id as string | null | undefined,
-    breakdown,
-  );
-  const statutory = parseStatutoryIds(components);
-  const branding = await getPayslipBranding(supabase, organizationId);
-
-  const employerContributions = buildEmployerContributions(components, breakdown);
-  const employerContributionTotal = employerContributions.reduce(
-    (sum, line) => sum + line.amount,
-    0,
-  );
-
   const payrollMonthDate = new Date(payroll.payroll_month);
   const payrollYear = Number.isNaN(payrollMonthDate.getTime())
     ? new Date().getFullYear()
@@ -4968,18 +4943,47 @@ export async function getPayslipById(
     : payrollMonthDate.getMonth() + 1;
   const leaveMonthKey = `${payrollYear}-${String(payrollMonthNum).padStart(2, "0")}-01`;
 
-  const leaveBalances: PayslipDetail["leaveBalances"] = {
-    casual: { usedInMonth: 0, balance: 0 },
-    earned: { usedInMonth: 0, balance: 0 },
-  };
-  try {
-    const leaveSnapshots = await getEmployeeLeaveBalanceSnapshot(
+  // Independent enrichment queries — run in parallel (speed only; same results).
+  const [bankAccount, components, branding, leaveSnapshots] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("bank_accounts")
+      .select("bank_name, account_number, ifsc_code, account_holder_name, branch_name")
+      .eq("employee_id", payslip.employee_id)
+      .eq("is_primary", true)
+      .is("deleted_at", null)
+      .maybeSingle()
+      .then((res) => res.data),
+    resolvePayslipSalaryComponents(
+      supabase,
+      payslip.employee_id,
+      payroll.payroll_month,
+      payrollItem?.salary_structure_id as string | null | undefined,
+      breakdown,
+    ),
+    getPayslipBranding(supabase, organizationId),
+    getEmployeeLeaveBalanceSnapshot(
       supabase,
       payslip.employee_id,
       getCurrentBalanceYear(leaveMonthKey),
       { month: payrollMonthNum, year: payrollYear },
       organizationId,
-    );
+    ).catch(() => null),
+  ]);
+
+  const statutory = parseStatutoryIds(components);
+
+  const employerContributions = buildEmployerContributions(components, breakdown);
+  const employerContributionTotal = employerContributions.reduce(
+    (sum, line) => sum + line.amount,
+    0,
+  );
+
+  const leaveBalances: PayslipDetail["leaveBalances"] = {
+    casual: { usedInMonth: 0, balance: 0 },
+    earned: { usedInMonth: 0, balance: 0 },
+  };
+  if (leaveSnapshots) {
     for (const code of LEAVE_BALANCE_CARD_CODES) {
       const row = leaveSnapshots.find((item) => item.leaveTypeCode === code);
       if (!row) continue;
@@ -4990,8 +4994,6 @@ export async function getPayslipById(
       if (code === "CL") leaveBalances.casual = entry;
       if (code === "EL") leaveBalances.earned = entry;
     }
-  } catch {
-    // Leave snapshot is display-only; never block payslip load.
   }
 
   const detail: PayslipDetail = {

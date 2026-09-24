@@ -96,13 +96,16 @@ export function CeoLeaveDetailDrawer({
 
   useEffect(() => {
     if (!open || !leaveRequestId) {
-      setDetail(null);
+      // Keep last detail in memory for fast reopen; clear only transient UI state.
       setError(null);
       setRejectComments("");
       return;
     }
+    // Same-id reopen: skip refetch when we already have the detail.
+    if (detail?.id === leaveRequestId) return;
+    setDetail(null);
     loadDetail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on open/id; loadDetail is stable enough
   }, [open, leaveRequestId]);
 
   const handleApprove = () => {

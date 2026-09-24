@@ -1,5 +1,7 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+
 import { Modal } from "@/components/common/modal";
 import {
   canPreviewInline,
@@ -7,10 +9,12 @@ import {
 } from "@/components/employee/documents/document-icons";
 
 export type DocumentPreviewTarget = {
-  url: string;
+  /** Null while the signed URL is still resolving. */
+  url: string | null;
   fileName: string;
   mimeType: string;
   title?: string;
+  loading?: boolean;
 };
 
 type Props = {
@@ -22,6 +26,7 @@ export function DocumentPreviewDialog({ target, onOpenChange }: Props) {
   const open = Boolean(target);
   const kind = target ? getFileKind(target.mimeType, target.fileName) : "file";
   const canInline = target ? canPreviewInline(kind) : false;
+  const isLoading = Boolean(target?.loading || (target && !target.url && canInline));
 
   return (
     <Modal
@@ -36,7 +41,12 @@ export function DocumentPreviewDialog({ target, onOpenChange }: Props) {
       {target ? (
         canInline ? (
           <div className="flex min-h-[min(70vh,640px)] items-center justify-center rounded-lg border bg-muted/20">
-            {kind === "image" ? (
+            {isLoading || !target.url ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Loading preview…
+              </div>
+            ) : kind === "image" ? (
               // eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL preview
               <img
                 src={target.url}

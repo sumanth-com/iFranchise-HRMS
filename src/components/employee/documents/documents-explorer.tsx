@@ -36,6 +36,7 @@ import {
   employeeDeleteDocumentAction,
   resolveEmployeeDocumentPayslipIdAction,
 } from "@/lib/employee/actions/employee-documents-actions";
+import { prefetchEmployeePayslipDetail } from "@/lib/payroll/payslip-detail-client-cache";
 import type {
   EmployeeDocFile,
   EmployeeDocFolder,
@@ -158,17 +159,24 @@ export function DocumentsExplorer({
   const [payslipPreviewBusy, setPayslipPreviewBusy] = useState(false);
 
   async function openPayslipPreview(file: EmployeeDocFile) {
+    // Open the Payroll drawer immediately; resolve id / prefetch in parallel.
+    let payslipId = file.payslipId?.trim() || null;
+    if (payslipId) {
+      void prefetchEmployeePayslipDetail(payslipId);
+      setPayslipPreviewId(payslipId);
+      setPayslipPreviewOpen(true);
+      return;
+    }
+
     setPayslipPreviewBusy(true);
     try {
-      let payslipId = file.payslipId?.trim() || null;
-      if (!payslipId) {
-        const result = await resolveEmployeeDocumentPayslipIdAction(file.id);
-        if (!result.success || !result.data) {
-          toast.error(result.message ?? "Unable to open payslip preview");
-          return;
-        }
-        payslipId = result.data;
+      const result = await resolveEmployeeDocumentPayslipIdAction(file.id);
+      if (!result.success || !result.data) {
+        toast.error(result.message ?? "Unable to open payslip preview");
+        return;
       }
+      payslipId = result.data;
+      void prefetchEmployeePayslipDetail(payslipId);
       setPayslipPreviewId(payslipId);
       setPayslipPreviewOpen(true);
     } finally {

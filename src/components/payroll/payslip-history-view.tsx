@@ -19,6 +19,10 @@ import { toast } from "sonner";
 
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
+import {
+  prefetchEmployeePayslipDetail,
+  prefetchHrPayslipDetail,
+} from "@/lib/payroll/payslip-detail-client-cache";
 import { PayrollSendPayslipDialog } from "@/components/payroll/payroll-run-item-dialogs";
 import {
   ApprovalSelectCheckbox,
@@ -562,6 +566,7 @@ export function PayslipHistoryView({
         toast.error("Payslip is not available for this employee yet.");
         return;
       }
+      void prefetchEmployeePayslipDetail(row.id);
       setActivePayslipId(row.id);
       setPreviewOpen(true);
       return;
@@ -569,6 +574,7 @@ export function PayslipHistoryView({
 
     // Open immediately when the row already has a payslip id — no extra round trip.
     if (row.hasPayslip && row.id) {
+      void prefetchHrPayslipDetail(row.id);
       setActivePayslipId(row.id);
       setPreviewOpen(true);
       return;
@@ -599,6 +605,7 @@ export function PayslipHistoryView({
             : entry,
         ),
       );
+      void prefetchHrPayslipDetail(result.data);
       setActivePayslipId(result.data);
       setPreviewOpen(true);
     })();

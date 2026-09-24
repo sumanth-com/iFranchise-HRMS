@@ -9,6 +9,24 @@ import {
   employeeGetDocumentUrlAction,
 } from "@/lib/employee/actions/employee-documents-actions";
 
+/** Short-lived signed URL cache so reopen/preview doesn't wait on a new round-trip. */
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const SIGNED_URL_TTL_MS = 4 * 60 * 1000; // under typical 1h signed URL; refresh early
+
+function getCachedSignedUrl(storagePath: string): string | null {
+  const hit = signedUrlCache.get(storagePath);
+  if (!hit) return null;
+  if (Date.now() >= hit.expiresAt) {
+    signedUrlCache.delete(storagePath);
+    return null;
+  }
+  return hit.url;
+}
+
+function setCachedSignedUrl(storagePath: string, url: string) {
+  signedUrlCache.set(storagePath, { url, expiresAt: Date.now() + SIGNED_URL_TTL_MS });
+}
+
 export type DocumentFileActions = Pick<
   ReturnType<typeof useEmployeeDocumentFile>,
   "isBusy" | "preview" | "download"
@@ -19,11 +37,15 @@ export function useEmployeeDocumentFile() {
   const [previewTarget, setPreviewTarget] = useState<DocumentPreviewTarget | null>(null);
 
   async function resolveUrl(storagePath: string) {
+    const cached = getCachedSignedUrl(storagePath);
+    if (cached) return cached;
+
     const result = await employeeGetDocumentUrlAction(storagePath);
     if (!result.success || !result.data) {
       toast.error(result.message ?? "Unable to open this file");
       return null;
     }
+    setCachedSignedUrl(storagePath, result.data);
     return result.data;
   }
 
@@ -33,11 +55,26 @@ export function useEmployeeDocumentFile() {
     mimeType: string,
     title?: string,
   ) {
+    const cached = getCachedSignedUrl(storagePath);
+    // Open shell immediately; fill URL when ready (don't block modal on signed URL).
+    setPreviewTarget({
+      url: cached,
+      fileName,
+      mimeType,
+      title,
+      loading: !cached,
+    });
+
+    if (cached) return;
+
     setIsBusy(true);
     try {
       const url = await resolveUrl(storagePath);
-      if (!url) return;
-      setPreviewTarget({ url, fileName, mimeType, title });
+      if (!url) {
+        setPreviewTarget(null);
+        return;
+      }
+      setPreviewTarget({ url, fileName, mimeType, title, loading: false });
     } finally {
       setIsBusy(false);
     }

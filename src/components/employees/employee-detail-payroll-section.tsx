@@ -6,6 +6,7 @@ import { format, parseISO } from "date-fns";
 import { Download, FileText, FileStack, IndianRupee, Wallet } from "lucide-react";
 
 import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
+import { prefetchHrPayslipDetail } from "@/lib/payroll/payslip-detail-client-cache";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { Button } from "@/components/common/button";
 import { FilterSelect } from "@/components/common/filter-select";
@@ -125,6 +126,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
   }
 
   function openPayslip(id: string) {
+    void prefetchHrPayslipDetail(id);
     setActivePayslipId(id);
     setDrawerOpen(true);
   }

@@ -22,6 +22,7 @@ import {
   EmployeeStatCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
+import { prefetchEmployeePayslipDetail } from "@/lib/payroll/payslip-detail-client-cache";
 import { PaymentTimeline } from "@/components/employee/payroll/payment-timeline";
 import { EarningsDeductionsTable } from "@/components/payroll/earnings-deductions-table";
 import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
@@ -123,6 +124,8 @@ export function EmployeePayrollView({
   const canOpenLatestPayslip = Boolean(latestPayslip?.canEmployeeAccess);
 
   function openPayslip(id: string) {
+    // Start detail fetch immediately so the drawer can paint from cache/inflight.
+    void prefetchEmployeePayslipDetail(id);
     setActivePayslipId(id);
     setDrawerOpen(true);
   }
