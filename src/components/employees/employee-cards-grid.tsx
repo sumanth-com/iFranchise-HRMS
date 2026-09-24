@@ -170,6 +170,14 @@ export function EmployeeCardsGrid({
                     {designationLabel}
                   </span>
                 </div>
+                {employee.employeeCode ? (
+                  <p
+                    className="mt-1.5 text-[11px] font-medium tracking-wide text-muted-foreground tabular-nums"
+                    title={`Employee ID ${employee.employeeCode}`}
+                  >
+                    {employee.employeeCode}
+                  </p>
+                ) : null}
               </div>
             </button>
 

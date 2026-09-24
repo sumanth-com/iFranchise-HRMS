@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import {
   getCeoPerformanceEmployeeDetail,
   getCeoPerformanceInsights,
@@ -186,6 +187,7 @@ export async function approveCeoPromotionAction(
 
     revalidatePath(CEO_ROUTES.performance);
     revalidatePath(CEO_ROUTES.approvals);
+    revalidateCeoDashboardHome();
     revalidatePath(PERFORMANCE_ROUTES.promotions);
     revalidatePath(HR_HUB_ROUTES.myGoals);
     revalidatePath(`${HR_HUB_ROUTES.myGoals}/promotions`);

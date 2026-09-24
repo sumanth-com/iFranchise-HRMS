@@ -2,6 +2,11 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   extractMeetingLinkFromAgenda,
 } from "@/lib/performance/services/performance-meeting-link";
+import { isEmployeeAppVisible } from "@/lib/employees/app-hidden";
+import {
+  excludeItSystemAccountFromEmployeeQuery,
+  isItSystemAccount,
+} from "@/lib/employees/it-system-account";
 import type { UserProfile } from "@/types/auth";
 import type {
   DepartmentPerformanceItem,
@@ -96,14 +101,16 @@ export async function getPerformanceLookups(
     };
   }
 
-  let employeesQuery = supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id, first_name, last_name, employee_code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"])
-    .order("first_name");
+  let employeesQuery = excludeItSystemAccountFromEmployeeQuery(
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, first_name, last_name, employee_code")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .in("employment_status", ["active", "probation", "on_leave"])
+      .order("first_name"),
+  );
 
   if (employeeIds?.length) {
     employeesQuery = employeesQuery.in("id", employeeIds);
@@ -819,8 +826,8 @@ export async function listOneOnOnes(
   let query = fromHrms(supabase, "performance_one_on_ones")
     .select(
       `id, employee_id, manager_employee_id, scheduled_at, agenda, notes, follow_up_date, meeting_status, created_at,
-      employee:employee_id(first_name, last_name),
-      manager:manager_employee_id(first_name, last_name),
+      employee:employee_id(first_name, last_name, email, employee_code, app_hidden_at),
+      manager:manager_employee_id(first_name, last_name, email, employee_code, app_hidden_at),
       performance_one_on_one_actions(id, is_completed)`,
       { count: "exact" },
     )
@@ -846,7 +853,25 @@ export async function listOneOnOnes(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  const items: OneOnOneListItem[] = (data ?? []).map((row: PerfRow) => {
+  const items: OneOnOneListItem[] = (data ?? [])
+    .filter((row: PerfRow) => {
+      const emp = unwrapRelation(row.employee);
+      const manager = unwrapRelation(row.manager);
+      const participants = [emp, manager].filter(Boolean);
+      if (participants.length === 0) return false;
+      return participants.every(
+        (person) =>
+          isEmployeeAppVisible({
+            email: person.email,
+            app_hidden_at: person.app_hidden_at,
+          }) &&
+          !isItSystemAccount({
+            email: person.email,
+            employeeCode: person.employee_code,
+          }),
+      );
+    })
+    .map((row: PerfRow) => {
     const emp = unwrapRelation(row.employee);
     const manager = unwrapRelation(row.manager);
     const actions = (row.performance_one_on_one_actions as Array<{ is_completed: boolean }>) ?? [];

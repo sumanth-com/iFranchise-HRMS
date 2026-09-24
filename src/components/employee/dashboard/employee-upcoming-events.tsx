@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Cake, CalendarDays, Megaphone, Newspaper, Pencil, Settings2, Sparkles } from "lucide-react";
 import Image from "next/image";
@@ -50,6 +50,42 @@ function countdownLabel(date: string, referenceDate: string): string {
 
 const combinedIconSlotClass =
   "flex size-14 shrink-0 items-center justify-center";
+
+/** Stable highlight tabs — same size active/hover; no variant border jump. */
+function highlightTabClass(active: boolean) {
+  return cn(
+    "h-7 shrink-0 gap-1 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-semibold shadow-none",
+    "transition-[color,background-color,border-color,box-shadow] duration-150 ease-out",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1",
+    active
+      ? "border-violet-600 bg-violet-600 text-white hover:border-violet-600 hover:bg-violet-600 hover:text-white"
+      : "border-violet-500/30 bg-white text-violet-800 hover:border-violet-500/55 hover:bg-violet-500/10 hover:text-violet-900",
+  );
+}
+
+function HighlightsEmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col items-center justify-center px-4 py-5">
+      <div className="flex w-full max-w-[17rem] flex-col items-center rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-5 py-6 text-center ring-1 ring-violet-500/15">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15">
+          {icon}
+        </span>
+        <p className="mt-3 text-sm font-semibold tracking-tight text-foreground">{title}</p>
+        <p className="mt-1.5 max-w-[14rem] text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function birthdayInitials(firstName: string, lastName: string) {
   const first = firstName.trim().charAt(0);
@@ -655,29 +691,23 @@ export function EmployeeUpcomingEvents({
         ) : null}
       </div>
     ) : (
-      <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl bg-violet-500/[0.04] px-5 text-center ring-1 ring-violet-500/12">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
-          <CalendarDays className="size-5" />
-        </span>
-        <p className="mt-3 text-sm font-semibold text-foreground">
-          Nothing to celebrate this week
-        </p>
-        <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
-          No holidays or birthdays coming up. Enjoy a productive week!
-        </p>
-      </div>
+      <HighlightsEmptyState
+        icon={<CalendarDays className="size-5" />}
+        title="Nothing to celebrate this week"
+        description="No holidays or birthdays coming up. Enjoy a productive week!"
+      />
     );
 
   if (showImportantNotices) {
     return (
       <section className={cn(employeeSectionClass, "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden", className)}>
         <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto pb-0.5">
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
             <Button
               type="button"
               size="xs"
-              variant={panel === "celebrations" && !announcementsOpen ? "default" : "outline"}
-              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
+              variant="ghost"
+              className={highlightTabClass(panel === "celebrations" && !announcementsOpen)}
               aria-pressed={panel === "celebrations" && !announcementsOpen}
               onClick={() => {
                 setPanel("celebrations");
@@ -691,8 +721,8 @@ export function EmployeeUpcomingEvents({
             <Button
               type="button"
               size="xs"
-              variant={panel === "notices" && !announcementsOpen ? "default" : "outline"}
-              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
+              variant="ghost"
+              className={highlightTabClass(panel === "notices" && !announcementsOpen)}
               aria-pressed={panel === "notices" && !announcementsOpen}
               onClick={() => {
                 setPanel("notices");
@@ -705,8 +735,8 @@ export function EmployeeUpcomingEvents({
             <Button
               type="button"
               size="xs"
-              variant={announcementsOpen ? "default" : "outline"}
-              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
+              variant="ghost"
+              className={highlightTabClass(announcementsOpen)}
               aria-pressed={announcementsOpen}
               aria-haspopup="dialog"
               onClick={() => setAnnouncementsOpen(true)}
@@ -714,7 +744,14 @@ export function EmployeeUpcomingEvents({
               <Megaphone className="size-3 shrink-0" />
               Announcements
               {unreadAnnouncementCount > 0 ? (
-                <span className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums">
+                <span
+                  className={cn(
+                    "ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+                    announcementsOpen
+                      ? "bg-white/25 text-white"
+                      : "bg-violet-600 text-white",
+                  )}
+                >
                   {unreadAnnouncementCount > 99 ? "99+" : unreadAnnouncementCount}
                 </span>
               ) : null}
@@ -724,8 +761,8 @@ export function EmployeeUpcomingEvents({
             <Button
               type="button"
               size="xs"
-              variant="outline"
-              className="h-7 shrink-0 gap-1 whitespace-nowrap px-2 text-[11px]"
+              variant="ghost"
+              className={highlightTabClass(false)}
               onClick={() => setManageOpen(true)}
             >
               <Pencil className="size-3 shrink-0" />

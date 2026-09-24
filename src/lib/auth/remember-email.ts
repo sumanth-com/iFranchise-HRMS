@@ -1,10 +1,11 @@
 "use client";
 
 import { REMEMBERED_EMAIL_STORAGE_KEY } from "@/lib/auth/constants";
+import { IT_SYSTEM_ACCOUNT_EMAIL } from "@/lib/employees/it-system-account";
 
 /** Former system-account email; migrate remembered login only (not used for auth). */
 const LEGACY_SYSTEM_LOGIN_EMAIL = "sumanth.reddy@ifranchise.in";
-const CURRENT_SYSTEM_LOGIN_EMAIL = "it@ifranchise.in";
+const CURRENT_SYSTEM_LOGIN_EMAIL = IT_SYSTEM_ACCOUNT_EMAIL;
 
 export function getRememberedEmail(): string {
   if (typeof window === "undefined") return "";

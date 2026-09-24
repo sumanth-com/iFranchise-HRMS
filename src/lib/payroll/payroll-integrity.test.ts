@@ -34,7 +34,7 @@ describe("payroll integrity eligibility", () => {
     );
   });
 
-  it("includes the IT Team employee in payroll eligibility", () => {
+  it("excludes the IT system account from payroll eligibility", () => {
     assert.equal(
       isPayrollEligibleEmployee({
         ...visible,
@@ -43,7 +43,7 @@ describe("payroll integrity eligibility", () => {
         last_name: "Team",
         email: "it@ifranchise.in",
       }),
-      true,
+      false,
     );
   });
 

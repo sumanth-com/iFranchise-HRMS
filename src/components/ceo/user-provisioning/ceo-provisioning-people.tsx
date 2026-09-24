@@ -53,6 +53,7 @@ type CeoProvisioningPeopleProps = {
   busyEmployeeId?: string | null;
   showFilters?: boolean;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
+  onOpenBulkAssign?: () => void;
 };
 
 function matchesSearch(user: CeoProvisioningUser, query: string) {
@@ -339,6 +340,7 @@ export function CeoProvisioningPeople({
   busyEmployeeId,
   showFilters = false,
   onAction,
+  onOpenBulkAssign,
 }: CeoProvisioningPeopleProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -367,6 +369,18 @@ export function CeoProvisioningPeople({
             All employees with portal access status and provisioning details.
           </p>
         </div>
+        {onOpenBulkAssign ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 shrink-0 gap-1.5"
+            onClick={onOpenBulkAssign}
+          >
+            <UserCheck className="size-3.5" />
+            Filters
+          </Button>
+        ) : null}
         {showFilters ? (
           <>
             <CeoProvisioningUserSearch

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
@@ -76,6 +77,8 @@ function revalidateLeaveSelfServicePaths(leaveRequestId?: string) {
   if (leaveRequestId) {
     revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
   }
+  // CEO home KPIs: pending leave approvals + today's on-leave / attendance %.
+  revalidateCeoDashboardHome();
 }
 
 export async function createLeaveRequestAction(

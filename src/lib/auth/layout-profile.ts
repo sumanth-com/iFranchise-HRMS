@@ -21,14 +21,17 @@ export const getLayoutUserProfile = cache(async function getLayoutUserProfile(
   supabaseClient?: AuthSupabaseClient,
 ): Promise<ProfileLoadResult> {
   const t0 = performance.now();
-  const verifiedPermissionCodes = await getVerifiedPermissionCodesForUser(userId);
+  // Do not await here — overlap HMAC cookie verify with employee/org queries.
+  const verifiedPermissionCodes = getVerifiedPermissionCodesForUser(userId);
 
   if (process.env.NODE_ENV === "development") {
-    console.info("[layout-timing]", {
-      atMs: Math.round(performance.now() - t0),
-      label: verifiedPermissionCodes
-        ? "layout-profile:permission_cookie_hit"
-        : "layout-profile:permission_cookie_miss",
+    void verifiedPermissionCodes.then((codes) => {
+      console.info("[layout-timing]", {
+        atMs: Math.round(performance.now() - t0),
+        label: codes
+          ? "layout-profile:permission_cookie_hit"
+          : "layout-profile:permission_cookie_miss",
+      });
     });
   }
 

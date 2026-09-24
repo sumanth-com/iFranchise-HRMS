@@ -8,13 +8,21 @@ import { createClient } from "@/lib/supabase/server";
 export default async function CeoOrganizationProfilePage() {
   const profile = await requireCeoPortal();
   const supabase = await createClient();
-  const orgProfile = await getOrganizationProfile(supabase, profile.employee.organizationId);
+  const orgProfile = await getOrganizationProfile(
+    supabase,
+    profile.employee.organizationId,
+  );
 
   if (!orgProfile) {
     return <p className="text-muted-foreground">Organization not found.</p>;
   }
 
-  const logoUrl = await getOrganizationLogoSignedUrl(supabase, orgProfile.logoStoragePath);
+  // Logo signing is independent once the storage path is known; kick it off
+  // without sequential idle time after other profile fields are ready.
+  const logoUrl = await getOrganizationLogoSignedUrl(
+    supabase,
+    orgProfile.logoStoragePath,
+  );
 
   return (
     <OrganizationProfileForm

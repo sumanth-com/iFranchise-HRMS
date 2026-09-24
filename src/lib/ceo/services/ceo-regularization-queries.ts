@@ -8,6 +8,7 @@ import {
   executiveRequestCategoryLabel,
   getExecutiveRequestCategory,
 } from "@/lib/approvals/executive-request-routing";
+import { isItSystemAccount } from "@/lib/employees/it-system-account";
 import { getEmployeeRoleCodes, isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { getMonthDateRange } from "@/lib/leave/services/leave-utils";
 
@@ -34,6 +35,7 @@ type CorrectionRow = {
         employee_code: string;
         first_name: string;
         last_name: string;
+        email?: string | null;
         organization_id: string;
         departments: { name: string } | { name: string }[] | null;
       }
@@ -41,6 +43,7 @@ type CorrectionRow = {
         employee_code: string;
         first_name: string;
         last_name: string;
+        email?: string | null;
         organization_id: string;
         departments: { name: string } | { name: string }[] | null;
       }>
@@ -57,6 +60,14 @@ async function mapCorrectionRows(
   for (const row of rows) {
     const employee = unwrap(row.employees);
     if (!employee) continue;
+    if (
+      isItSystemAccount({
+        email: employee.email,
+        employeeCode: employee.employee_code,
+      })
+    ) {
+      continue;
+    }
 
     const attendance = unwrap(row.attendance);
     let roleCodes = roleCodesByEmployee.get(row.employee_id);
@@ -103,6 +114,7 @@ const CORRECTION_SELECT = `
     employee_code,
     first_name,
     last_name,
+    email,
     organization_id,
     departments:department_id (name)
   )

@@ -12,8 +12,8 @@ import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 /** Match middleware budget so RSC auth does not hang longer than Edge. */
 const SERVER_SUPABASE_FETCH_TIMEOUT_MS = 15_000;
-const AUTH_SESSION_MAX_ATTEMPTS = 3;
-const AUTH_SESSION_RETRY_DELAY_MS = 350;
+const AUTH_SESSION_MAX_ATTEMPTS = 2;
+const AUTH_SESSION_RETRY_DELAY_MS = 200;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -23,6 +23,7 @@ import {
   updateProvisioningReportingContactsAction,
 } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
 import { provisioningContactFieldVisibility } from "@/lib/ceo/provisioning-contact-fields";
+import { reportingContactsSuccessMessage } from "@/lib/ceo/provisioning-reporting-messages";
 import {
   changeProvisioningRoleSchema,
   updatePendingProvisioningUserSchema,
@@ -58,7 +59,7 @@ type ReportingContactsDialogProps = {
   user: CeoProvisioningUser | null;
   lookups: CeoProvisioningLookups;
   onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
+  onSaved: (message: string) => void;
 };
 
 export function CeoPendingEditDialog({
@@ -391,15 +392,26 @@ export function CeoProvisioningReportingContactsDialog({
   const onSubmit = form.handleSubmit((data) => {
     setSubmitError(null);
     startTransition(async () => {
+      const nextManagerId = showReportingManager
+        ? data.reportingManagerId ?? null
+        : undefined;
+      const nextHrId = showAssignedHr ? data.assignedHrEmployeeId ?? null : undefined;
+      const managerChanged =
+        showReportingManager &&
+        (nextManagerId ?? null) !== (user?.reportingManagerId ?? null);
+      const hrChanged =
+        showAssignedHr &&
+        (nextHrId ?? null) !== (user?.assignedHrEmployeeId ?? null);
+
+      if (!managerChanged && !hrChanged) {
+        setSubmitError("No changes to save.");
+        return;
+      }
+
       const payload: UpdateProvisioningReportingContactsInput = {
         employeeId: data.employeeId,
-        // Only persist fields that are visible — avoid clearing the other contact.
-        reportingManagerId: showReportingManager
-          ? data.reportingManagerId ?? null
-          : undefined,
-        assignedHrEmployeeId: showAssignedHr
-          ? data.assignedHrEmployeeId ?? null
-          : undefined,
+        reportingManagerId: showReportingManager ? nextManagerId : undefined,
+        assignedHrEmployeeId: showAssignedHr ? nextHrId : undefined,
       };
       const result = await updateProvisioningReportingContactsAction(payload);
       if (!result.success) {
@@ -407,7 +419,12 @@ export function CeoProvisioningReportingContactsDialog({
         return;
       }
       onOpenChange(false);
-      onSaved();
+      onSaved(
+        reportingContactsSuccessMessage({
+          managerChanged,
+          hrChanged,
+        }),
+      );
     });
   });
 
@@ -426,32 +443,29 @@ export function CeoProvisioningReportingContactsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(90vh,40rem)] w-full flex-col gap-0 overflow-visible sm:max-w-xl">
+        <DialogHeader className="shrink-0 space-y-1.5 pr-8">
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col gap-5 pt-4">
           {submitError ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
               {submitError}
             </p>
           ) : null}
           {showReportingManager || showAssignedHr ? (
-            <div
-              className={
-                showReportingManager && showAssignedHr
-                  ? "grid gap-3 sm:grid-cols-2"
-                  : "grid gap-3"
-              }
-            >
+            <div className="grid gap-4">
               {showReportingManager ? (
                 <div className="space-y-2">
-                  <Label>Manager</Label>
+                  <Label htmlFor="provisioning-manager">Manager</Label>
                   <LabeledSelect
+                    id="provisioning-manager"
                     value={form.watch("reportingManagerId") ?? "__none__"}
                     placeholder="Select manager"
                     items={managerItems}
+                    triggerClassName="h-10 w-full min-w-0 bg-white dark:bg-input"
+                    contentClassName="z-[1200] max-h-64 min-w-[var(--anchor-width)] w-[var(--anchor-width)]"
                     onValueChange={(value) =>
                       form.setValue(
                         "reportingManagerId",
@@ -464,11 +478,14 @@ export function CeoProvisioningReportingContactsDialog({
               ) : null}
               {showAssignedHr ? (
                 <div className="space-y-2">
-                  <Label>HR contact</Label>
+                  <Label htmlFor="provisioning-hr">HR contact</Label>
                   <LabeledSelect
+                    id="provisioning-hr"
                     value={form.watch("assignedHrEmployeeId") ?? ""}
                     placeholder="Select HR contact"
                     items={hrItems}
+                    triggerClassName="h-10 w-full min-w-0 bg-white dark:bg-input"
+                    contentClassName="z-[1200] max-h-64 min-w-[var(--anchor-width)] w-[var(--anchor-width)]"
                     onValueChange={(value) =>
                       form.setValue("assignedHrEmployeeId", value || null, {
                         shouldValidate: true,
@@ -479,7 +496,7 @@ export function CeoProvisioningReportingContactsDialog({
               ) : null}
             </div>
           ) : null}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="mt-auto flex justify-end gap-2 border-t border-border/70 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

@@ -18,7 +18,8 @@ import { signPayload, verifySignedPayload } from "@/lib/security/hmac";
  */
 
 const COOKIE_NAME = "hrms_permissions";
-const TTL_SECONDS = 5 * 60;
+/** Keep soft-nav RSC cache warm longer; codes still fail-closed on expiry/HMAC. */
+const TTL_SECONDS = 15 * 60;
 /** Stay under Chromium's 4096 name+value limit with headroom for cookie name + attributes. */
 const MAX_CHUNK_BYTES = 3000;
 const MAX_CHUNKS = 8;

@@ -5,6 +5,8 @@ import {
   ORGANIZATION_LOGO_MAX_BYTES,
   ORGANIZATION_LOGO_PATH_PREFIX,
 } from "@/lib/organization/constants";
+import { cache } from "react";
+import { createClient } from "@/lib/supabase/server";
 
 export function buildOrganizationLogoStoragePath(
   organizationId: string,
@@ -14,12 +16,19 @@ export function buildOrganizationLogoStoragePath(
   return `${organizationId}/${ORGANIZATION_LOGO_PATH_PREFIX}/logo.${safeExt}`;
 }
 
+const getOrganizationLogoSignedUrlMemo = cache(
+  async (logoStoragePath: string): Promise<string | null> => {
+    const supabase = await createClient();
+    return createSignedStorageUrl(supabase, ASSET_IMAGE_BUCKET, logoStoragePath);
+  },
+);
+
 export async function getOrganizationLogoSignedUrl(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   logoStoragePath: string | null | undefined,
 ): Promise<string | null> {
   if (!logoStoragePath) return null;
-  return createSignedStorageUrl(supabase, ASSET_IMAGE_BUCKET, logoStoragePath);
+  return getOrganizationLogoSignedUrlMemo(logoStoragePath);
 }
 
 export async function uploadOrganizationLogo(

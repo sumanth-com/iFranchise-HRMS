@@ -4,6 +4,10 @@
  * Identification is explicit (IDs/emails), never a broad "@gmail.com" filter.
  */
 
+import {
+  excludeItSystemAccountFromEmployeeQuery,
+} from "@/lib/employees/it-system-account";
+
 /** Work emails of Gmail shell/duplicate profiles marked app-hidden. */
 export const APP_HIDDEN_EMPLOYEE_EMAILS = [
   "codegai.official@gmail.com",
@@ -44,10 +48,14 @@ export function isEmployeeAppVisible(row: {
 /**
  * Defense-in-depth filter for employee queries (esp. service-role / admin clients
  * that bypass RLS). Prefer chaining after .from("employees").
+ * Excludes app-hidden rows and the IT system account from workforce surfaces.
  */
-export function filterAppVisibleEmployees<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  T extends { is: (column: string, value: null) => any },
->(query: T): T {
-  return query.is("app_hidden_at", null) as T;
+export function filterAppVisibleEmployees<T>(query: T): T {
+  const withHidden = (query as { is: (column: string, value: null) => unknown }).is(
+    "app_hidden_at",
+    null,
+  );
+  return excludeItSystemAccountFromEmployeeQuery(
+    withHidden as { neq: (column: string, value: string) => unknown },
+  ) as T;
 }

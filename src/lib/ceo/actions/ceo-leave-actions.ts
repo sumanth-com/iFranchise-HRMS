@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import {
   buildCeoLeaveInsights,
   countManagersOnLeaveNextWeek,
@@ -221,6 +222,7 @@ export async function approveCeoLeaveAction(
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
     revalidatePath(CEO_ROUTES.leave);
+    revalidateCeoDashboardHome();
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -248,6 +250,7 @@ export async function rejectCeoLeaveAction(
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
     revalidatePath(CEO_ROUTES.leave);
+    revalidateCeoDashboardHome();
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -293,6 +296,7 @@ export async function bulkApproveCeoLeaveAction(
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
     revalidatePath(CEO_ROUTES.leave);
+    revalidateCeoDashboardHome();
 
     return { success: true, data: { succeeded, failed, errors } };
   } catch (error) {
@@ -341,6 +345,7 @@ export async function bulkRejectCeoLeaveAction(
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
     revalidatePath(CEO_ROUTES.leave);
+    revalidateCeoDashboardHome();
 
     return { success: true, data: { succeeded, failed, errors } };
   } catch (error) {

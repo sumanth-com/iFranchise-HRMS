@@ -1,3 +1,8 @@
+import { normalizeEmployeeEmail } from "@/lib/employees/app-hidden";
+import {
+  IT_SYSTEM_ACCOUNT_EMAIL,
+  isItSystemAccount,
+} from "@/lib/employees/it-system-account";
 import {
   PORTAL_SWITCH_LINKS,
   SYSTEM_ADMIN_PERMISSION,
@@ -14,7 +19,20 @@ export const PORTAL_SWITCH_PERMISSION_MAP: Record<string, string> = {
   employee: "portal.employee.access",
 };
 
+/** Only this authenticated email may see the top-right Portal Switcher. */
+export const PORTAL_SWITCHER_ALLOWED_EMAIL = IT_SYSTEM_ACCOUNT_EMAIL;
+
 export type PortalSwitchLink = (typeof PORTAL_SWITCH_LINKS)[number];
+
+/**
+ * Visibility gate for the portal switcher (UI only).
+ * Uses the authenticated email identity — not roles or permissions.
+ */
+export function canSeePortalSwitcher(
+  email: string | null | undefined,
+): boolean {
+  return isItSystemAccount({ email: normalizeEmployeeEmail(email) || email });
+}
 
 /** Filter registry by live permission codes (no role/email shortcuts). */
 export function filterPortalSwitchLinks(

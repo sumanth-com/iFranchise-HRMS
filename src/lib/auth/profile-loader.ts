@@ -102,8 +102,9 @@ export type LoadUserProfileOptions = {
    * HMAC-verified permission codes from the signed cookie.
    * When provided and non-empty, skips get_user_permission_codes RPC.
    * Callers must only pass codes from getVerifiedPermissionCodesForUser.
+   * May be a Promise so cookie verify overlaps the employee/org queries.
    */
-  verifiedPermissionCodes?: string[] | null;
+  verifiedPermissionCodes?: string[] | null | Promise<string[] | null>;
 };
 
 export const loadUserProfile = cache(async function loadUserProfile(
@@ -247,10 +248,13 @@ export const loadUserProfile = cache(async function loadUserProfile(
 
   const roleIds = userRoleRows.map((row) => row.role_id);
 
+  const resolvedPermissionCodes = await Promise.resolve(
+    options?.verifiedPermissionCodes,
+  );
   const cachedPermissionCodes =
-    Array.isArray(options?.verifiedPermissionCodes) &&
-    options.verifiedPermissionCodes.length > 0
-      ? options.verifiedPermissionCodes
+    Array.isArray(resolvedPermissionCodes) &&
+    resolvedPermissionCodes.length > 0
+      ? resolvedPermissionCodes
       : null;
 
   // Layout critical path: skip storage signing (caller may load logo after paint).

@@ -23,12 +23,15 @@ import { notifyProvisioningStakeholders } from "@/lib/user-provisioning/notifica
 import type { UserProfile } from "@/types/auth";
 import { ROLE_LABELS } from "@/types/ceo-user-provisioning";
 import type {
+  BulkUpdateProvisioningReportingContactsInput,
   ChangeProvisioningRoleInput,
   InviteExecutiveUserInput,
   InviteExistingEmployeeInput,
   UpdatePendingProvisioningUserInput,
   UpdateProvisioningReportingContactsInput,
 } from "@/lib/validations/ceo-user-provisioning";
+import { provisioningContactFieldVisibility } from "@/lib/ceo/provisioning-contact-fields";
+import { bulkReportingContactsSuccessMessage } from "@/lib/ceo/provisioning-reporting-messages";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
@@ -367,6 +370,110 @@ export async function updateProvisioningReportingContacts(
       assignedHrEmployeeId: input.assignedHrEmployeeId ?? null,
     },
   );
+}
+
+export async function bulkUpdateProvisioningReportingContacts(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: BulkUpdateProvisioningReportingContactsInput,
+): Promise<{ updatedCount: number; message: string }> {
+  if (!input.updateManager && !input.updateHr) {
+    throw new Error("Select a manager and/or HR contact to update.");
+  }
+
+  const admin = createAdminClient();
+  const uniqueIds = [...new Set(input.employeeIds)];
+
+  const { data: employees, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id, first_name, last_name, reporting_manager_id, assigned_hr_employee_id")
+    .eq("organization_id", profile.employee.organizationId)
+    .in("id", uniqueIds)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+  if (!employees?.length) throw new Error("No matching employees found.");
+
+  let updatedCount = 0;
+
+  for (const row of employees as LooseRow[]) {
+    const employeeId = String(row.id);
+    const roleCode =
+      (await resolveEmployeeRoleCode(
+        supabase,
+        profile.employee.organizationId,
+        employeeId,
+      )) ?? "employee";
+
+    const visibility = provisioningContactFieldVisibility({
+      roleCode,
+    } as Parameters<typeof provisioningContactFieldVisibility>[0]);
+
+    const updates: Record<string, unknown> = {
+      updated_by: profile.userId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.updateManager && visibility.showReportingManager) {
+      updates.reporting_manager_id = input.reportingManagerId ?? null;
+    }
+    if (input.updateHr && visibility.showAssignedHr) {
+      updates.assigned_hr_employee_id = input.assignedHrEmployeeId ?? null;
+    }
+
+    if (
+      updates.reporting_manager_id === undefined &&
+      updates.assigned_hr_employee_id === undefined
+    ) {
+      continue;
+    }
+
+    const { error: updateError } = await admin
+      .schema("hrms")
+      .from("employees")
+      .update(updates)
+      .eq("id", employeeId)
+      .eq("organization_id", profile.employee.organizationId);
+
+    if (updateError) throw new Error(updateError.message);
+
+    await audit(
+      supabase,
+      profile,
+      "employee.updated",
+      `Bulk updated reporting contacts for ${row.first_name} ${row.last_name}`,
+      employeeId,
+      {
+        employeeId,
+        reportingManagerId:
+          updates.reporting_manager_id !== undefined
+            ? updates.reporting_manager_id
+            : row.reporting_manager_id,
+        assignedHrEmployeeId:
+          updates.assigned_hr_employee_id !== undefined
+            ? updates.assigned_hr_employee_id
+            : row.assigned_hr_employee_id,
+        bulk: true,
+      },
+    );
+    updatedCount += 1;
+  }
+
+  if (updatedCount === 0) {
+    throw new Error(
+      "None of the selected employees can receive manager or HR contact updates.",
+    );
+  }
+
+  return {
+    updatedCount,
+    message: bulkReportingContactsSuccessMessage({
+      managerChanged: input.updateManager,
+      hrChanged: input.updateHr,
+      employeeCount: updatedCount,
+    }),
+  };
 }
 
 export async function resendExecutiveInvitation(

@@ -12,8 +12,7 @@ import {
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import {
-  DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
-  type EmploymentCategoryFilter,
+  parseEmploymentCategoryFilter,
 } from "@/lib/employees/employment-category";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { employeeListParamsSchema } from "@/lib/validations/employee";
@@ -27,15 +26,6 @@ function firstString(
   value: string | string[] | undefined,
 ): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function parseEmploymentCategory(
-  value: string | undefined,
-): EmploymentCategoryFilter {
-  if (value === "all" || value === "probation" || value === "full_time") {
-    return value;
-  }
-  return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
 export default async function EmployeesPage({ searchParams }: EmployeesPageProps) {
@@ -60,7 +50,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
       department: rawDepartment,
       employmentStatus: firstString(rawParams.employmentStatus),
       accountStatus: firstString(rawParams.accountStatus),
-      employmentCategory: parseEmploymentCategory(firstString(rawParams.employmentCategory)),
+      employmentCategory: parseEmploymentCategoryFilter(firstString(rawParams.employmentCategory)),
     });
 
     const [departments, lookups, result] = await Promise.all([
@@ -155,7 +145,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     department: departmentCode,
     employmentStatus: firstString(rawParams.employmentStatus),
     accountStatus: firstString(rawParams.accountStatus),
-    employmentCategory: parseEmploymentCategory(firstString(rawParams.employmentCategory)),
+    employmentCategory: parseEmploymentCategoryFilter(firstString(rawParams.employmentCategory)),
   });
 
   const [lookups, result] = await Promise.all([

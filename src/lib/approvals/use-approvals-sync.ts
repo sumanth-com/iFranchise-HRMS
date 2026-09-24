@@ -55,7 +55,11 @@ type UseApprovalsSyncOptions = {
 export function useApprovalsSync({
   onRefresh,
   tables,
-  pollIntervalMs = 12000,
+  /**
+   * Periodic fallback poll. Default 0 (off): realtime + focus/visibility +
+   * cross-tab broadcast already refresh. Enable only when a surface needs it.
+   */
+  pollIntervalMs = 0,
   enabled = true,
 }: UseApprovalsSyncOptions) {
   const refreshRef = useRef(onRefresh);
@@ -145,13 +149,16 @@ export function useApprovalsSync({
 
     channel.subscribe();
 
-    // 5. Periodic polling while tab is open as fallback
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        lastFocusRefreshAt.current = Date.now();
-        void refreshRef.current();
-      }
-    }, pollIntervalMs);
+    // 5. Optional periodic polling (off by default — avoids competing RSC/action storms)
+    const intervalId =
+      pollIntervalMs > 0
+        ? setInterval(() => {
+            if (document.visibilityState === "visible") {
+              lastFocusRefreshAt.current = Date.now();
+              void refreshRef.current();
+            }
+          }, pollIntervalMs)
+        : null;
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);

@@ -124,6 +124,29 @@ export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Team Payroll summary cards — always derive from the same employee payroll rows. */
+export function sumPayrollEmployeeRowTotals(
+  items: Array<{
+    grossSalary: number;
+    totalDeductions: number;
+    netSalary: number;
+  }>,
+): {
+  employeeCount: number;
+  totalGross: number;
+  totalDeductions: number;
+  totalNet: number;
+} {
+  return {
+    employeeCount: items.length,
+    totalGross: roundCurrency(items.reduce((sum, item) => sum + Number(item.grossSalary ?? 0), 0)),
+    totalDeductions: roundCurrency(
+      items.reduce((sum, item) => sum + Number(item.totalDeductions ?? 0), 0),
+    ),
+    totalNet: roundCurrency(items.reduce((sum, item) => sum + Number(item.netSalary ?? 0), 0)),
+  };
+}
+
 export function displaySalaryBankDetails<T extends {
   bankName: string;
   ifscCode?: string | null;
@@ -633,6 +656,40 @@ export function mapPayrollDisplayAmounts(input: {
       breakdown,
       input.totalAllowances,
     ),
+  };
+}
+
+/**
+ * Team Payroll "Final payable" month total — same row formula as the payroll sheet
+ * (`mapPayrollDisplayAmounts` / `resolveFinalPayableAmount`).
+ */
+export function sumPayrollFinalPayableTotals(
+  items: Array<{
+    basicSalary: number;
+    grossSalary: number;
+    netSalary: number;
+    totalDeductions: number;
+    totalAllowances: number;
+    breakdown?: PayrollBreakdown | null;
+  }>,
+): {
+  employeeCount: number;
+  totalFinalPayable: number;
+} {
+  let totalFinalPayable = 0;
+  for (const item of items) {
+    totalFinalPayable += mapPayrollDisplayAmounts({
+      basicSalary: Number(item.basicSalary ?? 0),
+      grossSalary: Number(item.grossSalary ?? 0),
+      netSalary: Number(item.netSalary ?? 0),
+      totalDeductions: Number(item.totalDeductions ?? 0),
+      totalAllowances: Number(item.totalAllowances ?? 0),
+      breakdown: item.breakdown ?? null,
+    }).finalPayable;
+  }
+  return {
+    employeeCount: items.length,
+    totalFinalPayable: roundCurrency(totalFinalPayable),
   };
 }
 

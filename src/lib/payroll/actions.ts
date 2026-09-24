@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { siteConfig } from "@/config/site";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
@@ -165,6 +166,7 @@ function revalidatePayrollPaths() {
   revalidatePath(PAYROLL_ROUTES.payslips);
   revalidatePath(SELF_PAYROLL_ROUTES.list);
   revalidatePath(CEO_ROUTES.payroll);
+  revalidateCeoDashboardHome();
   revalidatePath("/accountant/payroll");
   revalidatePath("/accountant/finance");
 }

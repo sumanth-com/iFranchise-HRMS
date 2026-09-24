@@ -178,7 +178,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(payroll.breakdown.attendance.lopDays, 3);
     assert.equal(lop?.amount, 3_000);
-    // 20 present + 8 holiday = 28 (week_off ignored)
+    // 20 present + 8 holiday = 28 (week_off ignored); Absent/sandwich excluded from paid days
     assert.equal(payroll.grossSalary, 28_000);
     assert.equal(payroll.netSalary, 27_800);
   });

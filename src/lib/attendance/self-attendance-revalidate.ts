@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
@@ -26,6 +27,7 @@ export function revalidateEmployeeFacingAttendancePaths() {
   revalidatePath(MANAGER_ROUTES.home);
   revalidatePath(MANAGER_ROUTES.attendance);
   revalidatePath(CEO_ROUTES.attendance);
+  revalidateCeoDashboardHome();
   revalidatePath(SYSTEM_ADMIN_ROUTES.home);
   revalidatePath(SYSTEM_ADMIN_ROUTES.attendance);
 }

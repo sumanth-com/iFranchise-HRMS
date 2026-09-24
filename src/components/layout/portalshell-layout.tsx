@@ -69,9 +69,13 @@ async function ResolvedPortalShell({
     redirect(AUTH_ROUTES.login);
   }
 
+  // Overlap tablet UA check with profile load (independent of DB).
   const profileStartedAt = performance.now();
-  const profileResult = await getLayoutUserProfile(user.id, email, supabase);
-  logLayout("layout:getLayoutUserProfile", profileStartedAt);
+  const [profileResult, tabletClient] = await Promise.all([
+    getLayoutUserProfile(user.id, email, supabase),
+    isTabletClientRequest(),
+  ]);
+  logLayout("layout:getLayoutUserProfile+tablet", profileStartedAt);
 
   if (!profileResult.success) {
     if (profileResult.error !== "PROFILE_LOOKUP_FAILED") {
@@ -95,7 +99,6 @@ async function ResolvedPortalShell({
 
   logLayout("layout:total_before_children", layoutStartedAt);
 
-  const tabletClient = await isTabletClientRequest();
   const tabletAllowed =
     portalVariant !== "employee" ||
     isTabletHrmsAllowed(profileResult.profile, tabletClient);

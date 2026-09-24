@@ -9,6 +9,7 @@ import {
   CeoModulePageHeader,
 } from "@/components/ceo/ceo-module-primitives";
 import { CeoInviteUserDialog } from "@/components/ceo/user-provisioning/ceo-invite-user-dialog";
+import { CeoProvisioningBulkAssignDialog } from "@/components/ceo/user-provisioning/ceo-provisioning-bulk-assign-dialog";
 import {
   CeoPendingEditDialog,
   CeoPendingRoleDialog,
@@ -96,6 +97,7 @@ export function CeoUserProvisioningView({
   const [roleUser, setRoleUser] = useState<CeoProvisioningUser | null>(null);
   const [reportingContactsUser, setReportingContactsUser] =
     useState<CeoProvisioningUser | null>(null);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
 
   const refreshModuleData = useCallback(
     async (next: CeoProvisioningListParams, options?: { showRefreshing?: boolean }) => {
@@ -257,6 +259,7 @@ export function CeoUserProvisioningView({
         busyEmployeeId={busyEmployeeId}
         showFilters={variant === "hr"}
         onAction={requestAction}
+        onOpenBulkAssign={() => setBulkAssignOpen(true)}
       />
 
       <CeoInviteUserDialog
@@ -301,8 +304,19 @@ export function CeoUserProvisioningView({
         onOpenChange={(open) => {
           if (!open) setReportingContactsUser(null);
         }}
-        onSaved={() => {
-          toast.success("HR contact updated.");
+        onSaved={(message) => {
+          toast.success(message);
+          void refreshList(pageParams);
+        }}
+      />
+
+      <CeoProvisioningBulkAssignDialog
+        open={bulkAssignOpen}
+        users={users?.data ?? []}
+        lookups={lookups}
+        onOpenChange={setBulkAssignOpen}
+        onSaved={(message) => {
+          toast.success(message);
           void refreshList(pageParams);
         }}
       />

@@ -1,6 +1,6 @@
 export const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set([
-  // IF2026000 (it@ifranchise.in / IT Team) is a real Super Admin employee and
-  // must appear in payroll, reimbursements, and people lists — do not hide it.
+  // IT system operator — authenticates / portal-switches, never a workforce employee.
+  "IF2026000",
   "IF-MGR-001",
   "IF2026016",
 ]);
@@ -12,6 +12,7 @@ import {
   formatDesignationDisplay,
   normalizeEmployeeCode,
 } from "@/lib/employees/designation-display";
+import { isItSystemAccount } from "@/lib/employees/it-system-account";
 
 export { normalizeEmployeeCode };
 
@@ -38,8 +39,17 @@ function isDirectorySumanth(person?: DirectoryPersonName): boolean {
 
 export function isHiddenFromEmployeeDirectory(
   employeeCode: string | null | undefined,
-  person?: DirectoryPersonName,
+  person?: DirectoryPersonName & { email?: string | null },
 ): boolean {
+  if (
+    isItSystemAccount({
+      email: person?.email,
+      employeeCode,
+    })
+  ) {
+    return true;
+  }
+
   if (DIRECTORY_HIDDEN_EMPLOYEE_CODES.has(normalizeEmployeeCode(employeeCode))) {
     return true;
   }
@@ -63,7 +73,7 @@ export function isHiddenFromEmployeeDirectory(
 /** Hidden from employee/department filter dropdowns across HRMS modules. */
 export function isHiddenFromPeopleFilters(
   employeeCode: string | null | undefined,
-  person?: DirectoryPersonName,
+  person?: DirectoryPersonName & { email?: string | null },
 ): boolean {
   if (isHiddenFromEmployeeDirectory(employeeCode, person)) return true;
   const designation = (person?.designationTitle ?? "").trim().toLowerCase();
@@ -80,6 +90,7 @@ const ATTENDANCE_EXCLUDED_DESIGNATION_CODES = new Set([
 
 type AttendanceWorkforcePerson = DirectoryPersonName & {
   designationCode?: string | null;
+  email?: string | null;
 };
 
 /**
@@ -91,6 +102,7 @@ export function isExcludedFromAttendanceWorkforce(
   person?: AttendanceWorkforcePerson,
 ): boolean {
   if (isHiddenFromPeopleFilters(employeeCode, person)) return true;
+  if (isItSystemAccount({ email: person?.email, employeeCode })) return true;
 
   const fullName = directoryFullName(person);
   if (fullName.includes("abrar")) return true;
@@ -125,9 +137,10 @@ export function isExcludedFromAttendanceWorkforce(
 
 export function isExcludedFromTeamPayslips(
   employeeCode: string | null | undefined,
-  person?: DirectoryPersonName,
+  person?: DirectoryPersonName & { email?: string | null },
 ): boolean {
   if (isHiddenFromEmployeeDirectory(employeeCode, person)) return true;
+  if (isItSystemAccount({ email: person?.email, employeeCode })) return true;
 
   const fullName = directoryFullName(person);
   const designation = (person?.designationTitle ?? "").trim().toLowerCase();

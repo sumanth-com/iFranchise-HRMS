@@ -15,7 +15,17 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
-export default async function CeoApprovalsPage({
+export default function CeoApprovalsPage({
+  searchParams,
+}: CeoApprovalsPageProps) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <CeoApprovalsContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function CeoApprovalsContent({
   searchParams,
 }: CeoApprovalsPageProps) {
   await requireServerPermission(PORTAL_PERMISSIONS.ceo);
@@ -36,9 +46,5 @@ export default async function CeoApprovalsPage({
 
   const data = await getCeoApprovalsModuleData(parsed);
 
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <CeoApprovalsView {...data} initialFilters={parsed} />
-    </Suspense>
-  );
+  return <CeoApprovalsView {...data} initialFilters={parsed} />;
 }

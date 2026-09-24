@@ -76,6 +76,11 @@ import {
   applySundayHolidaysToAttendanceSummary,
 } from "@/lib/payroll/services/payroll-attendance-holidays";
 import {
+  applyPayrollAttendanceDay,
+  mergePayrollLeaveSummary,
+  type PayrollAttendanceDayRow,
+} from "@/lib/payroll/services/payroll-attendance-leave-sync";
+import {
   generatePayslipNumber,
   formatPayrollMonth,
   formatPayrollMonthLabel,
@@ -84,6 +89,7 @@ import {
   parsePayrollMonthFromPayslipNumber,
   roundCurrency,
   resolvePayrollReimbursement,
+  sumPayrollEmployeeRowTotals,
 } from "@/lib/payroll/services/payroll-utils";
 import { isRowLevelSecurityError } from "@/lib/errors/user-messages";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
@@ -180,8 +186,9 @@ async function getActiveEmployees(
   organizationId: string,
   periodEnd?: string,
 ) {
-  // Use service role so eligible employees (including IT Team) are never
-  // omitted from payroll because of caller RLS/visibility quirks.
+  // Use service role so eligible employees are never omitted from payroll
+  // because of caller RLS/visibility quirks. IT system account is excluded
+  // via isPayrollEligibleEmployee (not a workforce payroll member).
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
@@ -578,7 +585,7 @@ async function getAttendanceSummary(
   month: number,
   year: number,
   options?: { asOfDate?: Date },
-): Promise<AttendanceSummary> {
+): Promise<{ attendance: AttendanceSummary; leaveSummary: LeaveMonthSummary }> {
   const monthRange = getMonthDateRange(month, year);
   const applicable = resolvePayrollApplicablePeriod(month, year, { today: options?.asOfDate });
   const queryEnd =
@@ -590,7 +597,7 @@ async function getAttendanceSummary(
   const { data, error } = await supabase
     .schema("hrms")
     .from("attendance")
-    .select("attendance_status, overtime_hours, attendance_date, organization_id")
+    .select("attendance_status, overtime_hours, attendance_date, organization_id, notes")
     .eq("employee_id", employeeId)
     .gte("attendance_date", monthRange.startDate)
     .lte("attendance_date", queryEnd)
@@ -601,13 +608,24 @@ async function getAttendanceSummary(
   const summary = emptyAttendanceSummary();
   const occupiedDates: string[] = [];
   const statusByDate = new Map<string, string | null | undefined>();
+  const attendanceRows: PayrollAttendanceDayRow[] = [];
   let organizationId: string | null = null;
   let joiningDate: string | null = null;
 
   for (const row of data ?? []) {
     const date = String(row.attendance_date).slice(0, 10);
     statusByDate.set(date, row.attendance_status);
-    applyAttendanceStatus(summary, row.attendance_status, Number(row.overtime_hours ?? 0));
+    attendanceRows.push({
+      attendance_status: row.attendance_status,
+      notes: row.notes,
+      overtime_hours: row.overtime_hours,
+    });
+    applyPayrollAttendanceDay(
+      summary,
+      row.attendance_status,
+      Number(row.overtime_hours ?? 0),
+      row.notes,
+    );
     if (occupiedAttendanceDate(row.attendance_status)) {
       occupiedDates.push(date);
     }
@@ -635,7 +653,7 @@ async function getAttendanceSummary(
   // (open months use month end — not capped at today).
   const holidayCreditEnd = queryEnd;
 
-  const [leaveSummary, officialHolidays] = await Promise.all([
+  const [leaveRequestSummary, officialHolidays] = await Promise.all([
     getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate: options?.asOfDate }),
     loadOfficialHolidayDates(
       supabase,
@@ -644,6 +662,11 @@ async function getAttendanceSummary(
       holidayCreditEnd,
     ),
   ]);
+
+  const leaveSummary = mergePayrollLeaveSummary({
+    attendanceRows,
+    requestSummary: leaveRequestSummary,
+  });
 
   const holidayPeriodStart =
     joiningDate && joiningDate > monthRange.startDate ? joiningDate : monthRange.startDate;
@@ -667,7 +690,7 @@ async function getAttendanceSummary(
     officialHolidays,
   );
 
-  return summary;
+  return { attendance: summary, leaveSummary };
 }
 
 async function getLeaveMonthSummary(
@@ -896,34 +919,10 @@ function emptyAttendanceSummary(): AttendanceSummary {
 function applyAttendanceStatus(
   summary: AttendanceSummary,
   status: string | null | undefined,
-  _overtimeHours: number,
+  overtimeHours: number,
+  notes?: string | null,
 ) {
-  switch (status) {
-    case "present":
-      summary.presentDays += 1;
-      break;
-    case "late":
-      summary.presentDays += 1;
-      summary.lateDays += 1;
-      break;
-    case "absent":
-      summary.absentDays += 1;
-      break;
-    case "half_day":
-      summary.halfDays += 1;
-      break;
-    case "on_leave":
-      summary.onLeaveDays += 1;
-      break;
-    case "week_off":
-      summary.weekOffDays += 1;
-      break;
-    case "holiday":
-      summary.holidayDays += 1;
-      break;
-    default:
-      break;
-  }
+  applyPayrollAttendanceDay(summary, status, overtimeHours, notes);
 }
 
 async function loadPayrollPeriodFacts(
@@ -937,6 +936,7 @@ async function loadPayrollPeriodFacts(
   const structuresByEmployee = new Map<string, SalaryStructureRow>();
   const attendanceByEmployee = new Map<string, AttendanceSummary>();
   const leaveByEmployee = new Map<string, LeaveMonthSummary>();
+  const attendanceRowsByEmployee = new Map<string, PayrollAttendanceDayRow[]>();
   const bonusesByEmployee = new Map<string, Array<{ amount: number | string; bonus_type: string }>>();
   const reimbursementsByEmployee = new Map<
     string,
@@ -946,6 +946,7 @@ async function loadPayrollPeriodFacts(
   for (const id of employeeIds) {
     attendanceByEmployee.set(id, emptyAttendanceSummary());
     leaveByEmployee.set(id, { lopDays: 0, paidLeaveDays: 0, sandwichDates: [] });
+    attendanceRowsByEmployee.set(id, []);
     bonusesByEmployee.set(id, []);
     reimbursementsByEmployee.set(id, []);
   }
@@ -992,7 +993,7 @@ async function loadPayrollPeriodFacts(
         admin
           .schema("hrms")
           .from("attendance")
-          .select("employee_id, organization_id, attendance_date, attendance_status, overtime_hours")
+          .select("employee_id, organization_id, attendance_date, attendance_status, overtime_hours, notes")
           .in("employee_id", chunk)
           .gte("attendance_date", queryStart)
           .lte("attendance_date", queryEnd)
@@ -1001,7 +1002,7 @@ async function loadPayrollPeriodFacts(
           .schema("hrms")
           .from("leave_requests")
           .select(
-            "employee_id, total_days, duration_breakdown, leave_types!inner(code, is_paid)",
+            "employee_id, start_date, end_date, total_days, duration_breakdown, leave_types!inner(code, is_paid)",
           )
           .in("employee_id", chunk)
           .eq("leave_status", "approved")
@@ -1063,7 +1064,18 @@ async function loadPayrollPeriodFacts(
         statusByEmployeeDate.set(row.employee_id, statusMap);
       }
       statusMap.set(date, row.attendance_status);
-      applyAttendanceStatus(summary, row.attendance_status, Number(row.overtime_hours ?? 0));
+      const dayRow: PayrollAttendanceDayRow = {
+        attendance_status: row.attendance_status,
+        notes: row.notes,
+        overtime_hours: row.overtime_hours,
+      };
+      attendanceRowsByEmployee.get(row.employee_id)?.push(dayRow);
+      applyPayrollAttendanceDay(
+        summary,
+        row.attendance_status,
+        Number(row.overtime_hours ?? 0),
+        row.notes,
+      );
       if (row.organization_id) {
         organizationByEmployee.set(row.employee_id, String(row.organization_id));
       }
@@ -1077,6 +1089,8 @@ async function loadPayrollPeriodFacts(
     const leaveRowsByEmployee = new Map<
       string,
       Array<{
+        start_date?: string | null;
+        end_date?: string | null;
         total_days?: number | string | null;
         duration_breakdown?: { lopDays?: unknown; paidDays?: unknown } | null;
         leave_types?: { code?: string; is_paid?: boolean } | { code?: string; is_paid?: boolean }[] | null;
@@ -1089,9 +1103,34 @@ async function loadPayrollPeriodFacts(
     }
 
     for (const [employeeId, rows] of leaveRowsByEmployee) {
+      const requestSummary = summarizeLeaveRows(rows, {
+        periodStart: queryStart,
+        periodEnd: queryEnd,
+      });
       leaveByEmployee.set(
         employeeId,
-        summarizeLeaveRows(rows, { periodStart: queryStart, periodEnd: queryEnd }),
+        mergePayrollLeaveSummary({
+          attendanceRows: attendanceRowsByEmployee.get(employeeId) ?? [],
+          requestSummary,
+        }),
+      );
+    }
+
+    // Employees with attendance leave markers but no approved leave requests still need CL/EL/LOP sync.
+    for (const employeeId of chunk) {
+      if (leaveRowsByEmployee.has(employeeId)) continue;
+      const attendanceRows = attendanceRowsByEmployee.get(employeeId) ?? [];
+      if (attendanceRows.length === 0) continue;
+      leaveByEmployee.set(
+        employeeId,
+        mergePayrollLeaveSummary({
+          attendanceRows,
+          requestSummary: leaveByEmployee.get(employeeId) ?? {
+            lopDays: 0,
+            paidLeaveDays: 0,
+            sandwichDates: [],
+          },
+        }),
       );
     }
 
@@ -1369,11 +1408,10 @@ async function refreshEmployeePayrollItemForMonth(
     asOfDate,
   );
 
-  const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
+  const [salaryStructure, attendanceFacts, bonuses, reimbursements] =
     await Promise.all([
       getEffectiveSalaryStructure(admin, employeeId, month, year),
       getAttendanceSummary(admin, employeeId, month, year, { asOfDate }),
-      getLeaveMonthSummary(admin, employeeId, month, year, { asOfDate }),
       getPayableBonuses(admin, employeeId, [getPayrollMonthDate(month, year)], {
         includeAttached: true,
       }),
@@ -1382,6 +1420,7 @@ async function refreshEmployeePayrollItemForMonth(
         organizationId,
       }),
     ]);
+  const { attendance, leaveSummary } = attendanceFacts;
 
   const { data: existingItem } = await admin
     .schema("hrms")
@@ -1627,21 +1666,17 @@ export async function buildPayrollPreview(
     };
   });
 
-  const totalGross = roundCurrency(items.reduce((s, i) => s + i.grossSalary, 0));
-  const totalDeductions = roundCurrency(
-    items.reduce((s, i) => s + i.totalDeductions, 0),
-  );
-  const totalNet = roundCurrency(items.reduce((s, i) => s + i.netSalary, 0));
+  const totals = sumPayrollEmployeeRowTotals(items);
 
   return {
     month,
     year,
     payrollMonth: getPayrollMonthDate(month, year),
     items,
-    totalGross,
-    totalDeductions,
-    totalNet,
-    employeeCount: items.length,
+    totalGross: totals.totalGross,
+    totalDeductions: totals.totalDeductions,
+    totalNet: totals.totalNet,
+    employeeCount: totals.employeeCount,
   };
 }
 
@@ -1707,11 +1742,10 @@ export async function getEmployeeRunBreakdown(
     asOfDate,
   );
 
-  const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
+  const [salaryStructure, attendanceFacts, bonuses, reimbursements] =
     await Promise.all([
       getEffectiveSalaryStructure(supabase, employeeId, month, year),
       getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
-      getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate }),
       getPayableBonuses(
         supabase,
         employeeId,
@@ -1728,6 +1762,7 @@ export async function getEmployeeRunBreakdown(
         { includeAttached: true },
       ),
     ]);
+  const { attendance, leaveSummary } = attendanceFacts;
 
   const calc = calculateEmployeePayroll({
     month,
@@ -3678,11 +3713,10 @@ export async function refreshDraftPayrollItemsForEmployee(
       asOfDate,
     );
 
-    const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
+    const [salaryStructure, attendanceFacts, bonuses, reimbursements] =
       await Promise.all([
         getEffectiveSalaryStructure(supabase, employeeId, month, year),
         getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
-        getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate }),
         getPayableBonuses(supabase, employeeId, [getPayrollMonthDate(month, year)], {
           includeAttached: true,
         }),
@@ -3690,6 +3724,7 @@ export async function refreshDraftPayrollItemsForEmployee(
           includeAttached: true,
         }),
       ]);
+    const { attendance, leaveSummary } = attendanceFacts;
 
     const { data: existingItem } = await supabase
       .schema("hrms")
@@ -4653,15 +4688,15 @@ export async function getPayrollRunById(
       }];
   });
 
+  const totals = sumPayrollEmployeeRowTotals(visibleItems);
+
   return {
     id: payroll.id,
     payrollMonth: payroll.payroll_month,
     payrollStatus: payroll.payroll_status,
-    totalGross: roundCurrency(visibleItems.reduce((sum, item) => sum + item.grossSalary, 0)),
-    totalDeductions: roundCurrency(
-      visibleItems.reduce((sum, item) => sum + item.totalDeductions, 0),
-    ),
-    totalNet: roundCurrency(visibleItems.reduce((sum, item) => sum + item.netSalary, 0)),
+    totalGross: totals.totalGross,
+    totalDeductions: totals.totalDeductions,
+    totalNet: totals.totalNet,
     isLocked: Boolean(payroll.is_locked),
     notes: payroll.notes,
     processedAt: payroll.processed_at,

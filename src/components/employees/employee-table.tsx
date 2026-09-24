@@ -203,7 +203,6 @@ export function EmployeeTable({
       <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3">
         <EmploymentCategoryFilters
           value={employmentCategory ?? DEFAULT_EMPLOYMENT_CATEGORY_FILTER}
-          disabled={isPending}
           onChange={(value) =>
             updateParams({
               employmentCategory: value === "all" ? undefined : value,

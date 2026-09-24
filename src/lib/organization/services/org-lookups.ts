@@ -3,6 +3,10 @@ import { cache } from "react";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
+import {
+  IT_SYSTEM_ACCOUNT_CODE,
+  IT_SYSTEM_ACCOUNT_EMAIL,
+} from "@/lib/employees/it-system-account";
 import type { LookupOption } from "@/types/employee";
 
 export function unwrapRelation<T>(value: T | T[] | null): T | null {
@@ -158,6 +162,8 @@ export const getEmployeeLookups = cache(async function getEmployeeLookups(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .is("app_hidden_at", null)
+    .neq("email", IT_SYSTEM_ACCOUNT_EMAIL)
+    .neq("employee_code", IT_SYSTEM_ACCOUNT_CODE)
     .in("employment_status", ["active", "probation", "on_leave"])
     .order("first_name");
 

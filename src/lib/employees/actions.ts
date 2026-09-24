@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireAuthenticatedProfile,
@@ -124,6 +125,7 @@ function revalidateSelfProfilePaths() {
   revalidatePath("/dashboard/system/leave");
   revalidatePath("/dashboard/leave");
   revalidatePath("/ceo/leave");
+  revalidateCeoDashboardHome();
 }
 
 export async function fetchEmployeesAction(
@@ -171,6 +173,7 @@ export async function changeEmployeeEmploymentTypeAction(
     revalidatePath("/dashboard/attendance");
     revalidatePath("/dashboard/leave");
     revalidatePath("/dashboard/payroll");
+    revalidateCeoDashboardHome();
 
     return { success: true, data };
   } catch (error) {
@@ -235,6 +238,7 @@ export async function createEmployeeAction(
     }
 
     revalidatePath(EMPLOYEE_ROUTES.list);
+    revalidateCeoDashboardHome();
 
     return {
       success: true,
@@ -296,6 +300,7 @@ export async function deleteEmployeeAction(
     revalidatePath("/dashboard/payroll");
     revalidatePath("/employee");
     revalidatePath("/manager");
+    revalidateCeoDashboardHome();
 
     return { success: true, data: deleted };
   } catch (error) {

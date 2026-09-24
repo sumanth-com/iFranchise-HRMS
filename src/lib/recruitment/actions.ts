@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { managerOrPermissions } from "@/lib/manager/portal-scope";
@@ -65,6 +66,7 @@ function revalidateRecruitment() {
   revalidatePath(MANAGER_ROUTES.recruitmentOffers);
   revalidatePath(MANAGER_ROUTES.recruitmentOnboarding);
   revalidatePath("/dashboard/employees");
+  revalidateCeoDashboardHome();
 }
 
 export async function createJobOpeningAction(input: unknown): Promise<ActionResult<string>> {

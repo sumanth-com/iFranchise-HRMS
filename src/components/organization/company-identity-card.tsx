@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Trash2, Upload } from "lucide-react";
@@ -21,6 +22,10 @@ type Props = {
   canEdit: boolean;
   className?: string;
 };
+
+function isLocalPublicLogo(url: string) {
+  return url.startsWith("/") && !url.startsWith("//");
+}
 
 export function CompanyIdentityCard({
   companyName,
@@ -105,6 +110,10 @@ export function CompanyIdentityCard({
   };
 
   const showHoverActions = canEdit && (photoHovered || isPending);
+  const useOptimizedLocalLogo =
+    Boolean(previewUrl) &&
+    isLocalPublicLogo(previewUrl) &&
+    !previewUrl.startsWith("blob:");
 
   return (
     <div className={cn("relative mx-auto w-full max-w-[22rem]", className)}>
@@ -133,11 +142,24 @@ export function CompanyIdentityCard({
         >
           <div className="relative flex size-full items-center justify-center overflow-hidden rounded-2xl border bg-background/80 shadow-inner">
             {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt={`${companyName} logo`}
-                className="max-h-full max-w-full object-contain p-4"
-              />
+              useOptimizedLocalLogo ? (
+                <Image
+                  src={previewUrl}
+                  alt={`${companyName} logo`}
+                  width={512}
+                  height={494}
+                  className="max-h-full max-w-full object-contain p-4"
+                  sizes="(max-width: 768px) 80vw, 22rem"
+                  priority
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- signed/blob URLs
+                <img
+                  src={previewUrl}
+                  alt={`${companyName} logo`}
+                  className="max-h-full max-w-full object-contain p-4"
+                />
+              )
             ) : (
               <span className="flex size-16 items-center justify-center rounded-full bg-muted text-muted-foreground ring-1 ring-border">
                 <Camera className="size-7" strokeWidth={1.75} />

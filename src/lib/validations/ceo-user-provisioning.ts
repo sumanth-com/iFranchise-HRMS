@@ -64,6 +64,24 @@ export const updateProvisioningReportingContactsSchema = z.object({
   assignedHrEmployeeId: z.string().uuid().nullable().optional(),
 });
 
+export const bulkUpdateProvisioningReportingContactsSchema = z
+  .object({
+    employeeIds: z.array(z.string().uuid()).min(1, "Select at least one employee"),
+    reportingManagerId: z.string().uuid().nullable().optional(),
+    assignedHrEmployeeId: z.string().uuid().nullable().optional(),
+    updateManager: z.boolean().default(false),
+    updateHr: z.boolean().default(false),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.updateManager && !value.updateHr) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select a manager and/or HR contact to update.",
+        path: ["updateManager"],
+      });
+    }
+  });
+
 export const updatePendingProvisioningUserSchema = z.object({
   employeeId: z.string().uuid(),
   firstName: z
@@ -106,6 +124,9 @@ export type UpdatePendingProvisioningUserInput = z.infer<
 export type ChangeProvisioningRoleInput = z.infer<typeof changeProvisioningRoleSchema>;
 export type UpdateProvisioningReportingContactsInput = z.infer<
   typeof updateProvisioningReportingContactsSchema
+>;
+export type BulkUpdateProvisioningReportingContactsInput = z.infer<
+  typeof bulkUpdateProvisioningReportingContactsSchema
 >;
 export type CeoProvisioningListParamsInput = z.infer<
   typeof ceoProvisioningListParamsSchema

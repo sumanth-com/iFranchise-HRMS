@@ -12,6 +12,8 @@ import { UserProfileDropdown } from "@/components/layout/user-profile-dropdown";
 import { PortalSwitcherSkeleton } from "@/components/system-admin/portal-switcher";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
+import { canSeePortalSwitcher } from "@/lib/system-admin/portal-switch";
+import { useAuth } from "@/providers/auth-provider";
 
 const PortalSwitcher = dynamic(
   () =>
@@ -26,9 +28,13 @@ const PortalSwitcher = dynamic(
 
 export function TopNav() {
   const pathname = usePathname();
+  const { profile } = useAuth();
   const { toggleCollapsed, isCollapsed, setMobileOpen } = useSidebar();
   const { portalHome } = useSidebarNavigation();
   const isPortalHome = pathname === portalHome;
+  const showPortalSwitcher =
+    canSeePortalSwitcher(profile.email) ||
+    canSeePortalSwitcher(profile.employee?.email);
 
   return (
     <header className="app-shell-topnav relative z-40 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border/50 px-4">
@@ -66,7 +72,7 @@ export function TopNav() {
         </div>
       </div>
       <div className="flex items-center gap-3 pl-1">
-        <PortalSwitcher />
+        {showPortalSwitcher ? <PortalSwitcher /> : null}
         <NotificationBell />
         <UserProfileDropdown />
       </div>

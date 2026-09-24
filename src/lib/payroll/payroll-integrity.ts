@@ -5,8 +5,9 @@ import {
   isEmployeeAppVisible,
   normalizeEmployeeEmail,
 } from "@/lib/employees/app-hidden";
+import { isItSystemAccount } from "@/lib/employees/it-system-account";
 import { employeeJoinedBy } from "@/lib/payroll/salary-structure-period";
-import { roundCurrency } from "@/lib/payroll/services/payroll-utils";
+import { roundCurrency, sumPayrollEmployeeRowTotals } from "@/lib/payroll/services/payroll-utils";
 
 export const PAYROLL_INTEGRITY_MARKER = "[PAYROLL_INTEGRITY]";
 
@@ -58,6 +59,14 @@ export function isPayrollEligibleEmployee(
 ): boolean {
   if (!employee) return false;
   if (
+    isItSystemAccount({
+      email: employee.email,
+      employeeCode: employee.employee_code,
+    })
+  ) {
+    return false;
+  }
+  if (
     !isEmployeeAppVisible({
       email: employee.email,
       app_hidden_at: employee.app_hidden_at,
@@ -72,6 +81,7 @@ export function isPayrollEligibleEmployee(
       firstName: employee.first_name,
       lastName: employee.last_name,
       designationTitle: employee.designationTitle,
+      email: employee.email,
     })
   ) {
     return false;
@@ -91,6 +101,18 @@ export function ineligibilityReason(
   }
   const code = employee.employee_code ?? "unknown";
   if (
+    isItSystemAccount({
+      email: employee.email,
+      employeeCode: employee.employee_code,
+    })
+  ) {
+    return {
+      code: "hidden_or_excluded",
+      employeeCode: code,
+      message: `${code} is the IT system account and cannot be included in payroll.`,
+    };
+  }
+  if (
     !isEmployeeAppVisible({
       email: employee.email,
       app_hidden_at: employee.app_hidden_at,
@@ -109,6 +131,7 @@ export function ineligibilityReason(
       firstName: employee.first_name,
       lastName: employee.last_name,
       designationTitle: employee.designationTitle,
+      email: employee.email,
     })
   ) {
     return {
@@ -207,16 +230,11 @@ export function evaluatePayrollIntegrity(input: {
     eligibleItems.push(item);
   }
 
+  const rowTotals = sumPayrollEmployeeRowTotals(eligibleItems);
   const totals = {
-    totalGross: roundCurrency(
-      eligibleItems.reduce((sum, row) => sum + Number(row.grossSalary ?? 0), 0),
-    ),
-    totalDeductions: roundCurrency(
-      eligibleItems.reduce((sum, row) => sum + Number(row.totalDeductions ?? 0), 0),
-    ),
-    totalNet: roundCurrency(
-      eligibleItems.reduce((sum, row) => sum + Number(row.netSalary ?? 0), 0),
-    ),
+    totalGross: rowTotals.totalGross,
+    totalDeductions: rowTotals.totalDeductions,
+    totalNet: rowTotals.totalNet,
   };
 
   if (

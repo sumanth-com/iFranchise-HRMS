@@ -21,7 +21,8 @@ function asNumber(value: number | null | undefined) {
 
 function formatPercent(value: number | null | undefined) {
   const safe = asNumber(value);
-  return `${safe.toFixed(safe % 1 === 0 ? 0 : 1)}%`;
+  if (Number.isInteger(safe)) return `${safe}%`;
+  return `${safe.toFixed(2)}%`;
 }
 
 /** Always open Approvals → Leave (never Executive). */
@@ -56,7 +57,7 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
         accent="text-sky-600 dark:text-sky-400"
         iconBg="bg-sky-500/10"
         tone="sky"
-        href={CEO_ROUTES.organization}
+        href={CEO_ROUTES.employees}
       />
       <EmployeeStatCard
         label="Attendance"

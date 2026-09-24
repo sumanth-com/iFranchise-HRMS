@@ -15,10 +15,11 @@ import {
   isHrPortalProvisioningRole,
   isProvisioningDirectoryRoleCode,
   isProvisioningHrRole,
-  isProvisioningManagerRole,
+  isProvisioningManagerLookupCandidate,
   isSuperAdminProvisioningRole,
   shouldIncludeInUserProvisioningList,
 } from "@/lib/ceo/provisioning-directory-filters";
+import { deriveProvisioningInvitationStatus } from "@/lib/ceo/provisioning-invitation-status";
 import type { UserProfile } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
 import {
@@ -32,8 +33,6 @@ import {
   type CeoProvisioningUserDetail,
   type ProvisioningInvitationStatus,
 } from "@/types/ceo-user-provisioning";
-
-const INVITATION_EXPIRY_HOURS = 48;
 
 const PENDING_ACCOUNT_STATUSES = new Set([
   "invitation_pending",
@@ -89,40 +88,125 @@ function fullName(first?: string | null, last?: string | null) {
 }
 
 function deriveInvitationStatus(row: LooseRow): ProvisioningInvitationStatus {
-  const status = String(row.account_status ?? "draft");
-  const hasPortalUser = Boolean(row.user_id);
-  const hasLoggedIn = Boolean(row.first_login_at);
+  return deriveProvisioningInvitationStatus({
+    account_status: row.account_status,
+    user_id: row.user_id,
+    first_login_at: row.first_login_at,
+    last_login_at: row.last_login_at,
+    invitation_sent_at: row.invitation_sent_at,
+    invitation_cancelled_at: row.invitation_cancelled_at,
+  });
+}
 
-  if (status === "suspended") return "revoked";
-  if (status === "inactive") return "inactive";
-  if (status === "draft") {
-    return row.invitation_cancelled_at ? "cancelled" : "pending";
+/**
+ * Heal stale invitation_pending rows when Auth already has a successful sign-in.
+ * Status badges then reflect actual portal access without hardcoding people.
+ */
+async function reconcilePortalLoginFromAuth(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  users: NormalizedExecutiveUser[],
+): Promise<NormalizedExecutiveUser[]> {
+  const candidates = users.filter(
+    (user) =>
+      user.userId &&
+      !user.firstLoginAt &&
+      (user.accountStatus === "invitation_pending" ||
+        user.accountStatus === "invitation_accepted" ||
+        user.accountStatus === "invited"),
+  );
+  if (candidates.length === 0) return users;
+
+  const healedByEmployeeId = new Map<string, { firstLoginAt: string; accountStatus: string }>();
+
+  await Promise.all(
+    candidates.map(async (user) => {
+      try {
+        const { data, error } = await admin.auth.admin.getUserById(user.userId!);
+        if (error || !data.user?.last_sign_in_at) return;
+
+        const firstLoginAt = data.user.last_sign_in_at;
+        const { error: updateError } = await admin
+          .schema("hrms")
+          .from("employees")
+          .update({
+            first_login_at: firstLoginAt,
+            last_login_at: firstLoginAt,
+            account_status: "active",
+            account_activated_at: user.acceptedAt ?? firstLoginAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.employeeId)
+          .eq("organization_id", organizationId)
+          .is("deleted_at", null);
+
+        if (updateError) return;
+        healedByEmployeeId.set(user.employeeId, {
+          firstLoginAt,
+          accountStatus: "active",
+        });
+      } catch {
+        // Non-critical — fall back to existing derived status.
+      }
+    }),
+  );
+
+  if (healedByEmployeeId.size === 0) return users;
+
+  return users.map((user) => {
+    const healed = healedByEmployeeId.get(user.employeeId);
+    if (!healed) return user;
+    return {
+      ...user,
+      firstLoginAt: healed.firstLoginAt,
+      accountStatus: healed.accountStatus,
+      invitationStatus: "active",
+      acceptedAt: user.acceptedAt ?? healed.firstLoginAt,
+      lastActivityAt: healed.firstLoginAt,
+    };
+  });
+}
+
+function collectManagerIdsWithReports(
+  users: NormalizedExecutiveUser[],
+  extraManagerIds: Iterable<string> = [],
+): Set<string> {
+  const managerIds = new Set<string>();
+  for (const user of users) {
+    if (user.reportingManagerId) managerIds.add(user.reportingManagerId);
   }
-
-  // Fully provisioned only after successful portal login.
-  if (status === "active" && hasPortalUser && hasLoggedIn) {
-    return "active";
+  for (const id of extraManagerIds) {
+    if (id) managerIds.add(id);
   }
+  return managerIds;
+}
 
-  // Password set / link opened is still PENDING until first portal access.
-  // Do not surface "opened" in the provisioning workflow.
-  if (
-    status === "invitation_accepted" ||
-    status === "invitation_pending" ||
-    status === "invited"
-  ) {
-    if (row.invitation_sent_at && !hasLoggedIn) {
-      const ageMs = Date.now() - new Date(row.invitation_sent_at).getTime();
-      if (ageMs > INVITATION_EXPIRY_HOURS * 60 * 60 * 1000) return "expired";
-    }
-    return "pending";
-  }
+function buildContactLookupLabel(user: NormalizedExecutiveUser): string {
+  return `${user.fullName} · ${user.employeeCode}`;
+}
 
-  if (status === "active" && !hasLoggedIn) {
-    return "pending";
-  }
+function buildProvisioningContactLookups(
+  users: NormalizedExecutiveUser[],
+  managerIdsWithReports: ReadonlySet<string>,
+): { managers: LookupOption[]; hrApprovers: LookupOption[] } {
+  const managers = users
+    .filter(
+      (user) =>
+        isProvisioningManagerLookupCandidate({
+          roleCode: user.roleCode,
+          employeeId: user.employeeId,
+          managerIdsWithReports,
+        }) && !isExcludedFromProvisioningManagerLookup(user),
+    )
+    .sort(compareProvisioningPeopleByName)
+    .map((user) => ({ id: user.employeeId, label: buildContactLookupLabel(user) }));
 
-  return "pending";
+  const hrApprovers = users
+    .filter((user) => isProvisioningHrRole(user.roleCode))
+    .sort(compareProvisioningPeopleByName)
+    .map((user) => ({ id: user.employeeId, label: buildContactLookupLabel(user) }));
+
+  return { managers, hrApprovers };
 }
 
 /** Pending invite shells, or records explicitly targeted for a portal role. */
@@ -154,30 +238,6 @@ function shouldIncludeInProvisioningDirectory(employee: LooseRow): boolean {
     app_hidden_at: employee.app_hidden_at,
     deleted_at: employee.deleted_at,
   });
-}
-
-function buildContactLookupLabel(user: NormalizedExecutiveUser): string {
-  return `${user.fullName} · ${user.employeeCode}`;
-}
-
-function buildProvisioningContactLookups(
-  users: NormalizedExecutiveUser[],
-): { managers: LookupOption[]; hrApprovers: LookupOption[] } {
-  const managers = users
-    .filter(
-      (user) =>
-        isProvisioningManagerRole(user.roleCode) &&
-        !isExcludedFromProvisioningManagerLookup(user),
-    )
-    .sort(compareProvisioningPeopleByName)
-    .map((user) => ({ id: user.employeeId, label: buildContactLookupLabel(user) }));
-
-  const hrApprovers = users
-    .filter((user) => isProvisioningHrRole(user.roleCode))
-    .sort(compareProvisioningPeopleByName)
-    .map((user) => ({ id: user.employeeId, label: buildContactLookupLabel(user) }));
-
-  return { managers, hrApprovers };
 }
 
 function buildProvisioningUserRow(
@@ -565,7 +625,11 @@ const loadProvisionedPortalUsers = cache(async function loadProvisionedPortalUse
     }
   }
 
-  return [...byEmployee.values()].sort(compareProvisioningPeopleByName);
+  return reconcilePortalLoginFromAuth(
+    admin,
+    organizationId,
+    [...byEmployee.values()].sort(compareProvisioningPeopleByName),
+  );
 });
 
 /** All employees visible in the Employees module, enriched with portal provisioning data. */
@@ -750,6 +814,7 @@ export async function getCeoProvisioningLookups(
   profile: UserProfile,
 ): Promise<CeoProvisioningLookups> {
   const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
 
   const [inviteRoles, departmentsRes, branchesRes, employmentTypesRes, provisionedUsers] =
     await Promise.all([
@@ -776,7 +841,27 @@ export async function getCeoProvisioningLookups(
     if (res.error) throw new Error(res.error.message);
   }
 
-  const { managers, hrApprovers } = buildProvisioningContactLookups(provisionedUsers);
+  const { data: reportingRows, error: reportingError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("reporting_manager_id")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .not("reporting_manager_id", "is", null);
+
+  if (reportingError) throw new Error(reportingError.message);
+
+  const managerIdsWithReports = collectManagerIdsWithReports(
+    provisionedUsers,
+    ((reportingRows ?? []) as LooseRow[])
+      .map((row) => (row.reporting_manager_id ? String(row.reporting_manager_id) : ""))
+      .filter(Boolean),
+  );
+
+  const { managers, hrApprovers } = buildProvisioningContactLookups(
+    provisionedUsers,
+    managerIdsWithReports,
+  );
 
   const portalOptions: LookupOption[] = [
     { id: "ceo", label: "Executive Portal" },

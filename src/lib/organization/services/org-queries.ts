@@ -1,6 +1,10 @@
 import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import {
+  IT_SYSTEM_ACCOUNT_CODE,
+  IT_SYSTEM_ACCOUNT_EMAIL,
+} from "@/lib/employees/it-system-account";
 import type { UserProfile } from "@/types/auth";
 import type {
   BranchListResult,
@@ -793,6 +797,8 @@ export async function listHierarchyEmployees(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
+    .neq("email", IT_SYSTEM_ACCOUNT_EMAIL)
+    .neq("employee_code", IT_SYSTEM_ACCOUNT_CODE)
     .in("employment_status", ["active", "probation", "on_leave"])
     .order("first_name");
 

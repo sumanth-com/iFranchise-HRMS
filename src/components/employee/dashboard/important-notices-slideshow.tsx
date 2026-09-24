@@ -71,14 +71,18 @@ export function TeamUpdatesPanel({ events }: { events: EmployeeUpcomingEvent[] }
 
   if (events.length === 0) {
     return (
-      <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl bg-violet-500/[0.04] px-4 text-center ring-1 ring-violet-500/12">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
-          <Newspaper className="size-4" />
-        </span>
-        <p className="mt-2 text-sm font-semibold text-foreground">No team updates</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Short notes from HR or leadership will appear here.
-        </p>
+      <div className="flex h-full min-h-0 flex-col items-center justify-center px-4 py-5">
+        <div className="flex w-full max-w-[17rem] flex-col items-center rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-5 py-6 text-center ring-1 ring-violet-500/15">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15">
+            <Newspaper className="size-5" />
+          </span>
+          <p className="mt-3 text-sm font-semibold tracking-tight text-foreground">
+            No team updates
+          </p>
+          <p className="mt-1.5 max-w-[14rem] text-xs leading-relaxed text-muted-foreground">
+            Short notes from HR or leadership will appear here.
+          </p>
+        </div>
       </div>
     );
   }

@@ -3,16 +3,36 @@ import {
   type StandardEmploymentTypeCode,
 } from "@/lib/employees/standard-employment-types";
 
-export type EmploymentCategoryFilter = "all" | "probation" | "full_time";
+export type EmploymentCategoryFilter =
+  | "all"
+  | "probation"
+  | "internship"
+  | "full_time";
 
 export const DEFAULT_EMPLOYMENT_CATEGORY_FILTER: EmploymentCategoryFilter = "all";
 
-function upper(value: string | null | undefined): string {
-  return String(value ?? "").trim().toUpperCase();
-}
+export const EMPLOYMENT_CATEGORY_FILTER_OPTIONS: Array<{
+  value: EmploymentCategoryFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All Employees" },
+  { value: "probation", label: "Probation" },
+  { value: "internship", label: "Internship" },
+  { value: "full_time", label: "Full Time" },
+];
 
-export function isFullTimeEmploymentTypeCode(code: string | null | undefined): boolean {
-  return upper(code) === "FULL_TIME";
+export function parseEmploymentCategoryFilter(
+  value: string | null | undefined,
+): EmploymentCategoryFilter {
+  if (
+    value === "all" ||
+    value === "probation" ||
+    value === "internship" ||
+    value === "full_time"
+  ) {
+    return value;
+  }
+  return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
 export function matchesEmploymentCategoryFilter(
@@ -25,16 +45,15 @@ export function matchesEmploymentCategoryFilter(
 
   const typeCode = normalizeStandardEmploymentTypeCode(input.employmentTypeCode);
 
-  if (category === "full_time") {
-    return typeCode === "FULL_TIME";
-  }
-
-  return typeCode === "INTERN" || typeCode === "PROBATION";
+  if (category === "full_time") return typeCode === "FULL_TIME";
+  if (category === "internship") return typeCode === "INTERN";
+  return typeCode === "PROBATION";
 }
 
 export function employmentCategoryTypeCodes(
   category: Exclude<EmploymentCategoryFilter, "all">,
 ): StandardEmploymentTypeCode[] {
   if (category === "full_time") return ["FULL_TIME"];
-  return ["INTERN", "PROBATION"];
+  if (category === "internship") return ["INTERN"];
+  return ["PROBATION"];
 }

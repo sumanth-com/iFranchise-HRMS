@@ -12,8 +12,7 @@ import {
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import {
-  DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
-  type EmploymentCategoryFilter,
+  parseEmploymentCategoryFilter,
 } from "@/lib/employees/employment-category";
 import { employeeListParamsSchema } from "@/lib/validations/employee";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -29,15 +28,6 @@ function firstString(
   value: string | string[] | undefined,
 ): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function parseEmploymentCategory(
-  value: string | undefined,
-): EmploymentCategoryFilter {
-  if (value === "all" || value === "probation" || value === "full_time") {
-    return value;
-  }
-  return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
 /**
@@ -67,7 +57,7 @@ export default async function SuperAdminEmployeesPage({
       department: rawDepartment,
       employmentStatus: firstString(rawParams.employmentStatus),
       accountStatus: firstString(rawParams.accountStatus),
-      employmentCategory: parseEmploymentCategory(
+      employmentCategory: parseEmploymentCategoryFilter(
         firstString(rawParams.employmentCategory),
       ),
     });
@@ -165,7 +155,7 @@ export default async function SuperAdminEmployeesPage({
     department: departmentCode,
     employmentStatus: firstString(rawParams.employmentStatus),
     accountStatus: firstString(rawParams.accountStatus),
-    employmentCategory: parseEmploymentCategory(
+    employmentCategory: parseEmploymentCategoryFilter(
       firstString(rawParams.employmentCategory),
     ),
   });

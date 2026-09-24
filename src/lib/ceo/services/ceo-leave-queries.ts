@@ -42,6 +42,8 @@ import {
   executiveRequestCategoryLabel,
   getExecutiveRequestCategory,
 } from "@/lib/approvals/executive-request-routing";
+import { isAppHiddenEmployeeEmail } from "@/lib/employees/app-hidden";
+import { isItSystemAccount } from "@/lib/employees/it-system-account";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 
 const APPROVER_ROLE_CODES = [
@@ -91,6 +93,18 @@ const LEAVE_ROW_SELECT = `
 
 type NameRow = { first_name: string; last_name: string };
 
+type LeaveEmployeeRow = {
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  email?: string | null;
+  department_id: string | null;
+  branch_id: string | null;
+  departments: { name: string } | { name: string }[] | null;
+  branches: { name: string } | { name: string }[] | null;
+  reporting_manager: NameRow | NameRow[] | null;
+};
+
 type LeaveRow = {
   id: string;
   employee_id: string;
@@ -104,28 +118,7 @@ type LeaveRow = {
   leave_status: string;
   duration_breakdown?: unknown;
   created_at: string;
-  employees:
-    | {
-        employee_code: string;
-        first_name: string;
-        last_name: string;
-        department_id: string | null;
-        branch_id: string | null;
-        departments: { name: string } | { name: string }[] | null;
-        branches: { name: string } | { name: string }[] | null;
-        reporting_manager: NameRow | NameRow[] | null;
-      }
-    | Array<{
-        employee_code: string;
-        first_name: string;
-        last_name: string;
-        department_id: string | null;
-        branch_id: string | null;
-        departments: { name: string } | { name: string }[] | null;
-        branches: { name: string } | { name: string }[] | null;
-        reporting_manager: NameRow | NameRow[] | null;
-      }>
-    | null;
+  employees: LeaveEmployeeRow | LeaveEmployeeRow[] | null;
   leave_types: { name: string; code: string } | { name: string; code: string }[] | null;
   leave_approvals: Array<{
     approval_level: number;
@@ -138,6 +131,20 @@ type LeaveRow = {
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function isWorkforceVisibleLeaveEmployee(employee: LeaveEmployeeRow | null): boolean {
+  if (!employee) return false;
+  if (
+    isItSystemAccount({
+      email: employee.email,
+      employeeCode: employee.employee_code,
+    })
+  ) {
+    return false;
+  }
+  if (isAppHiddenEmployeeEmail(employee.email)) return false;
+  return true;
 }
 
 function fullName(row: NameRow | null): string | null {
@@ -369,6 +376,9 @@ export async function listCeoApprovalQueue(
   const roleCodesByEmployee = new Map<string, string[]>();
 
   for (const row of byId.values()) {
+    const employee = unwrapRelation(row.employees);
+    if (!isWorkforceVisibleLeaveEmployee(employee)) continue;
+
     const approvals = row.leave_approvals ?? [];
     const activeLevel = approvals
       .filter((a) => a.approval_status === "pending")
@@ -473,6 +483,7 @@ export async function listCeoProcessedLeaveApprovals(
   if (error) throw new Error(error.message);
 
   return ((data as unknown as LeaveRow[]) ?? [])
+    .filter((row) => isWorkforceVisibleLeaveEmployee(unwrapRelation(row.employees)))
     .map((row) => {
       const record = mapLeaveRow(row);
       const decision = statusByRequest.get(row.id);

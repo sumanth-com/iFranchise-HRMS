@@ -8,6 +8,10 @@ import {
   isEmployeeAppVisible,
   normalizeEmployeeEmail,
 } from "@/lib/employees/app-hidden";
+import {
+  IT_SYSTEM_ACCOUNT_EMAIL,
+  isItSystemAccount,
+} from "@/lib/employees/it-system-account";
 
 type ProvisioningDirectoryPerson = {
   email?: string | null;
@@ -24,6 +28,7 @@ type ProvisioningDirectoryPerson = {
 
 function personFromRow(row: ProvisioningDirectoryPerson) {
   return {
+    email: row.email ?? null,
     employeeCode: row.employeeCode ?? row.employee_code ?? null,
     firstName: row.firstName ?? row.first_name ?? null,
     lastName: row.lastName ?? row.last_name ?? null,
@@ -31,9 +36,9 @@ function personFromRow(row: ProvisioningDirectoryPerson) {
   };
 }
 
-/** IT system account: keep in Employees module, exclude from User Provisioning UI. */
+/** IT system account: keep login/portal switching; exclude from workforce UIs. */
 export function isItSystemProvisioningAccount(email: string | null | undefined) {
-  return normalizeEmployeeEmail(email) === "it@ifranchise.in";
+  return isItSystemAccount({ email });
 }
 
 export function isDirectoryIncludedProvisioningEmployee(
@@ -108,10 +113,11 @@ export function isProvisioningManagerRole(roleCode: string | null | undefined) {
   return PROVISIONING_MANAGER_LOOKUP_ROLE_CODES.has(String(roleCode ?? "").toLowerCase());
 }
 
-/** System / shell accounts that must never appear as selectable reporting managers. */
+/** System / shell accounts that must never appear as selectable reporting managers.
+ * Real people (e.g. HR admins who also manage staff) are eligible from role/report data.
+ */
 const MANAGER_LOOKUP_EXCLUDED_EMAILS = new Set([
-  "it@ifranchise.in",
-  "hr@ifranchise.in",
+  IT_SYSTEM_ACCOUNT_EMAIL,
   "ifranchisehr@gmail.com",
   "ifranchiseemployee@gmail.com",
 ]);
@@ -152,6 +158,21 @@ export function isExcludedFromProvisioningManagerLookup(person: {
   }
 
   return false;
+}
+
+/**
+ * Manager dropdown eligibility from live employee/role data:
+ * - classic manager/executive roles, or
+ * - people who currently have at least one direct report.
+ * Shell/IT accounts stay excluded. HR contact list is unchanged.
+ */
+export function isProvisioningManagerLookupCandidate(input: {
+  roleCode: string | null | undefined;
+  employeeId: string;
+  managerIdsWithReports: ReadonlySet<string>;
+}): boolean {
+  if (isProvisioningManagerRole(input.roleCode)) return true;
+  return input.managerIdsWithReports.has(input.employeeId);
 }
 
 export function isProvisioningHrRole(roleCode: string | null | undefined) {

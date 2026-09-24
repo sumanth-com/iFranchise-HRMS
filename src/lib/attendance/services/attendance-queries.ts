@@ -19,6 +19,7 @@ import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
   isExcludedFromAttendanceWorkforce,
 } from "@/lib/employee/directory-listing";
+import { excludeItSystemAccountFromEmployeeQuery } from "@/lib/employees/it-system-account";
 import { formatCleanEmployeeName, cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import { getBranches, getOccupiedDepartments } from "@/lib/employees/services/employee-queries";
 import {
@@ -26,6 +27,8 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { resolveAttendanceLocationFlags } from "@/lib/attendance/services/attendance-location";
+import { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
@@ -46,6 +49,7 @@ function isHiddenAttendancePerson(row: LooseRow): boolean {
     employeeCode: row.employee_code as string | null,
     firstName: row.first_name as string | null,
     lastName: row.last_name as string | null,
+    email: (row.email as string | null) ?? null,
     designationTitle: designation?.title ?? null,
     designationCode: designation?.code ?? null,
   });
@@ -95,7 +99,7 @@ function matchesAttendanceStatusFilter(
   return matchesAttendanceUiStatusFilter(status, notes, filter);
 }
 
-async function loadAttendanceRoster(
+async function loadAttendanceRosterUncached(
   supabase: AuthSupabaseClient,
   params: {
     organizationId: string;
@@ -123,15 +127,17 @@ async function loadAttendanceRoster(
   const isSingleDay = rangeFrom === rangeTo;
   const rosterDates = isSingleDay ? [rangeFrom] : eachInclusiveDate(rangeFrom, rangeTo);
 
-  let empQuery = supabase
-    .schema("hrms")
-    .from("employees")
-    .select(
-      `
+  let empQuery = excludeItSystemAccountFromEmployeeQuery(
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        `
           id,
           employee_code,
           first_name,
           last_name,
+          email,
           department_id,
           designation_id,
           branch_id,
@@ -139,10 +145,11 @@ async function loadAttendanceRoster(
           departments:department_id (name),
           designations:designation_id (title, code)
         `,
-    )
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"]);
+      )
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .in("employment_status", ["active", "probation", "on_leave"]),
+  );
 
   const hiddenCodes = [...DIRECTORY_HIDDEN_EMPLOYEE_CODES];
   if (hiddenCodes.length > 0) {
@@ -365,6 +372,56 @@ async function loadAttendanceRoster(
   return records;
 }
 
+/**
+ * Per-request memo: listAttendance + getAttendanceSummary often load the same
+ * roster in parallel on attendance pages. Deduplicate without changing results.
+ */
+const loadAttendanceRosterMemo = cache(
+  async (cacheKey: string): Promise<AttendanceListResult["data"]> => {
+    const params = JSON.parse(cacheKey) as {
+      organizationId: string;
+      rangeFrom: string;
+      rangeTo: string;
+      employeeId?: string;
+      departmentId?: string;
+      branchId?: string;
+      search?: string;
+      scopedIds: string[] | null;
+      includeCorrections: boolean;
+    };
+    const supabase = await createClient();
+    return loadAttendanceRosterUncached(supabase, params);
+  },
+);
+
+async function loadAttendanceRoster(
+  _supabase: AuthSupabaseClient,
+  params: {
+    organizationId: string;
+    rangeFrom: string;
+    rangeTo: string;
+    employeeId?: string;
+    departmentId?: string;
+    branchId?: string;
+    search?: string;
+    scopedIds: string[] | null;
+    includeCorrections: boolean;
+  },
+): Promise<AttendanceListResult["data"]> {
+  const cacheKey = JSON.stringify({
+    organizationId: params.organizationId,
+    rangeFrom: params.rangeFrom,
+    rangeTo: params.rangeTo,
+    employeeId: params.employeeId ?? null,
+    departmentId: params.departmentId ?? null,
+    branchId: params.branchId ?? null,
+    search: params.search?.trim() ? params.search.trim() : null,
+    scopedIds: params.scopedIds ? [...params.scopedIds].sort() : null,
+    includeCorrections: params.includeCorrections,
+  });
+  return loadAttendanceRosterMemo(cacheKey);
+}
+
 export async function listAttendance(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -508,7 +565,8 @@ export async function getAttendanceSummary(
     departmentId: employeeId ? undefined : filters?.departmentId,
     branchId: filters?.branchId,
     scopedIds,
-    includeCorrections: false,
+    // Match listAttendance so React.cache can share one roster load per request.
+    includeCorrections: true,
   });
 
   const employeeIds = new Set(records.map((row) => row.employeeId));

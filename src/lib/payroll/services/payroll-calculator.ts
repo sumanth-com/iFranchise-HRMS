@@ -172,7 +172,10 @@ function reduceDeductionsToFitGross(
   return lines.filter((line) => line.amount > 0);
 }
 
-/** LOP is reflected in prorated payable gross; the LOP line is shown on payslips but does not reduce net again. */
+/**
+ * LOP days are excluded from paid working days (Excel Total Working Days).
+ * The LOP line remains on the breakdown for display but must not reduce net again.
+ */
 function deductionsForNetPay(lines: PayrollBreakdownLine[]): PayrollBreakdownLine[] {
   return lines.filter((line) => line.code !== "lop");
 }
@@ -357,15 +360,11 @@ function resolveDailyRateWorkingDays(
 }
 
 /**
- * Excel total paid working days (exact):
+ * Excel total working / paid days (exact):
  * Present + Holiday + CL + EL
  *
- * LOP and Absent are excluded.
- * week_off is NOT added (Saturdays/other offs stay unpaid unless reclassified).
- * Holiday includes:
- * - explicit attendance "holiday" marks
- * - Sundays in the selected payroll month window (Excel marks Sundays as H)
- * - official company holidays (is_optional=false) in the month window
+ * LOP and Absent do not count.
+ * week_off is NOT added (Sundays/other offs count only when marked as Holiday/H).
  * Half-days count as 0.5 present-equivalent.
  * Paid leave (CL/EL) comes from approved leave summary (or on_leave fallback).
  */
@@ -415,6 +414,10 @@ function prorateEarningsLines(
     .filter((line) => line.amount > 0);
 }
 
+/**
+ * Unpaid days for LOP display (leave LOP + unpaid Absent + half-day / late / sandwich).
+ * CL/EL never count as unpaid. Gross uses paid days × daily rate, not monthly − LOP.
+ */
 export function resolveLopDays(input: {
   attendance: AttendanceSummary;
   leaveLopDays: number;
@@ -426,18 +429,19 @@ export function resolveLopDays(input: {
     return Math.max(0, roundCurrency(input.lopDaysOverride));
   }
 
+  // Paid leave is intentionally ignored — CL/EL are paid working days.
+  void input.paidLeaveDays;
+  void input.settings?.paidLeaveDeduction;
+
   const unpaidAbsence =
     input.attendance.absentDays +
     (input.settings?.halfDayDeduction === false ? 0 : input.attendance.halfDays * 0.5);
   const latePenalty = lateEntryPenaltyDays(input.attendance.lateDays ?? 0);
-  let lop =
+  const lop =
     input.leaveLopDays +
     unpaidAbsence +
     latePenalty +
     (input.attendance.sandwichLopDays ?? 0);
-  if (input.settings?.paidLeaveDeduction) {
-    lop += input.paidLeaveDays;
-  }
   if (input.settings?.lossOfPayDeduction === false) {
     return 0;
   }
@@ -631,6 +635,10 @@ export function calculateEmployeePayroll(
     statutory?.incomeTax === false ? 0 : (components.incomeTax ?? 0);
   const structureOtherDeduction = components.other ?? 0;
 
+  // Excel source of truth:
+  // Total Working Days = Present + Holiday + CL + EL
+  // Per Day = Monthly Salary / 30
+  // Working Day Salary = Per Day × Total Working Days
   const rawPerDay = workingDaysForRate > 0 ? salaryGross / workingDaysForRate : 0;
   const perDay = roundCurrency(rawPerDay);
   const payableGross = roundCurrency(rawPerDay * payableDays);
@@ -796,7 +804,7 @@ export function calculateEmployeePayroll(
       notes: [
         `Daily rate ₹${roundCurrency(perDay).toLocaleString("en-IN")} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}) × ${payableDays} paid day(s) [P+H+CL+EL].`,
         lopDays > 0
-          ? `LOP excluded from paid days (₹${roundCurrency(lopDeduction).toLocaleString("en-IN")} at daily rate for ${lopDays} day(s)).`
+          ? `LOP/Absent excluded from paid days (₹${roundCurrency(lopDeduction).toLocaleString("en-IN")} at daily rate for ${lopDays} day(s)).`
           : null,
       ].filter(Boolean) as string[],
     },

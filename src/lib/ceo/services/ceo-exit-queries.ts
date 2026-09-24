@@ -6,11 +6,22 @@ import {
   unwrapRelation,
   type ExitRow,
 } from "@/lib/exit/services/exit-utils";
+import { isItSystemAccount } from "@/lib/employees/it-system-account";
 import type { UserProfile } from "@/types/auth";
 import type { ExitResignationItem, ExitStatus } from "@/types/exit";
 
-function mapResignation(row: ExitRow): ExitResignationItem {
+function mapResignation(row: ExitRow): ExitResignationItem | null {
   const employee = unwrapRelation(row.employees);
+  if (
+    !employee ||
+    isItSystemAccount({
+      email: employee.email,
+      employeeCode: employee.employee_code,
+    })
+  ) {
+    return null;
+  }
+
   const dept = unwrapRelation(employee?.departments ?? null);
   const desig = unwrapRelation(employee?.designations ?? null);
   const manager = unwrapRelation(row.manager);
@@ -51,7 +62,7 @@ const RESIGNATION_SELECT = `
   ceo_acted_at, ceo_remarks,
   rejected_reason, withdrawn_at, completed_at, created_at,
   employees:employee_id(
-    employee_code, first_name, last_name, department_id,
+    employee_code, first_name, last_name, email, department_id,
     departments:department_id(name),
     designations:designation_id(title)
   ),
@@ -71,7 +82,9 @@ export async function listCeoExitApprovalQueue(
     .limit(100);
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapResignation);
+  return ((data ?? []) as ExitRow[])
+    .map(mapResignation)
+    .filter((item): item is ExitResignationItem => item != null);
 }
 
 export async function listCeoProcessedExitApprovals(
@@ -95,5 +108,7 @@ export async function listCeoProcessedExitApprovals(
     .limit(100);
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapResignation);
+  return ((data ?? []) as ExitRow[])
+    .map(mapResignation)
+    .filter((item): item is ExitResignationItem => item != null);
 }

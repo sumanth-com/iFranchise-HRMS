@@ -9,7 +9,7 @@ import {
   resolveUserPermissionCodes,
   resolveUserRoleCodes,
 } from "@/lib/auth/permission-resolver";
-import { filterPortalSwitchLinks } from "@/lib/system-admin/portal-switch";
+import { filterPortalSwitchLinks, canSeePortalSwitcher } from "@/lib/system-admin/portal-switch";
 import { createClient, getServerSession } from "@/lib/supabase/server";
 
 export type PortalSwitcherStateResult =
@@ -26,12 +26,26 @@ export type PortalSwitcherStateResult =
  * Resolve portal switcher options from the live DB permission RPC.
  * Bypasses the signed permission cookie so newly granted portal.*.access
  * (e.g. Accountant) appears without logout/login.
+ *
+ * Visibility: only `it@ifranchise.in` receives portal options; everyone else
+ * gets an empty list (switcher stays hidden). Permissions are unchanged.
  */
 export async function getPortalSwitcherStateAction(): Promise<PortalSwitcherStateResult> {
   try {
     const session = await getServerSession();
     if (!session?.user?.id) {
       return { success: false, message: "Not authenticated" };
+    }
+
+    // Visibility-only gate — session email identity, not role/permission.
+    if (!canSeePortalSwitcher(session.user.email)) {
+      return {
+        success: true,
+        portals: [],
+        permissionCodes: [],
+        roleCodes: [],
+        hasAccountantAccess: false,
+      };
     }
 
     const supabase = session.supabase ?? (await createClient());

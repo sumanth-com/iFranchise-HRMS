@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
   approveTeamLeaveRequest,
@@ -65,6 +66,7 @@ function revalidateLeavePaths() {
   revalidatePath(MANAGER_ROUTES.overview);
   revalidatePath(MANAGER_ROUTES.team);
   revalidatePath(MANAGER_ROUTES.home);
+  revalidateCeoDashboardHome();
 }
 
 export async function fetchTeamLeaveRequestsAction(

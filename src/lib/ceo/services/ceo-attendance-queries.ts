@@ -177,6 +177,7 @@ function filterAttendanceWorkforce(employees: LooseRow[]) {
       employeeCode: row.employee_code,
       firstName: row.first_name,
       lastName: row.last_name,
+      email: row.email,
       designationTitle: designation?.title ?? null,
       designationCode: designation?.code ?? null,
     });

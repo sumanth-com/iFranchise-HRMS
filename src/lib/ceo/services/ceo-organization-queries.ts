@@ -8,6 +8,10 @@ import {
   getEmployeeLeaveBalances,
 } from "@/lib/employees/services/employee-detail";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
+import {
+  excludeItSystemAccountFromEmployeeQuery,
+  isItSystemAccount,
+} from "@/lib/employees/it-system-account";
 import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import {
   buildHierarchyTree,
@@ -55,18 +59,20 @@ export async function getCeoOrgSummary(
   const organizationId = profile.employee.organizationId;
 
   const [employeesRes, departmentsRes, managersRes] = await Promise.all([
-    fromHrms(supabase, "employees")
-      .select("id, employment_status, reporting_manager_id, department_id")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .limit(5000),
+    excludeItSystemAccountFromEmployeeQuery(
+      fromHrms(supabase, "employees")
+        .select("id, employment_status, reporting_manager_id, department_id")
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null)
+        .limit(5000),
+    ),
     fromHrms(supabase, "departments")
       .select("id, status")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "user_roles")
       .select(
-        "id, roles:role_id!inner(code), employees:employee_id(id, employment_status)",
+        "id, roles:role_id!inner(code), employees:employee_id(id, employment_status, email, employee_code)",
       )
       .eq("organization_id", organizationId)
       .eq("status", "active")
@@ -143,11 +149,13 @@ export async function getCeoOrgFilterLookups(
 ): Promise<CeoOrgFilterLookups> {
   const [employeesRes, departmentsRes, managersQuery, employmentTypesRes] =
     await Promise.all([
-      fromHrms(supabase, "employees")
-        .select("id, first_name, last_name, employee_code, employment_status, department_id")
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null)
-        .order("first_name"),
+      excludeItSystemAccountFromEmployeeQuery(
+        fromHrms(supabase, "employees")
+          .select("id, first_name, last_name, employee_code, employment_status, department_id")
+          .eq("organization_id", organizationId)
+          .is("deleted_at", null)
+          .order("first_name"),
+      ),
       fromHrms(supabase, "departments")
         .select("id, name, code")
         .eq("organization_id", organizationId)
@@ -155,7 +163,7 @@ export async function getCeoOrgFilterLookups(
         .order("name"),
       fromHrms(supabase, "user_roles")
         .select(
-          "id, roles:role_id!inner(code), employees:employee_id(id, first_name, last_name, employment_status, deleted_at)",
+          "id, roles:role_id!inner(code), employees:employee_id(id, first_name, last_name, employment_status, deleted_at, email, employee_code)",
         )
         .eq("organization_id", organizationId)
         .eq("status", "active")
@@ -178,6 +186,14 @@ export async function getCeoOrgFilterLookups(
     const employee = unwrap(row.employees);
     if (!employee?.id || employee.deleted_at) continue;
     if (!ACTIVE_STATUSES.has(employee.employment_status)) continue;
+    if (
+      isItSystemAccount({
+        email: employee.email,
+        employeeCode: employee.employee_code,
+      })
+    ) {
+      continue;
+    }
     managers.set(employee.id, {
       id: employee.id,
       label: `${employee.first_name} ${employee.last_name}`,
@@ -231,9 +247,10 @@ export async function listCeoOrgEmployees(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = fromHrms(supabase, "employees")
-    .select(
-      `
+  let query = excludeItSystemAccountFromEmployeeQuery(
+    fromHrms(supabase, "employees")
+      .select(
+        `
         id,
         employee_code,
         first_name,
@@ -254,11 +271,12 @@ export async function listCeoOrgEmployees(
         manager:reporting_manager_id (first_name, last_name),
         employee_profiles (profile_image_storage_path)
       `,
-      { count: "exact" },
-    )
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .neq("id", profile.employee.id);
+        { count: "exact" },
+      )
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .neq("id", profile.employee.id),
+  );
 
   if (employeeId) {
     query = query.eq("id", employeeId);
@@ -340,13 +358,15 @@ export async function getCeoOrgDepartments(
   const [departmentsRes, employeesRes, attendanceRes, reviewsRes, jobsRes] =
     await Promise.all([
       departmentsQuery,
-      fromHrms(supabase, "employees")
-        .select(
-          "id, department_id, employment_status, date_of_joining, reporting_manager_id",
-        )
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null)
-        .limit(5000),
+      excludeItSystemAccountFromEmployeeQuery(
+        fromHrms(supabase, "employees")
+          .select(
+            "id, department_id, employment_status, date_of_joining, reporting_manager_id",
+          )
+          .eq("organization_id", organizationId)
+          .is("deleted_at", null)
+          .limit(5000),
+      ),
       fromHrms(supabase, "attendance")
         .select("employee_id, attendance_status, employees:employee_id(department_id)")
         .eq("organization_id", organizationId)
@@ -466,9 +486,10 @@ export async function getCeoOrgWorkforceInsights(
   const organizationId = profile.employee.organizationId;
   const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
 
-  let employeesQuery = fromHrms(supabase, "employees")
-    .select(
-      `
+  let employeesQuery = excludeItSystemAccountFromEmployeeQuery(
+    fromHrms(supabase, "employees")
+      .select(
+        `
         id,
         employment_status,
         date_of_joining,
@@ -478,10 +499,11 @@ export async function getCeoOrgWorkforceInsights(
         departments:department_id(name),
         employment_types:employment_type_id(name)
       `,
-    )
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .limit(5000);
+      )
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .limit(5000),
+  );
 
   if (departmentId) employeesQuery = employeesQuery.eq("department_id", departmentId);
   if (employmentTypeId) employeesQuery = employeesQuery.eq("employment_type_id", employmentTypeId);

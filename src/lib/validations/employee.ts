@@ -72,7 +72,9 @@ export const employeeListParamsSchema = z.object({
     .optional(),
   employmentStatus: employmentStatusSchema.optional(),
   accountStatus: employeeAccountStatusSchema.optional(),
-  employmentCategory: z.enum(["all", "probation", "full_time"]).optional(),
+  employmentCategory: z
+    .enum(["all", "probation", "internship", "full_time"])
+    .optional(),
 });
 
 export const changeEmploymentTypeSchema = z.object({

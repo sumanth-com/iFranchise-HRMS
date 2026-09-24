@@ -15,6 +15,7 @@ import {
   inviteExistingEmployeeToPortal,
   reactivateExecutiveUser,
   resendExecutiveInvitation,
+  bulkUpdateProvisioningReportingContacts,
   updatePendingProvisioningUser,
   updateProvisioningReportingContacts,
 } from "@/lib/ceo/services/ceo-user-provisioning-mutations";
@@ -41,6 +42,7 @@ import type {
   PortalInviteEligibleEmployee,
 } from "@/types/ceo-user-provisioning";
 import {
+  bulkUpdateProvisioningReportingContactsSchema,
   ceoProvisioningListParamsSchema,
   changeProvisioningRoleSchema,
   inviteExecutiveUserSchema,
@@ -338,6 +340,35 @@ export async function updateProvisioningReportingContactsAction(
     await updateProvisioningReportingContacts(supabase, profile, parsed);
     revalidateUserProvisioning();
     return { success: true, message: "Reporting contacts updated." };
+  } catch (error) {
+    return {
+      success: false,
+      message: toProvisioningErrorMessage(
+        error,
+        "Unable to update reporting contacts. Please try again.",
+      ),
+    };
+  }
+}
+
+export async function bulkUpdateProvisioningReportingContactsAction(
+  input: unknown,
+): Promise<ActionResult & { updatedCount?: number }> {
+  try {
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    const parsed = bulkUpdateProvisioningReportingContactsSchema.parse(input);
+    const result = await bulkUpdateProvisioningReportingContacts(
+      supabase,
+      profile,
+      parsed,
+    );
+    revalidateUserProvisioning();
+    return {
+      success: true,
+      message: result.message,
+      updatedCount: result.updatedCount,
+    };
   } catch (error) {
     return {
       success: false,

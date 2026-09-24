@@ -16,6 +16,10 @@ import {
   type EmploymentCategoryFilter,
 } from "@/lib/employees/employment-category";
 import {
+  IT_SYSTEM_ACCOUNT_CODE,
+  IT_SYSTEM_ACCOUNT_EMAIL,
+} from "@/lib/employees/it-system-account";
+import {
   filterStandardEmploymentTypes,
   normalizeStandardEmploymentTypeCode,
 } from "@/lib/employees/standard-employment-types";
@@ -96,6 +100,10 @@ async function applyEmploymentCategoryFilter(
 
   if (category === "full_time") {
     return { mode: "full_time" as const, typeIds: [...new Set(matchingTypeIds)] };
+  }
+
+  if (category === "internship") {
+    return { mode: "internship" as const, typeIds: [...new Set(matchingTypeIds)] };
   }
 
   return { mode: "probation" as const, typeIds: [...new Set(matchingTypeIds)] };
@@ -657,6 +665,8 @@ export async function getManagers(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .is("app_hidden_at", null)
+    .neq("email", IT_SYSTEM_ACCOUNT_EMAIL)
+    .neq("employee_code", IT_SYSTEM_ACCOUNT_CODE)
     .in("employment_status", ["active", "probation", "on_leave"])
     .order("first_name");
 

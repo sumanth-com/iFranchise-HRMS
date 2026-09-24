@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { revalidateOneOnOnePaths } from "@/lib/performance/one-on-one-revalidation";
 import {
@@ -79,6 +80,7 @@ function revalidateTeamPaths() {
   revalidatePath(MANAGER_ROUTES.performance);
   revalidatePath("/dashboard/payroll");
   revalidatePath("/dashboard/employees");
+  revalidateCeoDashboardHome();
 }
 
 export async function fetchTeamEmployeesAction(

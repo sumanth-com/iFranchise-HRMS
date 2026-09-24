@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import {
@@ -9,12 +10,13 @@ import {
   CEO_PENDING_APPROVAL_STATUSES,
   PROMOTION_APPROVAL_TYPE,
 } from "@/lib/ceo/executive-approvals-constants";
+import { deriveCeoAttendanceKpis } from "@/lib/ceo/services/ceo-dashboard-kpi-utils";
+import { getCeoDashboardPayrollCost } from "@/lib/ceo/services/ceo-dashboard-payroll-cost";
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
 import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
 import { loadUpcomingCelebrations } from "@/lib/employee/services/employee-dashboard-queries";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
-import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
 import type { CeoActivityItem, CeoDashboardData } from "@/types/ceo-dashboard";
@@ -68,6 +70,10 @@ function activityHref(module: string | null): string | null {
 /**
  * Lean CEO home loader: only data the home UI renders
  * (KPIs, today's attendance, upcoming holidays).
+ *
+ * Attendance / headcount / today's workforce share getAttendanceSummary
+ * (same active roster + leave/holiday rules as HR Team Attendance).
+ * Payroll Cost uses Team Payroll Final Payable (same calculator + population).
  */
 export const getCeoDashboardData = cache(async function getCeoDashboardData(
   supabase: AuthSupabaseClient,
@@ -77,7 +83,6 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const today = getTodayDateString();
   const now = new Date();
   const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
-  const payrollMonthDate = getPayrollMonthDate(now.getMonth() + 1, now.getFullYear());
   const startedAt = performance.now();
 
   // Kick off domain sync in background without blocking dashboard load.
@@ -85,24 +90,11 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     console.error("[ceo-dashboard] executive approval sync failed", error);
   });
 
-  const attendanceStatusCount = (status: string) =>
-    fromHrms(supabase, "attendance")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("attendance_date", today)
-      .eq("attendance_status", status)
-      .is("deleted_at", null);
-
   const [
     pendingLeaveQueue,
-    activeEmployeesRes,
+    attendanceSummary,
+    payrollCost,
     exitingRes,
-    presentTodayRes,
-    absentTodayRes,
-    lateTodayRes,
-    halfDayTodayRes,
-    onLeaveTodayRes,
-    payrollRes,
     pendingApprovalsRes,
     holidaysResult,
     recruitmentSummary,
@@ -112,29 +104,17 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       console.error("[ceo-dashboard] leave approval queue failed", error);
       return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
     }),
-    fromHrms(supabase, "employees")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .in("employment_status", ["active", "probation", "on_leave"])
-      .is("deleted_at", null),
+    getAttendanceSummary(supabase, profile),
+    getCeoDashboardPayrollCost(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] payroll cost failed", error);
+      return 0;
+    }),
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .in("employment_status", ["resigned", "terminated"])
       .gte("date_of_leaving", monthStart)
       .is("deleted_at", null),
-    // Head counts only — avoid downloading every attendance row for org-wide KPIs.
-    attendanceStatusCount("present"),
-    attendanceStatusCount("absent"),
-    attendanceStatusCount("late"),
-    attendanceStatusCount("half_day"),
-    attendanceStatusCount("on_leave"),
-    fromHrms(supabase, "payrolls")
-      .select("total_net, total_gross")
-      .eq("organization_id", organizationId)
-      .eq("payroll_month", payrollMonthDate)
-      .is("deleted_at", null)
-      .maybeSingle(),
     // Match Approvals → Executive (promotion-scoped queue), not all request types.
     fromHrms(supabase, "executive_approval_requests")
       .select("id", { count: "exact", head: true })
@@ -154,71 +134,39 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     }),
   ]);
 
-  if (activeEmployeesRes.error) throw new Error(activeEmployeesRes.error.message);
   if (exitingRes.error) {
     console.error("[ceo-dashboard] exiting count failed", exitingRes.error.message);
-  }
-  for (const [label, result] of [
-    ["present", presentTodayRes],
-    ["absent", absentTodayRes],
-    ["late", lateTodayRes],
-    ["half_day", halfDayTodayRes],
-    ["on_leave", onLeaveTodayRes],
-  ] as const) {
-    if (result.error) {
-      console.error(`[ceo-dashboard] attendance ${label} count failed`, result.error.message);
-    }
-  }
-  if (payrollRes.error) {
-    console.error("[ceo-dashboard] payroll failed", payrollRes.error.message);
   }
   if (pendingApprovalsRes.error) {
     console.error("[ceo-dashboard] approvals count failed", pendingApprovalsRes.error.message);
   }
 
-  const totalEmployees = activeEmployeesRes.count ?? 0;
+  const attendanceKpis = deriveCeoAttendanceKpis(attendanceSummary);
+  const {
+    totalEmployees,
+    presentCount,
+    presentToday,
+    lateToday,
+    absentToday,
+    onLeaveToday,
+    attendancePercent,
+  } = attendanceKpis;
+
   const employeesExiting = exitingRes.count ?? 0;
   const openPositions = recruitmentSummary?.openPositions ?? 0;
-  const payrollCost = Number(payrollRes.data?.total_net ?? payrollRes.data?.total_gross ?? 0);
   const pendingApprovals = pendingApprovalsRes.count ?? 0;
-
-  const attendanceRaw = {
-    presentToday: presentTodayRes.count ?? 0,
-    absentToday: absentTodayRes.count ?? 0,
-    lateToday: lateTodayRes.count ?? 0,
-    halfDayToday: halfDayTodayRes.count ?? 0,
-    onLeaveToday: onLeaveTodayRes.count ?? 0,
-  };
-
-  const onSiteToday =
-    attendanceRaw.presentToday + attendanceRaw.lateToday + attendanceRaw.halfDayToday;
-  const absentDerived = Math.max(
-    attendanceRaw.absentToday,
-    Math.max(0, totalEmployees - onSiteToday - attendanceRaw.onLeaveToday),
-  );
-
-  const attendance = {
-    ...attendanceRaw,
-    absentToday: absentDerived,
-  };
-
-  const presentCount = onSiteToday;
-  const attendancePercent =
-    totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 1000) / 10 : 0;
   const attritionBase = totalEmployees + employeesExiting;
   const attritionRate =
     attritionBase > 0 ? Math.round((employeesExiting / attritionBase) * 1000) / 10 : 0;
 
-  const upcomingCelebrations = Array.isArray(holidaysResult)
-    ? holidaysResult
-    : [];
+  const upcomingCelebrations = Array.isArray(holidaysResult) ? holidaysResult : [];
 
   if (process.env.NODE_ENV === "development") {
     console.info("[perf]", {
       area: "ceo",
       label: "getCeoDashboardData",
       atMs: Math.round(performance.now() - startedAt),
-      note: "attendance KPIs via head counts; domain sync still blocks before KPIs",
+      note: "KPIs via getAttendanceSummary + getCeoDashboardPayrollCost + recruitment (parallel)",
     });
   }
 
@@ -284,22 +232,22 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     attendance: {
       presentPercent:
         totalEmployees > 0
-          ? Math.round((attendance.presentToday / totalEmployees) * 1000) / 10
+          ? Math.round((presentToday / totalEmployees) * 10000) / 100
           : 0,
       absentPercent:
         totalEmployees > 0
-          ? Math.round((attendance.absentToday / totalEmployees) * 1000) / 10
+          ? Math.round((absentToday / totalEmployees) * 10000) / 100
           : 0,
       latePercent:
         totalEmployees > 0
-          ? Math.round((attendance.lateToday / totalEmployees) * 1000) / 10
+          ? Math.round((lateToday / totalEmployees) * 10000) / 100
           : 0,
       workFromHome: 0,
       officeAttendance: presentCount,
-      presentToday: attendance.presentToday,
-      absentToday: attendance.absentToday,
-      lateToday: attendance.lateToday,
-      onLeaveToday: attendance.onLeaveToday,
+      presentToday,
+      absentToday,
+      lateToday,
+      onLeaveToday,
     },
     upcomingHolidays: upcomingCelebrations,
     canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
