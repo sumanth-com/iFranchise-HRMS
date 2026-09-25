@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
+import { revalidatePersonalAttendanceDashboardPaths } from "@/lib/attendance/self-attendance-revalidate";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   getManagerProfilePageData,
@@ -43,7 +43,7 @@ export async function punchManagerAttendanceAction(
     const parsed = managerAttendancePunchSchema.parse(input);
     const { profile, supabase } = await getContext();
     const today = await punchManagerAttendance(supabase, profile, parsed);
-    revalidateSelfAttendancePaths();
+    revalidatePersonalAttendanceDashboardPaths();
     return { success: true, today };
   } catch (error) {
     return {
@@ -61,7 +61,7 @@ export async function updateManagerCheckoutAction(
     const parsed = managerUpdateCheckoutSchema.parse(input);
     const { profile, supabase } = await getContext();
     const today = await updateManagerCheckout(supabase, profile, parsed);
-    revalidateSelfAttendancePaths();
+    revalidatePersonalAttendanceDashboardPaths();
     return { success: true, today };
   } catch (error) {
     return {
@@ -85,7 +85,7 @@ export async function requestManagerAttendanceRegularizationAction(
       profile,
       parsed,
     );
-    revalidateSelfAttendancePaths();
+    revalidatePersonalAttendanceDashboardPaths();
     return { success: true, correctionId };
   } catch (error) {
     return {

@@ -63,8 +63,26 @@ export function InstantNavPrefetch() {
       }
     };
 
-    // Warm sidebar modules when the browser is idle so this never competes with the
-    // in-flight navigation. Pointer-down below still prefetches immediately.
+    const warmPriorityModules = () => {
+      prefetch(portalHome);
+      for (const href of navHrefs) {
+        const path = toInternalPath(href);
+        if (!path) continue;
+        // High-frequency modules: warm immediately (not only on idle).
+        if (
+          /\/(documents|payroll|attendance|approvals|notifications)(\/|$|\?)/.test(
+            path,
+          ) ||
+          path === portalHome
+        ) {
+          prefetch(href);
+        }
+      }
+    };
+
+    // Warm priority routes right away; remaining nav on idle.
+    warmPriorityModules();
+
     const warmNavModules = () => {
       prefetch(portalHome);
       for (const href of navHrefs) {

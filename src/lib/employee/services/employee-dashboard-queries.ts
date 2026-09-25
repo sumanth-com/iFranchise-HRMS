@@ -6,12 +6,10 @@ import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-annou
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { getDirectoryAssetPhotoUrl } from "@/lib/employee/directory-asset-photos";
-import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
-import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import { HOLIDAY_TYPE_LABELS } from "@/lib/validations/organization";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -246,23 +244,15 @@ export async function loadUpcomingCelebrations(
         });
       }
 
-      const signedByPath = await createSignedStorageUrls(
-        supabase,
-        EMPLOYEE_STORAGE_BUCKETS.profileImages,
-        birthdayCandidates.map((candidate) => candidate.profileImagePath),
-      );
-
+      // Skip batch signed URLs on the dashboard paint path — directory
+      // fallbacks paint immediately; BirthdayAvatar can hydrate a signed URL later.
       for (const candidate of birthdayCandidates) {
-        const avatarUrl =
-          (candidate.profileImagePath
-            ? signedByPath.get(candidate.profileImagePath)
-            : null) ??
-          getDirectoryAssetPhotoUrl({
-            employeeCode: candidate.employeeCode,
-            firstName: candidate.firstName,
-            lastName: candidate.lastName,
-            fullName: candidate.fullName,
-          });
+        const avatarUrl = getDirectoryAssetPhotoUrl({
+          employeeCode: candidate.employeeCode,
+          firstName: candidate.firstName,
+          lastName: candidate.lastName,
+          fullName: candidate.fullName,
+        });
 
         events.push({
           id: `birthday-${candidate.employeeId}`,

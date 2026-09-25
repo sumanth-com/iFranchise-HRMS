@@ -16,20 +16,28 @@ export function revalidateHrTeamAttendanceListPaths() {
 }
 
 /**
- * Personal attendance + dashboard surfaces that read `hrms.attendance`.
- * Intentionally narrow — no location layouts, reports, or unrelated modules.
+ * Personal attendance + home dashboards that show the caller's punch state.
+ * Intentionally excludes CEO team attendance and HR team list (not needed for self-punch).
  */
-export function revalidateEmployeeFacingAttendancePaths() {
+export function revalidatePersonalAttendanceDashboardPaths() {
   revalidatePath(EMPLOYEE_ROUTES.home);
   revalidatePath(EMPLOYEE_ROUTES.attendance);
   revalidatePath(ACCOUNTANT_ROUTES.home);
   revalidatePath(ACCOUNTANT_ROUTES.attendance);
   revalidatePath(MANAGER_ROUTES.home);
   revalidatePath(MANAGER_ROUTES.attendance);
-  revalidatePath(CEO_ROUTES.attendance);
-  revalidateCeoDashboardHome();
   revalidatePath(SYSTEM_ADMIN_ROUTES.home);
   revalidatePath(SYSTEM_ADMIN_ROUTES.attendance);
+}
+
+/**
+ * Personal attendance + dashboard surfaces that read `hrms.attendance`.
+ * Broader than self-punch — includes CEO attendance home.
+ */
+export function revalidateEmployeeFacingAttendancePaths() {
+  revalidatePersonalAttendanceDashboardPaths();
+  revalidatePath(CEO_ROUTES.attendance);
+  revalidateCeoDashboardHome();
 }
 
 /**

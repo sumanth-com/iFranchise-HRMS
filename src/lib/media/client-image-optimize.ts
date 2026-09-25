@@ -19,13 +19,21 @@ function buildOptimizedName(fileName: string) {
 }
 
 /**
- * Resize and compress raster profile photos in the browser before upload.
+ * Resize and compress raster images in the browser before upload.
  * SVG and unsupported formats are returned unchanged.
+ * PDFs and non-images must never be passed here.
  */
-export async function optimizeProfileImageFile(file: File): Promise<File> {
+export async function optimizeImageFile(
+  file: File,
+  options?: { maxDimension?: number; quality?: number; skipBelowBytes?: number },
+): Promise<File> {
+  const maxDimension = options?.maxDimension ?? MAX_PROFILE_DIMENSION;
+  const quality = options?.quality ?? WEBP_QUALITY;
+  const skipBelow = options?.skipBelowBytes ?? SKIP_OPTIMIZE_BELOW_BYTES;
+
   if (typeof window === "undefined") return file;
   if (!file.type.startsWith("image/") || file.type === "image/svg+xml") return file;
-  if (file.size <= SKIP_OPTIMIZE_BELOW_BYTES && file.type === "image/webp") return file;
+  if (file.size <= skipBelow && file.type === "image/webp") return file;
 
   return new Promise((resolve) => {
     const objectUrl = URL.createObjectURL(file);
@@ -36,7 +44,7 @@ export async function optimizeProfileImageFile(file: File): Promise<File> {
       const { width, height } = scaleDimensions(
         image.naturalWidth,
         image.naturalHeight,
-        MAX_PROFILE_DIMENSION,
+        maxDimension,
       );
       const canvas = document.createElement("canvas");
       canvas.width = width;
@@ -60,7 +68,7 @@ export async function optimizeProfileImageFile(file: File): Promise<File> {
           resolve(optimized.size < file.size ? optimized : file);
         },
         "image/webp",
-        WEBP_QUALITY,
+        quality,
       );
     };
 
@@ -70,5 +78,22 @@ export async function optimizeProfileImageFile(file: File): Promise<File> {
     };
 
     image.src = objectUrl;
+  });
+}
+
+/**
+ * Resize and compress raster profile photos in the browser before upload.
+ * SVG and unsupported formats are returned unchanged.
+ */
+export async function optimizeProfileImageFile(file: File): Promise<File> {
+  return optimizeImageFile(file, { maxDimension: MAX_PROFILE_DIMENSION });
+}
+
+/** Document uploads: larger max edge, still WebP when smaller than the original. */
+export async function optimizeDocumentImageFile(file: File): Promise<File> {
+  return optimizeImageFile(file, {
+    maxDimension: 1920,
+    quality: 0.84,
+    skipBelowBytes: 200_000,
   });
 }

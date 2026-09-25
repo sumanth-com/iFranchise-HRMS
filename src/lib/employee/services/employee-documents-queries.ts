@@ -15,6 +15,7 @@ import {
 } from "@/lib/documents/storage-paths";
 import { DocRow, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
 import { extractPayslipIdFromDocumentNotes } from "@/lib/payroll/services/payslip-employee-document-identity";
+import { after } from "next/server";
 import type { UserProfile } from "@/types/auth";
 import type { DocumentSource, DocumentStatus } from "@/types/documents";
 import type {
@@ -58,7 +59,8 @@ export async function getEmployeeDocumentsExplorerForEmployee(
  * Aggregates everything the Employee Self-Service document explorer needs, scoped
  * strictly to the signed-in employee. Includes archived rows so version history can
  * be reconstructed from the `replaced_by_id` chain without exposing them as folders.
- * Syncs released payslips into Documents → Payslips before loading.
+ *
+ * Payslip → Documents mirroring is scheduled after the response (does not block LCP).
  */
 export async function getEmployeeDocumentsExplorer(
   supabase: AuthSupabaseClient,
@@ -72,6 +74,37 @@ export async function getEmployeeDocumentsExplorer(
   );
 }
 
+function schedulePayslipDocumentsSync(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+  options?: { profile?: UserProfile | null },
+) {
+  const run = async () => {
+    try {
+      const { syncReleasedPayslipsToEmployeeDocuments } = await import(
+        "@/lib/payroll/services/payslip-documents-sync"
+      );
+      await syncReleasedPayslipsToEmployeeDocuments(supabase, {
+        organizationId,
+        employeeId,
+        actorUserId: options?.profile?.userId ?? null,
+        profile: options?.profile ?? null,
+      });
+    } catch (error) {
+      console.warn("[documents] payslip Documents sync failed", {
+        employeeId,
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  };
+
+  // Prefer Next.js after() so sync does not delay Documents first paint.
+  after(() => {
+    void run();
+  });
+}
+
 async function buildEmployeeDocumentsExplorer(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -80,23 +113,8 @@ async function buildEmployeeDocumentsExplorer(
 ): Promise<EmployeeDocumentsExplorerData> {
   const explorerStartedAt = performance.now();
 
-  // Mirror released payslips into Documents → Payslips (same storage_path; idempotent).
-  try {
-    const { syncReleasedPayslipsToEmployeeDocuments } = await import(
-      "@/lib/payroll/services/payslip-documents-sync"
-    );
-    await syncReleasedPayslipsToEmployeeDocuments(supabase, {
-      organizationId,
-      employeeId,
-      actorUserId: options?.profile?.userId ?? null,
-      profile: options?.profile ?? null,
-    });
-  } catch (error) {
-    console.warn("[documents] payslip Documents sync failed", {
-      employeeId,
-      message: error instanceof Error ? error.message : "unknown",
-    });
-  }
+  // Mirror released payslips off the critical paint path (idempotent backfill).
+  schedulePayslipDocumentsSync(supabase, organizationId, employeeId, options);
 
   await ensureExplorerDocumentTypes(supabase, organizationId);
 

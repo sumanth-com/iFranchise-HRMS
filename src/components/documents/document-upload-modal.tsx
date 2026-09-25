@@ -93,7 +93,14 @@ export function DocumentUploadModal({
       if (expiryDate) formData.set("expiryDate", expiryDate);
       if (notes.trim()) formData.set("notes", notes.trim());
       if (replaceDocumentId) formData.set("replaceDocumentId", replaceDocumentId);
-      formData.set("file", file);
+      const { optimizeDocumentImageFile } = await import(
+        "@/lib/media/client-image-optimize"
+      );
+      const uploadFile =
+        file.type.startsWith("image/") && file.type !== "application/pdf"
+          ? await optimizeDocumentImageFile(file)
+          : file;
+      formData.set("file", uploadFile);
 
       const result = await uploadDocumentAction(formData);
       if (!result.success) {

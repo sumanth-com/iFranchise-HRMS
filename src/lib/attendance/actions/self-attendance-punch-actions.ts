@@ -8,7 +8,7 @@ import {
 } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
-import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
+import { revalidatePersonalAttendanceDashboardPaths } from "@/lib/attendance/self-attendance-revalidate";
 import type { SelfAttendancePunchResult } from "@/lib/attendance/self-attendance-punch-types";
 import {
   managerAttendancePunchSchema,
@@ -70,7 +70,7 @@ export async function selfAttendancePunchAction(
     } catch (payrollError) {
       console.error("[selfAttendancePunchAction] payroll refresh failed", payrollError);
     }
-    revalidateSelfAttendancePaths();
+    revalidatePersonalAttendanceDashboardPaths();
 
     const birthdayCelebration =
       parsed.type === "in"
@@ -109,7 +109,7 @@ export async function selfAttendanceUpdateCheckoutAction(
     } catch (payrollError) {
       console.error("[selfAttendanceUpdateCheckoutAction] payroll refresh failed", payrollError);
     }
-    revalidateSelfAttendancePaths();
+    revalidatePersonalAttendanceDashboardPaths();
     return { success: true, today };
   } catch (error) {
     return {

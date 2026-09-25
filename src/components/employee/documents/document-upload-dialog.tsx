@@ -216,7 +216,15 @@ export function DocumentUploadDialog({
             yearOnly ? `period:${year}` : `period:${year}-${month}`,
           );
         }
-        formData.set("file", file);
+        // Images → WebP compress client-side; PDFs stay PDF.
+        const { optimizeDocumentImageFile } = await import(
+          "@/lib/media/client-image-optimize"
+        );
+        const uploadFile =
+          file.type.startsWith("image/") && file.type !== "application/pdf"
+            ? await optimizeDocumentImageFile(file)
+            : file;
+        formData.set("file", uploadFile);
 
         const result = await employeeUploadDocumentAction(formData);
         if (!result.success) {
