@@ -7,6 +7,15 @@ import { useEffect, useRef, useState } from "react";
 import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
 import { SoftLoadError } from "@/components/common/soft-load-error";
 import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
+import {
+  DASHBOARD_HOME_BAND,
+  DASHBOARD_HOME_BOOST,
+  DASHBOARD_HOME_EVENTS,
+  DASHBOARD_HOME_INNER,
+  DASHBOARD_HOME_LEFT_STACK,
+  DASHBOARD_HOME_MAIN_GRID,
+  DASHBOARD_HOME_SHELL,
+} from "@/components/dashboard/dashboard-surface-classes";
 import { CeoDashboardKpis } from "@/components/ceo/ceo-dashboard-kpis";
 import { CeoDashboardPipeline } from "@/components/ceo/ceo-dashboard-pipeline";
 import { CeoDashboardToday } from "@/components/ceo/ceo-dashboard-today";
@@ -65,9 +74,9 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
       description={SECTION_LOAD_ERROR_DESCRIPTION}
       contentClassName="flex min-h-0 flex-1 flex-col"
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3">
-          <div className="shrink-0">
+      <div className={DASHBOARD_HOME_SHELL}>
+        <div className={DASHBOARD_HOME_INNER}>
+          <div className={DASHBOARD_HOME_BAND}>
             <EmployeeDashboardHeader
               greeting={{
                 employeeId,
@@ -82,13 +91,13 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
             />
           </div>
 
-          <div className="shrink-0">
+          <div className={DASHBOARD_HOME_BAND}>
             <CeoDashboardKpis kpis={data.kpis} />
           </div>
 
-                          <div className="grid min-h-0 min-w-0 flex-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-stretch">
-            <div className="flex min-h-0 min-w-0 flex-col gap-3">
-              <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className={DASHBOARD_HOME_MAIN_GRID}>
+            <div className={DASHBOARD_HOME_LEFT_STACK}>
+              <div className="grid w-full min-w-0 shrink-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:items-stretch">
                 <CeoDashboardToday attendance={data.attendance} />
                 <CeoDashboardPipeline recruitment={data.recruitment} />
               </div>
@@ -98,7 +107,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
                 personKey={employeeId}
                 referenceDate={referenceDate}
                 tone="executive"
-                className="min-h-[11.5rem] flex-[1.15] max-xl:min-h-[10rem] max-xl:flex-none"
+                className={DASHBOARD_HOME_BOOST}
               />
             </div>
             <EmployeeUpcomingEvents
@@ -107,7 +116,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
               canManageAnnouncements={data.canManageAnnouncements === true}
               pairHolidayBirthday
               showImportantNotices
-              className="min-h-0 min-w-0 h-full"
+              className={DASHBOARD_HOME_EVENTS}
             />
           </div>
         </div>

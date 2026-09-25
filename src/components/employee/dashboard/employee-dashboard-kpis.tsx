@@ -4,6 +4,7 @@ import { CalendarClock, CalendarDays, Clock, Timer } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
+import { DASHBOARD_KPI_GRID } from "@/components/dashboard/dashboard-surface-classes";
 import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import { resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
@@ -105,8 +106,8 @@ export function EmployeeDashboardKpiCards({
       aria-label="Your day at a glance"
       className={
         hideLeaveBalance
-          ? "grid w-full min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-3 xl:grid-cols-[repeat(3,minmax(0,1fr))]"
-          : "grid w-full min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))]"
+          ? "grid w-full min-w-0 grid-cols-2 items-stretch gap-3 xl:grid-cols-3"
+          : DASHBOARD_KPI_GRID
       }
     >
       <EmployeeStatCard

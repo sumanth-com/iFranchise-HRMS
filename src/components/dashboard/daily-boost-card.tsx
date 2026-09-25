@@ -43,8 +43,8 @@ export function DailyBoostCard({
     <section
       aria-label="Daily message"
       className={cn(
-        "relative overflow-hidden rounded-2xl",
-        compact ? "min-h-[7.5rem]" : "min-h-[11rem] max-xl:min-h-0",
+        "relative min-w-0 overflow-hidden rounded-2xl",
+        compact ? "min-h-[7.5rem]" : "min-h-[11rem]",
         className,
       )}
     >
@@ -65,7 +65,7 @@ export function DailyBoostCard({
         width={1920}
         height={720}
         sizes="100vw"
-        className="block h-[13.5rem] w-full object-cover object-[86%_42%] xl:hidden"
+        className="block aspect-[2.4/1] h-auto max-h-[13.5rem] min-h-[11rem] w-full object-cover object-[86%_42%] xl:hidden"
         priority={false}
         aria-hidden
       />

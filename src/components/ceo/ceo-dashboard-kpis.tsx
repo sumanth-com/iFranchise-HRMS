@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, type MouseEvent } from "react";
 
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
+import { DASHBOARD_KPI_GRID } from "@/components/dashboard/dashboard-surface-classes";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
 import type { CeoKpis } from "@/types/ceo-dashboard";
@@ -47,7 +48,7 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
   return (
     <section
       aria-label="Company at a glance"
-      className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      className={DASHBOARD_KPI_GRID}
     >
       <EmployeeStatCard
         label="Employees"

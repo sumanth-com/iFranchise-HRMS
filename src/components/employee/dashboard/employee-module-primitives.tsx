@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 
 /** Employee dashboard surfaces — borderless soft lift in light mode. */
 export const employeeSectionClass =
-  "dashboard-surface flex flex-col overflow-hidden rounded-xl border-0 bg-card p-4 dark:shadow-none";
+  "dashboard-surface flex flex-col overflow-x-clip overflow-y-visible rounded-xl border-0 bg-card p-4 dark:shadow-none";
 
 export const employeeStatCardClass =
-  "dashboard-surface relative flex h-full min-h-[6.75rem] min-w-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-3.5 text-left md:p-4 dark:shadow-none";
+  "dashboard-surface relative flex h-full min-h-[6.5rem] min-w-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-3.5 text-center md:min-h-[6.75rem] md:p-4 dark:shadow-none";
 
 export const employeeEventRowClass =
   "dashboard-surface flex items-center gap-3 rounded-lg border-0 bg-card px-3 py-2.5 transition-[box-shadow,background-color] dark:shadow-none";
@@ -98,9 +98,9 @@ export function EmployeeStatCard({
 }) {
   const content = (
     <>
-      <div className="relative z-10 flex flex-1 flex-col">
-        <div className="flex items-start justify-between gap-2">
-          <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
+      <div className="relative z-10 flex flex-1 flex-col items-center">
+        <div className="flex w-full items-center justify-center gap-2">
+          <p className="min-w-0 truncate whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
             {label}
           </p>
           <span
@@ -109,13 +109,18 @@ export function EmployeeStatCard({
               iconBg,
             )}
           >
-            <Icon className={cn("size-4", accent)} />
+            <Icon className={cn("size-4", accent)} aria-hidden />
           </span>
         </div>
-        <div className={cn("mt-3 flex min-w-0 flex-1 flex-col justify-end gap-2.5 pb-0.5", compact && "mt-2 gap-2")}>
+        <div
+          className={cn(
+            "mt-3 flex min-w-0 w-full flex-1 flex-col items-center justify-end gap-2.5 pb-0.5",
+            compact && "mt-2 gap-2",
+          )}
+        >
           <p
             className={cn(
-              "truncate text-2xl font-semibold leading-7 tracking-tight tabular-nums",
+              "w-full truncate text-center text-2xl font-semibold leading-7 tracking-tight tabular-nums",
               accent,
             )}
           >
@@ -124,7 +129,7 @@ export function EmployeeStatCard({
           {hint ? (
             <span
               className={cn(
-                "inline-flex w-fit max-w-full truncate rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ring-1 ring-inset",
+                "inline-flex max-w-full truncate rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ring-1 ring-inset",
                 tone
                   ? STAT_CARD_HINT[tone]
                   : "bg-muted/70 text-muted-foreground ring-border/60",

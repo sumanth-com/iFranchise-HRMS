@@ -13,6 +13,11 @@ import {
 
 import { buttonVariants } from "@/components/common/button";
 import {
+  DASHBOARD_HOME_INNER,
+  DASHBOARD_HOME_SHELL,
+  DASHBOARD_KPI_GRID,
+} from "@/components/dashboard/dashboard-surface-classes";
+import {
   EmployeeSectionCard,
   EmployeeStatCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
@@ -38,8 +43,8 @@ export function AccountantDashboardView({
     summary.pendingPayroll + reimbursementOverview.pendingCount;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 max-xl:overflow-x-visible xl:overflow-hidden">
-      <div className="mx-auto flex w-full min-w-0 max-w-[88rem] flex-col gap-3 max-xl:min-h-0 xl:h-full xl:min-h-0">
+    <div className={DASHBOARD_HOME_SHELL}>
+      <div className={DASHBOARD_HOME_INNER}>
         <header className="flex shrink-0 flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">Finance Dashboard</h1>
@@ -64,7 +69,7 @@ export function AccountantDashboardView({
 
         <section
           aria-label="Period metrics"
-          className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4"
+          className={DASHBOARD_KPI_GRID}
         >
           <EmployeeStatCard
             label="Payroll Period"

@@ -253,26 +253,29 @@ function HolidaySlide({
   const timing = countdownLabel(event.date, referenceDate);
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-3 py-4 text-center ring-1 ring-violet-500/15 sm:px-5 sm:py-5">
-      <span className="mx-auto aspect-square w-[min(100%,8rem)] max-h-[min(9rem,42%)] min-h-[5rem] shrink-0 sm:w-[min(100%,9.5rem)]">
-        <HolidayGlyph name={event.title} className="size-full max-h-full max-w-full" />
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center gap-0 overflow-visible rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-3 py-3 text-center ring-1 ring-violet-500/15 sm:px-4 sm:py-4">
+      <span className="mx-auto aspect-square w-[min(100%,6.75rem)] max-h-[6.75rem] min-h-[4.25rem] shrink-0 sm:w-[min(100%,7.5rem)] sm:max-h-[7.5rem]">
+        <HolidayGlyph
+          name={event.title}
+          className="size-full max-h-full max-w-full object-contain"
+        />
       </span>
 
-      <span className="mt-3.5 inline-flex max-w-full shrink-0 items-center justify-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-center text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
+      <span className="mt-2.5 inline-flex max-w-full shrink-0 items-center justify-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-center text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
         <span className="max-w-full break-words">{timing}</span>
       </span>
 
-      <p className="mt-2.5 w-full min-w-0 max-w-full shrink-0 break-words text-base leading-snug font-semibold tracking-tight text-pretty text-foreground sm:text-lg">
+      <p className="mt-2 w-full min-w-0 max-w-full shrink-0 break-words text-center text-base leading-snug font-semibold tracking-tight text-pretty text-foreground sm:text-lg">
         {event.title}
       </p>
 
       {event.subtitle ? (
-        <p className="mt-1 w-full min-w-0 max-w-full shrink-0 break-words text-xs leading-snug text-muted-foreground">
+        <p className="mt-1 w-full min-w-0 max-w-full shrink-0 break-words text-center text-xs leading-snug text-muted-foreground">
           {event.subtitle}
         </p>
       ) : null}
 
-      <p className="mt-3 w-full min-w-0 max-w-full shrink-0 break-words text-[11px] leading-snug font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
+      <p className="mt-2 w-full min-w-0 max-w-full shrink-0 break-words text-center text-[11px] leading-snug font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
         {format(eventDate, "EEEE, d MMM yyyy")}
       </p>
     </div>
@@ -621,7 +624,7 @@ export function EmployeeUpcomingEvents({
   const celebrationsBody =
     slideCount > 0 ? (
       <div
-        className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col"
+        className="relative flex min-h-[14rem] w-full min-w-0 flex-1 flex-col"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onFocusCapture={() => setPaused(true)}
@@ -631,7 +634,7 @@ export function EmployeeUpcomingEvents({
           }
         }}
       >
-        <div className="relative min-h-0 w-full min-w-0 flex-1">
+        <div className="relative min-h-[14rem] w-full min-w-0 flex-1">
           {pairHolidayBirthday
             ? pairedSlides.map((pair, slideIndex) => {
                 const active = slideIndex === index;
@@ -639,7 +642,7 @@ export function EmployeeUpcomingEvents({
                   <div
                     key={pair.id}
                     className={cn(
-                      "absolute inset-0 min-w-0 w-full transition-opacity duration-500 ease-out",
+                      "absolute inset-0 min-h-[14rem] min-w-0 w-full transition-opacity duration-500 ease-out",
                       active ? "z-[1] opacity-100" : "z-0 pointer-events-none opacity-0",
                     )}
                     aria-hidden={!active}
@@ -658,7 +661,7 @@ export function EmployeeUpcomingEvents({
                   <div
                     key={event.id}
                     className={cn(
-                      "absolute inset-0 min-w-0 w-full transition-opacity duration-500 ease-out",
+                      "absolute inset-0 min-h-[14rem] min-w-0 w-full transition-opacity duration-500 ease-out",
                       active ? "z-[1] opacity-100" : "z-0 pointer-events-none opacity-0",
                     )}
                     aria-hidden={!active}
@@ -711,8 +714,8 @@ export function EmployeeUpcomingEvents({
           className,
         )}
       >
-        <div className="mb-3 flex min-w-0 flex-wrap items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        <div className="mb-3 flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:items-start sm:justify-between sm:text-left">
+          <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:justify-start">
             <Button
               type="button"
               size="xs"
@@ -780,7 +783,7 @@ export function EmployeeUpcomingEvents({
             </Button>
           ) : null}
         </div>
-        <p className="mb-3 shrink-0 text-xs text-muted-foreground">
+        <p className="mb-3 shrink-0 text-center text-xs text-muted-foreground sm:text-left">
           {announcementsOpen
             ? "Company notices shared with you."
             : panel === "notices"

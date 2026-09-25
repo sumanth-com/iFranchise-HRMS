@@ -86,7 +86,7 @@ export function EmployeeDashboardHeader({
   return (
     <section
       className={cn(
-        "dashboard-surface relative w-full shrink-0 overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-card via-card to-violet-500/[0.06] px-5 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7 dark:shadow-none",
+        "dashboard-surface relative w-full shrink-0 overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-card via-card to-violet-500/[0.06] px-5 py-4 md:px-6 md:py-5 dark:shadow-none",
       )}
     >
       <div className="pointer-events-none absolute -top-12 -right-12 size-44 rounded-full bg-gradient-to-br from-blue-500/15 to-violet-500/20 blur-3xl" />
