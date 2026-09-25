@@ -65,7 +65,7 @@ export function EmploymentCategoryFilters({
     <div
       ref={containerRef}
       role="tablist"
-      aria-label="Employment type filters"
+      aria-label="Employment filters"
       className="relative inline-flex max-w-full flex-wrap items-center gap-2"
     >
       <span

@@ -19,6 +19,10 @@ import {
   shouldIncludeInUserProvisioningList,
 } from "@/lib/ceo/provisioning-directory-filters";
 import { deriveProvisioningInvitationStatus } from "@/lib/ceo/provisioning-invitation-status";
+import {
+  activeEmploymentStatusFilter,
+  isFormerEmploymentStatus,
+} from "@/lib/employees/employment-eligibility";
 import type { UserProfile } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
 import {
@@ -227,6 +231,9 @@ function isAwaitingPortalProvisioning(row: {
 }
 
 function shouldIncludeInProvisioningDirectory(employee: LooseRow): boolean {
+  if (isFormerEmploymentStatus(String(employee.employment_status ?? ""))) {
+    return false;
+  }
   const designation = unwrapRelation<LooseRow>(employee.designations);
   return !isExcludedFromUserProvisioningDirectory({
     email: employee.email,
@@ -316,7 +323,7 @@ const EMPLOYEE_SELECT_FIELDS = `
   account_status, invitation_sent_at, invitation_cancelled_at,
   first_login_at, last_login_at, account_activated_at,
   account_deactivated_at, account_suspended_at, created_by,
-  updated_at, date_of_joining, employment_type_id, invited_role_id,
+  updated_at, date_of_joining, employment_status, employment_type_id, invited_role_id,
   department_id, branch_id, designation_id, reporting_manager_id,
   assigned_hr_employee_id, deleted_at, app_hidden_at,
   departments:department_id ( name ),
@@ -471,9 +478,9 @@ const loadProvisionedPortalUsers = cache(async function loadProvisionedPortalUse
         account_status, invitation_sent_at, invitation_cancelled_at,
         first_login_at, last_login_at, account_activated_at,
         account_deactivated_at, account_suspended_at, created_by,
-        updated_at, date_of_joining, employment_type_id, invited_role_id,
+        updated_at, date_of_joining, employment_status, employment_type_id, invited_role_id,
         department_id, branch_id, designation_id, reporting_manager_id,
-        assigned_hr_employee_id, deleted_at,
+        assigned_hr_employee_id, deleted_at, app_hidden_at,
         departments:department_id ( name ),
         branches:branch_id ( name ),
         designations:designation_id ( title ),
@@ -1051,6 +1058,7 @@ export async function listPortalInviteEligibleEmployees(
     .select(
       `
       id, employee_code, first_name, last_name, email, account_status, user_id, first_login_at,
+      employment_status,
       departments:department_id ( name ),
       designations:designation_id ( title ),
       employee_profiles:employee_profiles ( personal_email, deleted_at ),
@@ -1060,6 +1068,7 @@ export async function listPortalInviteEligibleEmployees(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .is("app_hidden_at", null)
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name", { ascending: true })
     .limit(80);
 

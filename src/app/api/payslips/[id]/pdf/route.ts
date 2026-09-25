@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getPayslipById } from "@/lib/payroll/services/payroll-mutations";
-import { generatePayslipPdfBytes } from "@/lib/payroll/services/payslip-pdf";
 import { canAccessPayslipDuringReview } from "@/lib/payroll/services/payslip-publication";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -31,6 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
       }
     }
 
+    const { generatePayslipPdfBytes } = await import("@/lib/payroll/services/payslip-pdf");
     const pdfBytes = await generatePayslipPdfBytes(payslip);
     const filename = `payslip-${payslip.payslipNumber}.pdf`;
 

@@ -415,7 +415,11 @@ export async function listTeamEmployees(
 
   if (departmentId) query = query.eq("department_id", departmentId);
   if (designationId) query = query.eq("designation_id", designationId);
-  if (employmentStatus) query = query.eq("employment_status", employmentStatus);
+  if (employmentStatus) {
+    query = query.eq("employment_status", employmentStatus);
+  } else {
+    query = query.in("employment_status", [...ACTIVE_EMPLOYMENT]);
+  }
   if (employmentTypeId) query = query.eq("employment_type_id", employmentTypeId);
 
   query = query.order(sortBy, { ascending: sortOrder === "asc" }).range(from, to);

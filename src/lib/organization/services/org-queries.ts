@@ -684,7 +684,7 @@ export async function listWorkLocations(
   };
 }
 
-export async function listHolidays(
+export const listHolidays = cache(async function listHolidays(
   supabase: AuthSupabaseClient,
   organizationId: string,
   params: { year?: number; search?: string },
@@ -751,7 +751,7 @@ export async function listHolidays(
   });
 
   return { data: holidays, total: count ?? 0, year: targetYear, page: 1 };
-}
+});
 
 export async function listShiftTemplates(
   supabase: AuthSupabaseClient,

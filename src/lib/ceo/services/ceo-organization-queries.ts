@@ -9,6 +9,11 @@ import {
 } from "@/lib/employees/services/employee-detail";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import {
+  activeEmploymentStatusFilter,
+  isActiveEmploymentStatus,
+  isFormerEmploymentStatus,
+} from "@/lib/employees/employment-eligibility";
+import {
   excludeItSystemAccountFromEmployeeQuery,
   isItSystemAccount,
 } from "@/lib/employees/it-system-account";
@@ -34,8 +39,6 @@ import type {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
-
-const ACTIVE_STATUSES = new Set(["active", "probation", "on_leave"]);
 
 function unwrap<T>(value: T | T[] | null | undefined): T | null {
   return unwrapRelation(value as T | T[] | null);
@@ -84,7 +87,9 @@ export async function getCeoOrgSummary(
   if (departmentsRes.error) throw new Error(departmentsRes.error.message);
 
   const empRows = (employeesRes.data ?? []) as LooseRow[];
-  const activeEmployees = empRows.filter((row) => ACTIVE_STATUSES.has(row.employment_status));
+  const activeEmployees = empRows.filter((row) =>
+    isActiveEmploymentStatus(row.employment_status),
+  );
   const departmentsWithPeople = new Set(
     activeEmployees.map((row) => row.department_id).filter(Boolean),
   );
@@ -96,7 +101,7 @@ export async function getCeoOrgSummary(
   const managerRows = (managersRes.data ?? []) as LooseRow[];
   const activeManagers = managerRows.filter((row) => {
     const employee = unwrap(row.employees);
-    return employee && ACTIVE_STATUSES.has(employee.employment_status);
+    return employee && isActiveEmploymentStatus(employee.employment_status);
   });
 
   const reportCountByManager = new Map<string, number>();
@@ -185,7 +190,7 @@ export async function getCeoOrgFilterLookups(
   for (const row of (managersQuery.data ?? []) as LooseRow[]) {
     const employee = unwrap(row.employees);
     if (!employee?.id || employee.deleted_at) continue;
-    if (!ACTIVE_STATUSES.has(employee.employment_status)) continue;
+    if (!isActiveEmploymentStatus(employee.employment_status)) continue;
     if (
       isItSystemAccount({
         email: employee.email,
@@ -289,7 +294,11 @@ export async function listCeoOrgEmployees(
 
   if (departmentId) query = query.eq("department_id", departmentId);
   if (managerId) query = query.eq("reporting_manager_id", managerId);
-  if (employmentStatus) query = query.eq("employment_status", employmentStatus);
+  if (employmentStatus) {
+    query = query.eq("employment_status", employmentStatus);
+  } else {
+    query = query.in("employment_status", activeEmploymentStatusFilter());
+  }
   if (employmentTypeId) query = query.eq("employment_type_id", employmentTypeId);
 
   query = query.order(sortBy, { ascending: sortOrder === "asc" }).range(from, to);
@@ -395,14 +404,14 @@ export async function getCeoOrgDepartments(
   const managersByDept = new Map<string, Set<string>>();
 
   for (const row of empRows) {
-    if (!row.department_id || !ACTIVE_STATUSES.has(row.employment_status)) continue;
+    if (!row.department_id || !isActiveEmploymentStatus(row.employment_status)) continue;
     const list = activeByDept.get(row.department_id) ?? [];
     list.push(row);
     activeByDept.set(row.department_id, list);
   }
 
   for (const row of empRows) {
-    if (!row.reporting_manager_id || !ACTIVE_STATUSES.has(row.employment_status)) continue;
+    if (!row.reporting_manager_id || !isActiveEmploymentStatus(row.employment_status)) continue;
     const manager = empRows.find((item) => item.id === row.reporting_manager_id);
     if (!manager?.department_id) continue;
     const set = managersByDept.get(manager.department_id) ?? new Set();
@@ -512,7 +521,7 @@ export async function getCeoOrgWorkforceInsights(
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as LooseRow[];
-  const active = rows.filter((row) => ACTIVE_STATUSES.has(row.employment_status));
+  const active = rows.filter((row) => isActiveEmploymentStatus(row.employment_status));
 
   const departmentDistribution = new Map<string, number>();
   const employmentTypeDistribution = new Map<string, number>();
@@ -557,7 +566,7 @@ export async function getCeoOrgWorkforceInsights(
       (row) => row.date_of_joining && String(row.date_of_joining) >= monthStart,
     ).length,
     employeesOnNotice: rows.filter((row) =>
-      ["resigned", "terminated"].includes(row.employment_status),
+      isFormerEmploymentStatus(row.employment_status),
     ).length,
     employeesOnProbation: active.filter((row) => row.employment_status === "probation").length,
   };

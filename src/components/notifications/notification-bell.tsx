@@ -50,7 +50,7 @@ import type {
   NotificationBellItem,
 } from "@/types/notifications";
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 90_000;
 
 export function NotificationBell() {
   const router = useRouter();

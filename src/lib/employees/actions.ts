@@ -298,8 +298,6 @@ export async function deleteEmployeeAction(
     revalidatePath("/dashboard/hr-overview");
     revalidatePath("/dashboard/directory");
     revalidatePath("/dashboard/payroll");
-    revalidatePath("/employee");
-    revalidatePath("/manager");
     revalidateCeoDashboardHome();
 
     return { success: true, data: deleted };

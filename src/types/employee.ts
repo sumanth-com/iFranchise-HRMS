@@ -99,7 +99,7 @@ export type EmployeeListParams = {
   department?: string;
   employmentStatus?: EmploymentStatus;
   accountStatus?: EmployeeAccountStatus;
-  employmentCategory?: "all" | "probation" | "internship" | "full_time";
+  employmentCategory?: "all" | "probation" | "internship" | "full_time" | "former";
 };
 
 export type EmployeeSortField =

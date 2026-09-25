@@ -2,6 +2,7 @@ import { parseISO } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { isActiveEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import { createNotification } from "@/lib/notifications/services/notification-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
@@ -53,7 +54,7 @@ async function loadTodaysBirthdays(
     const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
     if (!employee || employee.deleted_at) continue;
     if (employee.status && employee.status !== "active") continue;
-    if (employee.employment_status === "terminated") continue;
+    if (!isActiveEmploymentStatus(String(employee.employment_status ?? ""))) continue;
 
     const dateOfBirth = row.date_of_birth as string | null;
     if (!dateOfBirth || !isBirthdayOnDate(dateOfBirth, referenceDate)) continue;

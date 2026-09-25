@@ -1,4 +1,5 @@
 import { addMonths, format } from "date-fns";
+import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
@@ -278,7 +279,7 @@ function buildTimeline(input: {
   };
 }
 
-export async function getEmployeePayrollData(
+export const getEmployeePayrollData = cache(async function getEmployeePayrollData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   options?: { targetEmployeeId?: string; appOrigin?: string },
@@ -900,4 +901,4 @@ export async function getEmployeePayrollData(
       financialYearLabel,
     },
   };
-}
+});

@@ -70,7 +70,7 @@ export function InstantNavPrefetch() {
         if (!path) continue;
         // High-frequency modules: warm immediately (not only on idle).
         if (
-          /\/(documents|payroll|attendance|approvals|notifications)(\/|$|\?)/.test(
+          /\/(documents|payroll|attendance|approvals|notifications|leave)(\/|$|\?)/.test(
             path,
           ) ||
           path === portalHome

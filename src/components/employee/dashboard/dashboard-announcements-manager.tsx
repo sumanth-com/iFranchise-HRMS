@@ -102,7 +102,16 @@ export function DashboardAnnouncementsManager({
       formData.set("priority", editing.priority);
       formData.set("isPublished", String(editing.isPublished));
       formData.set("clearImage", String(editing.clearImage));
-      if (imageFile) formData.set("image", imageFile);
+      if (imageFile) {
+        const { optimizeDocumentImageFile } = await import(
+          "@/lib/media/client-image-optimize"
+        );
+        const uploadImage =
+          imageFile.type.startsWith("image/") && imageFile.type !== "application/pdf"
+            ? await optimizeDocumentImageFile(imageFile)
+            : imageFile;
+        formData.set("image", uploadImage);
+      }
 
       const result = await saveDashboardAnnouncementAction(formData);
       if (!result.success) {

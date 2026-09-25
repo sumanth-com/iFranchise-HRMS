@@ -32,6 +32,7 @@ import {
   BONUS_TYPE_LABELS,
 } from "@/lib/payroll/constants";
 import { formatCurrency, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
+import { useModuleSoftData } from "@/lib/perf/use-module-soft-data";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import type {
   BonusItem,
@@ -102,7 +103,7 @@ function AwaitingHrPanel({
 }
 
 export function EmployeePayrollView({
-  data,
+  data: serverData,
   policyHref = EMPLOYEE_ROUTES.payrollPolicy,
   showPolicyLink = true,
   showHeaderActions = true,
@@ -114,6 +115,7 @@ export function EmployeePayrollView({
   showHeaderActions?: boolean;
   showPageHeading?: boolean;
 }) {
+  const data = useModuleSoftData(serverData, { moduleId: "employee-payroll" });
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 

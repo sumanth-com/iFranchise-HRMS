@@ -130,7 +130,7 @@ export function useApprovalsSync({
 
     // 4. Supabase Realtime channel subscription for instant cross-user / cross-portal sync
     const supabase = createClient();
-    const channelName = `approvals-sync-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const channelName = `approvals-sync:${resolvedTables.join(",")}`;
     const channel = supabase.channel(channelName);
 
     for (const table of resolvedTables) {

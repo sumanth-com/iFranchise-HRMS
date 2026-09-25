@@ -48,13 +48,12 @@ import { recruitmentSettingsSchema } from "@/lib/validations/recruitment";
 import type { CompanySettingsActionResult } from "@/types/company-settings";
 
 function revalidateCompanySettings() {
+  // Module-scoped only — do not nuke portal roots (/employee|/manager|/ceo)
+  // or soft-nav Router Cache for unrelated modules.
   revalidatePath(COMPANY_SETTINGS_ROUTES.base);
-  revalidatePath("/dashboard");
   revalidatePath("/dashboard/organization");
   revalidatePath("/dashboard/organization/profile");
-  revalidatePath("/employee");
-  revalidatePath("/manager");
-  revalidatePath("/ceo");
+  revalidatePath("/dashboard/company-settings");
   revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/attendance-management");
   revalidatePath("/dashboard/leave");

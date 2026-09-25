@@ -97,3 +97,12 @@ export async function optimizeDocumentImageFile(file: File): Promise<File> {
     skipBelowBytes: 200_000,
   });
 }
+
+/** Org / branding logos: keep sharp enough for header, still WebP when smaller. */
+export async function optimizeOrganizationLogoFile(file: File): Promise<File> {
+  return optimizeImageFile(file, {
+    maxDimension: 1024,
+    quality: 0.85,
+    skipBelowBytes: 80_000,
+  });
+}

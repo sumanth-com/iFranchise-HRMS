@@ -16,6 +16,10 @@ import {
   type EmploymentCategoryFilter,
 } from "@/lib/employees/employment-category";
 import {
+  activeEmploymentStatusFilter,
+  formerEmploymentStatusFilter,
+} from "@/lib/employees/employment-eligibility";
+import {
   IT_SYSTEM_ACCOUNT_CODE,
   IT_SYSTEM_ACCOUNT_EMAIL,
 } from "@/lib/employees/it-system-account";
@@ -76,7 +80,11 @@ async function applyEmploymentCategoryFilter(
   category: EmploymentCategoryFilter | undefined,
 ) {
   if (!category || category === "all") {
-    return null;
+    return { mode: "active_all" as const, typeIds: null as string[] | null };
+  }
+
+  if (category === "former") {
+    return { mode: "former" as const, typeIds: null as string[] | null };
   }
 
   const { data: types, error } = await supabase
@@ -107,6 +115,27 @@ async function applyEmploymentCategoryFilter(
   }
 
   return { mode: "probation" as const, typeIds: [...new Set(matchingTypeIds)] };
+}
+
+function applyListEmploymentPopulationFilter<T extends { in: (column: string, values: string[]) => T; eq: (column: string, value: string) => T }>(
+  query: T,
+  options: {
+    categoryMode: string;
+    employmentStatus?: string;
+  },
+): T {
+  const { categoryMode, employmentStatus } = options;
+
+  if (categoryMode === "former") {
+    return query.in("employment_status", formerEmploymentStatusFilter());
+  }
+
+  if (employmentStatus) {
+    return query.eq("employment_status", employmentStatus);
+  }
+
+  // Active tabs (all / type pills): never include former employees.
+  return query.in("employment_status", activeEmploymentStatusFilter());
 }
 
 type EmployeeListCountRow = {
@@ -151,7 +180,7 @@ export async function countEmployeeModuleListTotal(
     employmentCategory,
   );
 
-  if (categoryFilter && categoryFilter.typeIds.length === 0) {
+  if (categoryFilter.typeIds && categoryFilter.typeIds.length === 0) {
     return 0;
   }
 
@@ -219,15 +248,16 @@ export async function countEmployeeModuleListTotal(
     query = query.eq("department_id", departmentId);
   }
 
-  if (employmentStatus) {
-    query = query.eq("employment_status", employmentStatus);
-  }
+  query = applyListEmploymentPopulationFilter(query, {
+    categoryMode: categoryFilter.mode,
+    employmentStatus,
+  });
 
   if (accountStatus) {
     query = query.eq("account_status", accountStatus);
   }
 
-  if (categoryFilter && categoryFilter.typeIds.length > 0) {
+  if (categoryFilter.typeIds && categoryFilter.typeIds.length > 0) {
     query = query.in("employment_type_id", categoryFilter.typeIds);
   }
 
@@ -265,7 +295,7 @@ export async function listEmployees(
     employmentCategory,
   );
 
-  if (categoryFilter && categoryFilter.typeIds.length === 0) {
+  if (categoryFilter.typeIds && categoryFilter.typeIds.length === 0) {
     return { data: [], total: 0, page, pageSize };
   }
 
@@ -351,15 +381,16 @@ export async function listEmployees(
     query = query.eq("department_id", departmentId);
   }
 
-  if (employmentStatus) {
-    query = query.eq("employment_status", employmentStatus);
-  }
+  query = applyListEmploymentPopulationFilter(query, {
+    categoryMode: categoryFilter.mode,
+    employmentStatus,
+  });
 
   if (accountStatus) {
     query = query.eq("account_status", accountStatus);
   }
 
-  if (categoryFilter && categoryFilter.typeIds.length > 0) {
+  if (categoryFilter.typeIds && categoryFilter.typeIds.length > 0) {
     query = query.in("employment_type_id", categoryFilter.typeIds);
   }
 
@@ -401,13 +432,14 @@ export async function listEmployees(
   if (departmentId) {
     countQuery = countQuery.eq("department_id", departmentId);
   }
-  if (employmentStatus) {
-    countQuery = countQuery.eq("employment_status", employmentStatus);
-  }
+  countQuery = applyListEmploymentPopulationFilter(countQuery, {
+    categoryMode: categoryFilter.mode,
+    employmentStatus,
+  });
   if (accountStatus) {
     countQuery = countQuery.eq("account_status", accountStatus);
   }
-  if (categoryFilter && categoryFilter.typeIds.length > 0) {
+  if (categoryFilter.typeIds && categoryFilter.typeIds.length > 0) {
     countQuery = countQuery.in("employment_type_id", categoryFilter.typeIds);
   }
 
@@ -628,6 +660,7 @@ export async function getOccupiedDepartments(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .is("app_hidden_at", null)
+      .in("employment_status", activeEmploymentStatusFilter())
       .not("department_id", "is", null),
   ]);
 
@@ -667,7 +700,7 @@ export async function getManagers(
     .is("app_hidden_at", null)
     .neq("email", IT_SYSTEM_ACCOUNT_EMAIL)
     .neq("employee_code", IT_SYSTEM_ACCOUNT_CODE)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name");
 
   if (excludeEmployeeId) {

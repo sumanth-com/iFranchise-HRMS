@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 
 const BALA_GANESH_IMAGE = "/images/holidays/bala-ganesh.png";
+/** Colorful square portrait; cache-bust when asset is replaced in-place. */
+const GANDHI_JAYANTI_IMAGE = "/images/holidays/gandhi.jpg?v=2";
 
 function DussheraBowIcon({ className }: { className?: string }) {
   return (
@@ -53,20 +55,35 @@ export function holidayEmoji(name: string): string {
   return "📅";
 }
 
-function BalaGaneshImage({ className }: { className?: string }) {
+function HolidayPhotoGlyph({
+  src,
+  className,
+  frameClassName,
+  imageClassName,
+}: {
+  src: string;
+  className?: string;
+  frameClassName?: string;
+  /** Defaults to cover; use contain for portraits that must stay fully visible. */
+  imageClassName?: string;
+}) {
   return (
     <span
       className={cn(
-        "relative block aspect-square size-full overflow-hidden rounded-2xl bg-amber-50 shadow-sm ring-1 ring-black/5",
+        "relative block aspect-square size-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5",
+        frameClassName,
         className,
       )}
       aria-hidden
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- static public holiday asset */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- static public holiday asset; lazy so celebrations never block LCP */}
       <img
-        src={BALA_GANESH_IMAGE}
+        src={src}
         alt=""
-        className="size-full object-cover object-center"
+        className={cn("size-full object-cover object-center", imageClassName)}
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
         draggable={false}
       />
     </span>
@@ -81,7 +98,24 @@ export function HolidayGlyph({
   className?: string;
 }) {
   if (matchesHoliday(name, "ganesh", "vinayaka", "vinavaka", "chavithi", "ganapati")) {
-    return <BalaGaneshImage className={className} />;
+    return (
+      <HolidayPhotoGlyph
+        src={BALA_GANESH_IMAGE}
+        frameClassName="bg-amber-50"
+        className={className}
+      />
+    );
+  }
+
+  if (matchesHoliday(name, "gandhi")) {
+    return (
+      <HolidayPhotoGlyph
+        src={GANDHI_JAYANTI_IMAGE}
+        frameClassName="bg-gradient-to-b from-amber-50 to-orange-50/80 p-1.5"
+        imageClassName="rounded-xl object-contain object-center"
+        className={className}
+      />
+    );
   }
 
   if (matchesHoliday(name, "dusshera", "dussehra", "vijayadashami", "dasara")) {

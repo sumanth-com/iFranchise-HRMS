@@ -46,7 +46,7 @@ type OnboardingDashboardViewProps = OnboardingModuleData & {
   basePath?: string;
 };
 
-const LIST_REFRESH_MS = 15_000;
+const LIST_REFRESH_MS = 60_000;
 
 function canDeleteOnboardingCase(status: string) {
   return status !== "employee_created" && status !== "completed";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Input } from "@/components/common/input";
@@ -48,6 +48,25 @@ type EmployeeTableProps = {
   routesBasePath?: string;
 };
 
+type TabCacheEntry = {
+  employees: EmployeeListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+function categoryCacheKey(filters: EmployeeListParams): string {
+  return [
+    filters.employmentCategory ?? "all",
+    filters.department ?? "",
+    filters.search ?? "",
+    filters.page ?? 1,
+    filters.pageSize ?? 20,
+    filters.sortBy ?? "first_name",
+    filters.sortOrder ?? "asc",
+  ].join("|");
+}
+
 export function EmployeeTable({
   employees: initialEmployees,
   total: initialTotal,
@@ -86,6 +105,25 @@ export function EmployeeTable({
     employmentCategory: initialEmploymentCategory,
   });
   const [searchInput, setSearchInput] = useState(initialSearch ?? "");
+  const tabCacheRef = useRef(new Map<string, TabCacheEntry>());
+
+  useEffect(() => {
+    tabCacheRef.current.set(categoryCacheKey({
+      page: initialPage,
+      pageSize: initialPageSize,
+      search: initialSearch || undefined,
+      sortBy: initialSortBy as EmployeeListParams["sortBy"],
+      sortOrder: initialSortOrder,
+      department: initialDepartment,
+      employmentStatus: initialEmploymentStatus as EmployeeListParams["employmentStatus"],
+      employmentCategory: initialEmploymentCategory,
+    }), {
+      employees: initialEmployees,
+      total: initialTotal,
+      page: initialPage,
+      pageSize: initialPageSize,
+    });
+  }, []); // seed once from SSR payload
 
   useEffect(() => {
     if (window.location.search) {
@@ -117,7 +155,21 @@ export function EmployeeTable({
         (nextFilters as Record<string, unknown>)[key] = value || undefined;
       });
 
+      // Persist current tab result before switching.
+      tabCacheRef.current.set(categoryCacheKey(filters), {
+        employees: tableState.employees,
+        total: tableState.total,
+        page: tableState.page,
+        pageSize: tableState.pageSize,
+      });
+
       setFilters(nextFilters);
+
+      const cached = tabCacheRef.current.get(categoryCacheKey(nextFilters));
+      if (cached) {
+        setTableState(cached);
+        return;
+      }
 
       startTransition(async () => {
         const result = await fetchEmployeesAction(nextFilters);
@@ -126,15 +178,17 @@ export function EmployeeTable({
           return;
         }
 
-        setTableState({
+        const nextState = {
           employees: result.data.data,
           total: result.data.total,
           page: result.data.page,
           pageSize: result.data.pageSize,
-        });
+        };
+        tabCacheRef.current.set(categoryCacheKey(nextFilters), nextState);
+        setTableState(nextState);
       });
     },
-    [filters],
+    [filters, tableState.employees, tableState.page, tableState.pageSize, tableState.total],
   );
 
   useEffect(() => {
@@ -158,12 +212,18 @@ export function EmployeeTable({
   const refreshEmployees = useCallback(async () => {
     const refreshResult = await fetchEmployeesAction(filters);
     if (refreshResult.success) {
-      setTableState({
+      const nextState = {
         employees: refreshResult.data.data,
         total: refreshResult.data.total,
         page: refreshResult.data.page,
         pageSize: refreshResult.data.pageSize,
-      });
+      };
+      tabCacheRef.current.set(categoryCacheKey(filters), nextState);
+      // Mutations change workforce membership — drop other tab caches.
+      for (const key of [...tabCacheRef.current.keys()]) {
+        if (key !== categoryCacheKey(filters)) tabCacheRef.current.delete(key);
+      }
+      setTableState(nextState);
     }
   }, [filters]);
 

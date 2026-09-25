@@ -1,3 +1,6 @@
+import { cache } from "react";
+import { after } from "next/server";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   categoryForCode,
@@ -15,7 +18,6 @@ import {
 } from "@/lib/documents/storage-paths";
 import { DocRow, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
 import { extractPayslipIdFromDocumentNotes } from "@/lib/payroll/services/payslip-employee-document-identity";
-import { after } from "next/server";
 import type { UserProfile } from "@/types/auth";
 import type { DocumentSource, DocumentStatus } from "@/types/documents";
 import type {
@@ -61,8 +63,9 @@ export async function getEmployeeDocumentsExplorerForEmployee(
  * be reconstructed from the `replaced_by_id` chain without exposing them as folders.
  *
  * Payslip → Documents mirroring is scheduled after the response (does not block LCP).
+ * Request-scoped cache: layout + page + parallel children share one explorer build.
  */
-export async function getEmployeeDocumentsExplorer(
+export const getEmployeeDocumentsExplorer = cache(async function getEmployeeDocumentsExplorer(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<EmployeeDocumentsExplorerData> {
@@ -72,7 +75,7 @@ export async function getEmployeeDocumentsExplorer(
     profile.employee.id,
     { profile },
   );
-}
+});
 
 function schedulePayslipDocumentsSync(
   supabase: AuthSupabaseClient,

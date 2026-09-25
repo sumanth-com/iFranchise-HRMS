@@ -20,7 +20,6 @@ import {
   uploadProfileImageAction,
 } from "@/lib/employees/profile-image-actions";
 import { notifyProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
-import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import { cn } from "@/lib/utils";
 import type { EmploymentStatus } from "@/types/auth";
 import type { EmployeeAccountStatus } from "@/types/employee";
@@ -161,6 +160,9 @@ export function EmployeeIdCard({
     }
 
     startTransition(async () => {
+      const { optimizeProfileImageFile } = await import(
+        "@/lib/media/client-image-optimize"
+      );
       const optimized = await optimizeProfileImageFile(file);
       if (optimized.size > PROFILE_IMAGE_MAX_BYTES) {
         toast.error("Profile image must be 10 MB or smaller");

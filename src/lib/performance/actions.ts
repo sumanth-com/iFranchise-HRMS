@@ -106,6 +106,7 @@ async function getAuthenticatedSupabase() {
 }
 
 function revalidatePerformancePaths() {
+  // HR performance hub + CEO mirrors — avoid settings/history on every write.
   revalidatePath(PERFORMANCE_ROUTES.dashboard);
   revalidatePath(PERFORMANCE_ROUTES.goals);
   revalidatePath(PERFORMANCE_ROUTES.kpis);
@@ -113,8 +114,6 @@ function revalidatePerformancePaths() {
   revalidatePath(PERFORMANCE_ROUTES.feedback);
   revalidatePath(PERFORMANCE_ROUTES.oneOnOnes);
   revalidatePath(PERFORMANCE_ROUTES.promotions);
-  revalidatePath(PERFORMANCE_ROUTES.history);
-  revalidatePath(PERFORMANCE_ROUTES.settings);
   revalidatePath(CEO_ROUTES.performance);
   revalidatePath(CEO_ROUTES.performanceGoals);
   revalidatePath("/ceo/performance/kpis");

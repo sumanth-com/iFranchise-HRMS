@@ -73,7 +73,7 @@ export const employeeListParamsSchema = z.object({
   employmentStatus: employmentStatusSchema.optional(),
   accountStatus: employeeAccountStatusSchema.optional(),
   employmentCategory: z
-    .enum(["all", "probation", "internship", "full_time"])
+    .enum(["all", "probation", "internship", "full_time", "former"])
     .optional(),
 });
 

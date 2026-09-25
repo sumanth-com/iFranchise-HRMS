@@ -36,7 +36,13 @@ import {
   employeeDeleteDocumentAction,
   resolveEmployeeDocumentPayslipIdAction,
 } from "@/lib/employee/actions/employee-documents-actions";
+import {
+  EMPLOYEE_DOCUMENTS_MODULE_ID,
+  invalidateEmployeeDocumentsSoftCache,
+} from "@/lib/employee/documents/documents-module-cache";
 import { prefetchEmployeePayslipDetail } from "@/lib/payroll/payslip-detail-client-cache";
+import { useModuleSoftData } from "@/lib/perf/use-module-soft-data";
+import { useAuth } from "@/providers/auth-provider";
 import type {
   EmployeeDocFile,
   EmployeeDocFolder,
@@ -136,13 +142,15 @@ function PayrollSubFolderCard({
 }
 
 export function DocumentsExplorer({
-  data,
+  data: serverData,
   readOnly = false,
 }: {
   data: EmployeeDocumentsExplorerData;
   readOnly?: boolean;
 }) {
   const router = useRouter();
+  const { profile } = useAuth();
+  const data = useModuleSoftData(serverData, { moduleId: EMPLOYEE_DOCUMENTS_MODULE_ID });
   const [isPending, startTransition] = useTransition();
   const fileActions = useEmployeeDocumentFile();
 
@@ -295,6 +303,10 @@ export function DocumentsExplorer({
         }
         toast.success("Document deleted");
         setDeleteFile(null);
+        invalidateEmployeeDocumentsSoftCache({
+          organizationId: profile.employee.organizationId,
+          employeeId: profile.employee.id,
+        });
         router.refresh();
       } catch {
         toast.error("Unable to delete the document. Please try again.");

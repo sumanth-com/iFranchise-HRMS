@@ -1,5 +1,4 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { generatePayslipPdfBytes } from "@/lib/payroll/services/payslip-pdf";
 import { upsertPayslipEmployeeDocument } from "@/lib/payroll/services/payslip-to-employee-document";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { PayslipDetail } from "@/types/payroll";
@@ -28,6 +27,7 @@ export async function storePayslipPdf(
   organizationId: string,
   options?: { actorUserId?: string | null },
 ): Promise<string> {
+  const { generatePayslipPdfBytes } = await import("@/lib/payroll/services/payslip-pdf");
   const pdfBytes = await generatePayslipPdfBytes(payslip);
   // Storage policies require every object key to be namespaced by organization id.
   const storagePath = `${organizationId}/payslips/${payslip.employee.id}/${payslip.payslipNumber}.pdf`;

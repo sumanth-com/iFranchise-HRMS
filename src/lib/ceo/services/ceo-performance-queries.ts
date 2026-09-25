@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, format, startOfQuarter, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   MANAGER_COMPETENCY_FIELDS,
   parseReviewCommentsPayload,
@@ -106,7 +107,7 @@ async function loadScopedEmployees(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .neq("employment_status", "terminated");
+    .in("employment_status", activeEmploymentStatusFilter());
 
   if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
   if (filters.managerId) query = query.eq("reporting_manager_id", filters.managerId);
@@ -136,6 +137,7 @@ export async function getCeoPerformanceFilterLookups(
       .select("id, first_name, last_name, employee_code")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name"),
     fromHrms(supabase, "departments")
       .select("id, name")
@@ -148,7 +150,7 @@ export async function getCeoPerformanceFilterLookups(
       .select("id, first_name, last_name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .neq("employment_status", "terminated"),
+      .in("employment_status", activeEmploymentStatusFilter()),
     fromHrms(supabase, "performance_review_cycles")
       .select("id, name")
       .eq("organization_id", organizationId)

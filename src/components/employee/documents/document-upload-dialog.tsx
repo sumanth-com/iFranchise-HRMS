@@ -12,11 +12,13 @@ import { FileThumbnail, getFileExtension } from "@/components/employee/documents
 import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { employeeUploadDocumentAction } from "@/lib/employee/actions/employee-documents-actions";
+import { invalidateEmployeeDocumentsSoftCache } from "@/lib/employee/documents/documents-module-cache";
 import {
   isPeriodPickerDocumentCode,
   isRenameableDocumentCode,
 } from "@/lib/employee/documents/categories";
 import { DOCUMENT_YEAR_OPTIONS, EMPLOYEE_DOCUMENT_MAX_MB } from "@/lib/documents/storage-paths";
+import { useAuth } from "@/providers/auth-provider";
 import type { EmployeeDocumentTypeOption } from "@/types/employee-documents-explorer";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +99,7 @@ export function DocumentUploadDialog({
   replaceTarget = null,
 }: Props) {
   const router = useRouter();
+  const { profile } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const submitLockRef = useRef(false);
   const [isPending, startTransition] = useTransition();
@@ -235,6 +238,10 @@ export function DocumentUploadDialog({
         }
         toast.success(isReplace ? "New version uploaded" : "Document uploaded");
         onOpenChange(false);
+        invalidateEmployeeDocumentsSoftCache({
+          organizationId: profile.employee.organizationId,
+          employeeId: profile.employee.id,
+        });
         router.refresh();
       } catch {
         toast.error("Unable to upload the document. Please try again.");

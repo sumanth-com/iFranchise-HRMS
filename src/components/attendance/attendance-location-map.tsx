@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { Expand, MapPin, Minimize2 } from "lucide-react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 import { cn } from "@/lib/utils";
 

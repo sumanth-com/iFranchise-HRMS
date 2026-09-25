@@ -128,10 +128,20 @@ function CompanyLogoField({
     const preview = URL.createObjectURL(file);
     setPreviewUrl(preview);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     startTransition(async () => {
+      const { optimizeOrganizationLogoFile } = await import(
+        "@/lib/media/client-image-optimize"
+      );
+      const optimized = await optimizeOrganizationLogoFile(file);
+      if (optimized.size > ORGANIZATION_LOGO_MAX_BYTES) {
+        toast.error("Company logo must be 10 MB or smaller");
+        setPreviewUrl(resolvedLogoUrl);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", optimized);
+
       const result = await uploadCompanyLogoAction(formData);
       if (!result.success) {
         toast.error(result.message);

@@ -128,9 +128,7 @@ function revalidateOrganization() {
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard/leave");
   revalidatePath("/dashboard/attendance");
-  revalidatePath("/employee");
-  revalidatePath("/manager");
-  revalidatePath("/ceo");
+  // Do not revalidate portal roots — preserves soft-nav module cache.
 }
 
 export async function saveOrganizationProfileAction(

@@ -29,10 +29,11 @@ function friendlyError(error: unknown): string {
 }
 
 function revalidateAnnouncementSurfaces() {
-  revalidatePath("/dashboard");
-  revalidatePath("/employee");
-  revalidatePath("/ceo");
-  revalidatePath("/manager");
+  // Home dashboards only (`page`) — do not invalidate nested modules' soft-nav cache.
+  revalidatePath("/dashboard", "page");
+  revalidatePath("/employee", "page");
+  revalidatePath("/ceo", "page");
+  revalidatePath("/manager", "page");
 }
 
 async function requireAnnouncementManager() {

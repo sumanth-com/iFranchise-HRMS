@@ -33,9 +33,11 @@ function revalidateProfileImageSurfaces() {
   revalidatePath("/ceo/profile");
   revalidatePath("/ceo/employees");
   revalidatePath("/ceo/directory");
-  revalidatePath("/employee");
-  revalidatePath("/manager");
-  revalidatePath("/ceo");
+  // Avatar also appears on portal home headers — page-only, not nested modules.
+  revalidatePath("/employee", "page");
+  revalidatePath("/manager", "page");
+  revalidatePath("/ceo", "page");
+  revalidatePath("/dashboard", "page");
 }
 
 /** Signed URL for the signed-in user's profile photo (header avatar). */

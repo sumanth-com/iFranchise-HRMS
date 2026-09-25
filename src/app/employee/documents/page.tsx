@@ -1,5 +1,8 @@
+import { Suspense } from "react";
+
 import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
 import { DocumentsExplorer } from "@/components/employee/documents/documents-explorer";
+import { DocumentsExplorerSoftFallback } from "@/components/employee/documents/documents-explorer-soft-fallback";
 import { DocumentsLoadError } from "@/components/employee/documents/documents-load-error";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
@@ -9,19 +12,39 @@ import {
 import { safeServerCallWithError } from "@/lib/errors/safe-server";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import type { UserProfile } from "@/types/auth";
 
-export default async function EmployeeDocumentsPage() {
-  const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.employee,
-    "documents.view",
-  ]);
+async function EmployeeDocumentsExplorerSection({
+  profile,
+}: {
+  profile: UserProfile;
+}) {
   const supabase = await createClient();
-
   const { data, error } = await safeServerCallWithError(
     () => getEmployeeDocumentsExplorer(supabase, profile),
     EMPTY_EMPLOYEE_DOCUMENTS_EXPLORER,
     "[employee/documents] explorer",
   );
+
+  if (error) return <DocumentsLoadError message={error} />;
+
+  return (
+    <ClientSectionBoundary
+      title="Couldn't load your documents"
+      description="We couldn't load this section. Please try again."
+    >
+      <DocumentsExplorer data={data} />
+    </ClientSectionBoundary>
+  );
+}
+
+export default async function EmployeeDocumentsPage() {
+  // Auth/permission only in the outer shell so soft-nav can paint cached
+  // explorer content while the explorer query resolves.
+  const profile = await requireServerAnyPermission([
+    PORTAL_PERMISSIONS.employee,
+    "documents.view",
+  ]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
@@ -32,14 +55,9 @@ export default async function EmployeeDocumentsPage() {
             Securely store, organize and manage your personal and company documents.
           </p>
         </div>
-        {error ? <DocumentsLoadError message={error} /> : (
-          <ClientSectionBoundary
-            title="Couldn't load your documents"
-            description="We couldn't load this section. Please try again."
-          >
-            <DocumentsExplorer data={data} />
-          </ClientSectionBoundary>
-        )}
+        <Suspense fallback={<DocumentsExplorerSoftFallback />}>
+          <EmployeeDocumentsExplorerSection profile={profile} />
+        </Suspense>
       </div>
     </div>
   );

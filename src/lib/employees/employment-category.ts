@@ -7,7 +7,8 @@ export type EmploymentCategoryFilter =
   | "all"
   | "probation"
   | "internship"
-  | "full_time";
+  | "full_time"
+  | "former";
 
 export const DEFAULT_EMPLOYMENT_CATEGORY_FILTER: EmploymentCategoryFilter = "all";
 
@@ -19,6 +20,7 @@ export const EMPLOYMENT_CATEGORY_FILTER_OPTIONS: Array<{
   { value: "probation", label: "Probation" },
   { value: "internship", label: "Internship" },
   { value: "full_time", label: "Full Time" },
+  { value: "former", label: "Former Employees" },
 ];
 
 export function parseEmploymentCategoryFilter(
@@ -28,19 +30,34 @@ export function parseEmploymentCategoryFilter(
     value === "all" ||
     value === "probation" ||
     value === "internship" ||
-    value === "full_time"
+    value === "full_time" ||
+    value === "former"
   ) {
     return value;
   }
   return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
+export function isFormerEmploymentCategory(
+  category: EmploymentCategoryFilter | null | undefined,
+): boolean {
+  return category === "former";
+}
+
 export function matchesEmploymentCategoryFilter(
   category: EmploymentCategoryFilter,
   input: {
     employmentTypeCode?: string | null;
+    employmentStatus?: string | null;
   },
 ): boolean {
+  if (category === "former") {
+    return (
+      input.employmentStatus === "resigned" ||
+      input.employmentStatus === "terminated"
+    );
+  }
+
   if (category === "all") return true;
 
   const typeCode = normalizeStandardEmploymentTypeCode(input.employmentTypeCode);
@@ -51,7 +68,7 @@ export function matchesEmploymentCategoryFilter(
 }
 
 export function employmentCategoryTypeCodes(
-  category: Exclude<EmploymentCategoryFilter, "all">,
+  category: Exclude<EmploymentCategoryFilter, "all" | "former">,
 ): StandardEmploymentTypeCode[] {
   if (category === "full_time") return ["FULL_TIME"];
   if (category === "internship") return ["INTERN"];

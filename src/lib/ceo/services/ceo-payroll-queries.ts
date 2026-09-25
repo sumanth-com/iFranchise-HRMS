@@ -1,6 +1,7 @@
 import { addMonths, format, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
 import {
   formatPayrollMonthLabel,
@@ -103,6 +104,7 @@ export async function getCeoPayrollFilterLookups(
       .select("id, first_name, last_name, employee_code")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name"),
     fromHrms(supabase, "departments")
       .select("id, name")
@@ -346,7 +348,7 @@ export async function getCeoPayrollOverview(
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .neq("employment_status", "terminated");
+    .in("employment_status", activeEmploymentStatusFilter());
 
   if (totalEmployeesResult.error) throw new Error(totalEmployeesResult.error.message);
 

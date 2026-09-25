@@ -1,6 +1,5 @@
 import { EMAIL_BRAND_LOGO_PATH } from "@/lib/brand/constants";
 import { formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
-import { generatePayslipPdfBytes } from "@/lib/payroll/services/payslip-pdf";
 import { PAYSLIP_ENGINE_NAME } from "@/lib/payroll/services/payslip-publication";
 import { sendEmail } from "@/lib/email/mailer";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
@@ -75,6 +74,7 @@ export async function sendPayslipReadyEmail(
   appOrigin: string,
 ): Promise<{ delivered: boolean; skipped?: boolean }> {
   const month = formatPayrollMonthLabel(payslip.payrollMonth);
+  const { generatePayslipPdfBytes } = await import("@/lib/payroll/services/payslip-pdf");
   const pdfBytes = await generatePayslipPdfBytes(payslip);
   const downloadUrl = `${appOrigin}${PAYROLL_ROUTES.payslipDetail(payslip.id)}`;
   const logoUrl = resolveEmailLogoUrl(payslip.organization.logoUrl, appOrigin);
