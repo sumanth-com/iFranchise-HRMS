@@ -163,8 +163,13 @@ export function matchesAttendanceUiStatusFilter(
   if (filter === "on_leave") {
     return key === "casual_leave" || key === "earned_leave";
   }
-  if (filter === "late" || filter === "half_day") {
-    return key === "present";
+  // Late/half_day are not sheet display statuses (they render as Present).
+  // Keep the filter precise to the stored status so Late never expands to all Present rows.
+  if (filter === "late") {
+    return String(status ?? "") === "late";
+  }
+  if (filter === "half_day") {
+    return String(status ?? "") === "half_day";
   }
   if (filter === "week_off") {
     return key === "holiday";

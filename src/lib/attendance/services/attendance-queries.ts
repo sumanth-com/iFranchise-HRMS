@@ -584,24 +584,17 @@ export async function getAttendanceSummary(
     else if (row.attendanceStatus === "on_leave") onLeaveToday += 1;
   }
 
-  if (employeeId) {
-    return {
-      date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-      presentToday: presentToday + halfDayToday + lateToday,
-      absentToday,
-      lateToday,
-      halfDayToday,
-      onLeaveToday,
-      totalEmployees: employeeIds.size,
-    };
-  }
+  // Sheet-aligned KPIs: late/half_day display as Present (see resolveAttendanceUiDisplay).
+  // Fold into Present and zero Late/Half-day so summary cards never disagree with badges,
+  // and downstream present+late+half aggregations do not double-count.
+  const presentLike = presentToday + halfDayToday + lateToday;
 
   return {
     date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-    presentToday: presentToday + halfDayToday,
-    absentToday: absentToday + onLeaveToday,
-    lateToday,
-    halfDayToday,
+    presentToday: presentLike,
+    absentToday: employeeId ? absentToday : absentToday + onLeaveToday,
+    lateToday: 0,
+    halfDayToday: 0,
     onLeaveToday,
     totalEmployees: employeeIds.size,
   };

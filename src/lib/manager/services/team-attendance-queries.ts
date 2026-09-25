@@ -116,12 +116,15 @@ export async function getTeamAttendanceSummary(
     }
   }
 
+  // Sheet-aligned: late/half_day display as Present — fold into Present, Late = 0.
+  const presentLike = presentToday + halfDayToday + lateToday;
+
   return {
     dateLabel: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-    presentToday,
+    presentToday: presentLike,
     absentToday,
-    lateToday,
-    halfDayToday,
+    lateToday: 0,
+    halfDayToday: 0,
     workFromHomeToday,
     pendingRegularizations: correctionsResult.count ?? 0,
   };
