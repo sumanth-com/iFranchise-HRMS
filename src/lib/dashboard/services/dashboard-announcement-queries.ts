@@ -1,5 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { createSignedStorageUrlIfExists } from "@/lib/storage/signed-url";
+import { createSignedStorageUrl, createSignedStorageUrls } from "@/lib/storage/signed-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   DashboardAnnouncement,
@@ -38,23 +38,27 @@ function mapAnnouncement(
   };
 }
 
-async function signAnnouncementImages(
+/** Batch-sign without per-object storage.list existence checks. */
+async function signAnnouncementImagesFast(
   supabase: AuthSupabaseClient,
   rows: LooseRow[],
 ): Promise<Map<string, string | null>> {
   const result = new Map<string, string | null>();
-  await Promise.all(
-    rows.map(async (row) => {
-      const id = String(row.id);
-      const path = row.image_storage_path ? String(row.image_storage_path) : null;
-      if (!path) {
-        result.set(id, null);
-        return;
-      }
-      const url = await createSignedStorageUrlIfExists(supabase, ANNOUNCEMENT_BUCKET, path);
-      result.set(id, url);
-    }),
+  const paths = rows
+    .map((row) => (row.image_storage_path ? String(row.image_storage_path) : null))
+    .filter((path): path is string => Boolean(path));
+
+  const signedByPath = await createSignedStorageUrls(
+    supabase,
+    ANNOUNCEMENT_BUCKET,
+    paths,
   );
+
+  for (const row of rows) {
+    const id = String(row.id);
+    const path = row.image_storage_path ? String(row.image_storage_path) : null;
+    result.set(id, path ? signedByPath.get(path) ?? null : null);
+  }
   return result;
 }
 
@@ -83,8 +87,6 @@ export async function listPublishedDashboardAnnouncements(
   }
 
   const rows = (data ?? []) as LooseRow[];
-  // Important first (enum order: important before normal if we reverse — postgres enums
-  // sort by definition order: normal, important). Sort in JS instead.
   rows.sort((a, b) => {
     const aImp = a.priority === "important" ? 0 : 1;
     const bImp = b.priority === "important" ? 0 : 1;
@@ -94,8 +96,8 @@ export async function listPublishedDashboardAnnouncements(
     return bPub.localeCompare(aPub);
   });
 
-  const signed = await signAnnouncementImages(supabase, rows);
-  return rows.map((row) => mapAnnouncement(row, signed.get(String(row.id)) ?? null));
+  // Dashboard LCP: return text/layout immediately — do not block on signed images.
+  return rows.map((row) => mapAnnouncement(row, null));
 }
 
 /** Full list for HR/CEO manage UI. */
@@ -118,7 +120,7 @@ export async function listManagedDashboardAnnouncements(
   if (error) throw new Error("Unable to load announcements.");
 
   const rows = (data ?? []) as LooseRow[];
-  const signed = await signAnnouncementImages(supabase, rows);
+  const signed = await signAnnouncementImagesFast(supabase, rows);
   return rows.map((row) => mapAnnouncement(row, signed.get(String(row.id)) ?? null));
 }
 
@@ -141,7 +143,7 @@ export async function getDashboardAnnouncementById(
   if (error) throw new Error("Unable to load announcement.");
   if (!data) return null;
 
-  const signed = await signAnnouncementImages(supabase, [data as LooseRow]);
+  const signed = await signAnnouncementImagesFast(supabase, [data as LooseRow]);
   return mapAnnouncement(data as LooseRow, signed.get(String(data.id)) ?? null);
 }
 
@@ -155,7 +157,7 @@ export async function signAnnouncementImageAdmin(
   if (!path?.trim()) return null;
   try {
     const admin = createAdminClient();
-    return createSignedStorageUrlIfExists(admin, ANNOUNCEMENT_BUCKET, path.trim());
+    return createSignedStorageUrl(admin, ANNOUNCEMENT_BUCKET, path.trim());
   } catch {
     return null;
   }
