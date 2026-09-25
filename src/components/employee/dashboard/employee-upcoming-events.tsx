@@ -241,7 +241,7 @@ function pairHolidayBirthdaySlides(events: EmployeeUpcomingEvent[]): Celebration
   });
 }
 
-/** Holiday / celebration slide — preserves existing visual language. */
+/** Holiday / celebration slide — centered, wrap-safe at any width/zoom. */
 function HolidaySlide({
   event,
   referenceDate,
@@ -251,27 +251,28 @@ function HolidaySlide({
 }) {
   const eventDate = parseISO(event.date);
   const timing = countdownLabel(event.date, referenceDate);
-  const isToday = timing === "Today";
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-5 py-5 text-center ring-1 ring-violet-500/15">
-      <span className="flex size-[8.5rem] shrink-0 items-center justify-center sm:size-[10.5rem]">
-        <HolidayGlyph name={event.title} className="size-full" />
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-3 py-4 text-center ring-1 ring-violet-500/15 sm:px-5 sm:py-5">
+      <span className="mx-auto aspect-square w-[min(100%,7.25rem)] max-w-full shrink-0 sm:w-[min(100%,9rem)]">
+        <HolidayGlyph name={event.title} className="size-full max-h-full max-w-full" />
       </span>
 
-      <span className="mt-3.5 inline-flex items-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
-        {timing}
+      <span className="mt-3.5 inline-flex max-w-full shrink-0 items-center justify-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-center text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
+        <span className="max-w-full break-words">{timing}</span>
       </span>
 
-      <p className="mt-2.5 line-clamp-1 text-base font-semibold tracking-tight text-foreground sm:text-lg">
+      <p className="mt-2.5 w-full min-w-0 max-w-full shrink-0 break-words text-base leading-snug font-semibold tracking-tight text-pretty text-foreground sm:text-lg">
         {event.title}
       </p>
 
       {event.subtitle ? (
-        <p className="mt-1 text-xs text-muted-foreground">{event.subtitle}</p>
+        <p className="mt-1 w-full min-w-0 max-w-full shrink-0 break-words text-xs leading-snug text-muted-foreground">
+          {event.subtitle}
+        </p>
       ) : null}
 
-      <p className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
+      <p className="mt-3 w-full min-w-0 max-w-full shrink-0 break-words text-[11px] leading-snug font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
         {format(eventDate, "EEEE, d MMM yyyy")}
       </p>
     </div>
@@ -294,7 +295,7 @@ function BirthdaySlide({
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-5 py-5 text-center ring-1 ring-rose-500/15",
+        "relative flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-3 py-4 text-center ring-1 ring-rose-500/15 sm:px-5 sm:py-5",
         isToday && "from-rose-500/[0.12] ring-rose-500/25",
       )}
     >
@@ -316,15 +317,15 @@ function BirthdaySlide({
         ) : null}
       </div>
 
-      <span className="mt-3.5 inline-flex items-center rounded-full bg-rose-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-rose-700 uppercase dark:bg-rose-400/20 dark:text-rose-300">
-        {isToday ? "Happy Birthday" : "Coming up"}
+      <span className="mt-3.5 inline-flex max-w-full shrink-0 items-center justify-center rounded-full bg-rose-500/15 px-2.5 py-0.5 text-center text-[10px] font-bold tracking-wide text-rose-700 uppercase dark:bg-rose-400/20 dark:text-rose-300">
+        <span className="max-w-full break-words">{isToday ? "Happy Birthday" : "Coming up"}</span>
       </span>
 
-      <p className="mt-2.5 line-clamp-1 text-base font-semibold tracking-tight text-foreground sm:text-lg">
+      <p className="mt-2.5 w-full min-w-0 max-w-full shrink-0 break-words text-base leading-snug font-semibold tracking-tight text-pretty text-foreground sm:text-lg">
         {event.title}
       </p>
 
-      <p className="mt-1 line-clamp-2 max-w-[18rem] text-xs text-muted-foreground">
+      <p className="mt-1 w-full min-w-0 max-w-full shrink-0 break-words text-xs leading-snug text-muted-foreground">
         {birthdayCardMessage({
           firstName: event.firstName,
           title: event.title,
@@ -332,7 +333,7 @@ function BirthdaySlide({
         })}
       </p>
 
-      <p className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
+      <p className="mt-3 w-full min-w-0 max-w-full shrink-0 break-words text-[11px] leading-snug font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
         {format(eventDate, "EEEE, d MMM yyyy")}
         {!isToday ? ` · ${timing}` : null}
       </p>
@@ -347,7 +348,7 @@ function AnnouncementSlide({ event }: { event: EmployeeUpcomingEvent }) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl px-5 py-5 text-center",
+        "flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center rounded-xl px-3 py-4 text-center sm:px-5 sm:py-5",
         isImportant
           ? "bg-gradient-to-b from-violet-500/[0.1] to-violet-500/[0.03] ring-1 ring-violet-500/25"
           : "bg-gradient-to-b from-violet-500/[0.06] to-transparent ring-1 ring-violet-500/12",
@@ -358,7 +359,7 @@ function AnnouncementSlide({ event }: { event: EmployeeUpcomingEvent }) {
         <img
           src={event.imageUrl!}
           alt=""
-          className="mb-3 size-14 rounded-xl object-cover shadow-sm ring-1 ring-border/60 sm:size-16"
+          className="mb-3 size-14 max-w-full rounded-xl object-cover shadow-sm ring-1 ring-border/60 sm:size-16"
           onError={(eventTarget) => {
             eventTarget.currentTarget.style.display = "none";
           }}
@@ -366,7 +367,7 @@ function AnnouncementSlide({ event }: { event: EmployeeUpcomingEvent }) {
       ) : (
         <span
           className={cn(
-            "mb-3 flex size-12 items-center justify-center rounded-xl shadow-sm sm:size-14",
+            "mb-3 flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm sm:size-14",
             isImportant
               ? "bg-violet-500/15 text-violet-700 ring-1 ring-violet-500/20"
               : "bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15",
@@ -376,23 +377,23 @@ function AnnouncementSlide({ event }: { event: EmployeeUpcomingEvent }) {
         </span>
       )}
 
-      <div className="flex flex-wrap items-center justify-center gap-1.5">
-        <span className="inline-flex items-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5">
+        <span className="inline-flex max-w-full items-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
           Notice
         </span>
         {isImportant ? (
-          <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-800 uppercase dark:bg-amber-400/20 dark:text-amber-300">
+          <span className="inline-flex max-w-full items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-800 uppercase dark:bg-amber-400/20 dark:text-amber-300">
             Important
           </span>
         ) : null}
       </div>
 
-      <p className="mt-2.5 line-clamp-2 text-base font-semibold tracking-tight text-foreground sm:text-lg">
+      <p className="mt-2.5 w-full min-w-0 max-w-full break-words text-base leading-snug font-semibold tracking-tight text-pretty text-foreground sm:text-lg">
         {event.title}
       </p>
 
       {event.message ? (
-        <p className="mt-1.5 line-clamp-3 max-w-[20rem] text-xs leading-relaxed text-muted-foreground sm:text-[13px]">
+        <p className="mt-1.5 w-full min-w-0 max-w-full break-words text-xs leading-relaxed text-muted-foreground sm:text-[13px]">
           {event.message}
         </p>
       ) : null}
@@ -428,18 +429,18 @@ function CombinedHolidayPanel({
   const timing = countdownLabel(event.date, referenceDate);
 
   return (
-    <div className="flex min-h-0 flex-1 items-center gap-4 overflow-hidden rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-4 py-3.5 ring-1 ring-violet-500/15">
-      <span className={cn(combinedIconSlotClass)}>
-        <HolidayGlyph name={event.title} className="size-full" />
+    <div className="flex min-h-0 min-w-0 w-full flex-1 items-center gap-3 rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-3 py-3.5 ring-1 ring-violet-500/15 sm:gap-4 sm:px-4">
+      <span className={cn(combinedIconSlotClass, "max-w-[3.5rem]")}>
+        <HolidayGlyph name={event.title} className="size-full max-h-full max-w-full" />
       </span>
-      <div className="min-w-0 flex-1">
-        <span className="inline-flex items-center rounded-full bg-violet-500/12 px-2 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
-          {timing}
+      <div className="min-w-0 flex-1 text-left">
+        <span className="inline-flex max-w-full items-center rounded-full bg-violet-500/12 px-2 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
+          <span className="max-w-full break-words">{timing}</span>
         </span>
-        <p className="mt-1 line-clamp-1 text-base font-bold tracking-tight text-foreground">
+        <p className="mt-1 w-full min-w-0 break-words text-base leading-snug font-bold tracking-tight text-pretty text-foreground">
           {event.title}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="mt-0.5 w-full min-w-0 break-words text-xs leading-snug text-muted-foreground">
           {event.subtitle || "Company Holiday"}
         </p>
       </div>
@@ -463,7 +464,7 @@ function CombinedBirthdayPanel({
   return (
     <div
       className={cn(
-        "relative flex min-h-0 flex-1 items-center gap-4 overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-4 py-3.5 ring-1 ring-rose-500/15",
+        "relative flex min-h-0 min-w-0 w-full flex-1 items-center gap-3 rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-3 py-3.5 ring-1 ring-rose-500/15 sm:gap-4 sm:px-4",
         isToday && "from-rose-500/[0.12] ring-rose-500/25",
       )}
     >
@@ -483,14 +484,14 @@ function CombinedBirthdayPanel({
           </span>
         ) : null}
       </div>
-      <div className="min-w-0 flex-1">
-        <span className="inline-flex items-center rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-rose-700 uppercase dark:bg-rose-400/20 dark:text-rose-300">
+      <div className="min-w-0 flex-1 text-left">
+        <span className="inline-flex max-w-full items-center rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-rose-700 uppercase dark:bg-rose-400/20 dark:text-rose-300">
           {isToday ? "Today" : "Birthday"}
         </span>
-        <p className="mt-1 line-clamp-1 text-base font-bold tracking-tight text-foreground">
+        <p className="mt-1 w-full min-w-0 break-words text-base leading-snug font-bold tracking-tight text-pretty text-foreground">
           {event.title}
         </p>
-        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+        <p className="mt-0.5 w-full min-w-0 break-words text-xs leading-snug text-muted-foreground">
           {birthdayCardMessage({
             firstName: event.firstName,
             title: event.title,
@@ -516,7 +517,7 @@ function CombinedCelebrationSlide({
 
   if (holiday && birthday) {
     return (
-      <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-2">
         <CombinedHolidayPanel event={holiday} referenceDate={referenceDate} />
         <CombinedBirthdayPanel
           event={birthday}
@@ -620,7 +621,7 @@ export function EmployeeUpcomingEvents({
   const celebrationsBody =
     slideCount > 0 ? (
       <div
-        className="relative flex min-h-0 flex-1 flex-col"
+        className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onFocusCapture={() => setPaused(true)}
@@ -630,7 +631,7 @@ export function EmployeeUpcomingEvents({
           }
         }}
       >
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 w-full min-w-0 flex-1">
           {pairHolidayBirthday
             ? pairedSlides.map((pair, slideIndex) => {
                 const active = slideIndex === index;
@@ -638,7 +639,7 @@ export function EmployeeUpcomingEvents({
                   <div
                     key={pair.id}
                     className={cn(
-                      "absolute inset-0 transition-opacity duration-500 ease-out",
+                      "absolute inset-0 min-w-0 w-full transition-opacity duration-500 ease-out",
                       active ? "z-[1] opacity-100" : "z-0 pointer-events-none opacity-0",
                     )}
                     aria-hidden={!active}
@@ -657,7 +658,7 @@ export function EmployeeUpcomingEvents({
                   <div
                     key={event.id}
                     className={cn(
-                      "absolute inset-0 transition-opacity duration-500 ease-out",
+                      "absolute inset-0 min-w-0 w-full transition-opacity duration-500 ease-out",
                       active ? "z-[1] opacity-100" : "z-0 pointer-events-none opacity-0",
                     )}
                     aria-hidden={!active}
@@ -702,7 +703,7 @@ export function EmployeeUpcomingEvents({
 
   if (showImportantNotices) {
     return (
-      <section className={cn(employeeSectionClass, "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden", className)}>
+      <section className={cn(employeeSectionClass, "flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-clip overflow-y-hidden", className)}>
         <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
             <Button
@@ -779,9 +780,9 @@ export function EmployeeUpcomingEvents({
               ? "Quick notes from HR and leadership."
               : "Highlights for today and this week."}
         </p>
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-x-clip">
           <div
-            className="flex h-full transition-transform duration-500 ease-out"
+            className="flex h-full min-w-0 transition-transform duration-500 ease-out"
             style={{
               width: "200%",
               transform: noticesActive ? "translateX(-50%)" : "translateX(0)",
@@ -817,8 +818,8 @@ export function EmployeeUpcomingEvents({
     <EmployeeSectionCard
       title="Celebrations & This Week"
       description="Highlights for today and this week."
-      className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}
-      bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden"
+      className={cn("flex h-full min-h-0 w-full min-w-0 flex-col", className)}
+      bodyClassName="flex min-h-0 w-full min-w-0 flex-1 flex-col"
       action={
         showDashboardManage ? (
           <Button
