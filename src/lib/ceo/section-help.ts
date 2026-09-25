@@ -74,6 +74,21 @@ export const CEO_APPROVALS_SECTION_HELP = {
       },
     ] satisfies SectionHelpPoint[],
   },
+  leaveBalance: {
+    title: "About Leave Balance",
+    points: [
+      {
+        label: "What this page is for",
+        detail:
+          "View current CL, EL, optional holiday, LOP, and pending leave for every active employee.",
+      },
+      {
+        label: "Source of truth",
+        detail:
+          "Balances come from the same leave ledger employees see in My Leave — not a separate calculation.",
+      },
+    ] satisfies SectionHelpPoint[],
+  },
   exit: {
     title: "About Exit Approvals",
     points: [

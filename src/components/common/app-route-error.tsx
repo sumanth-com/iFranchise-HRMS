@@ -95,6 +95,7 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
   return (
     <div className="flex min-h-[50vh] items-center justify-center p-6">
       <ErrorState
+        variant="muted"
         title={isAuthUnavailable ? "Temporarily unavailable" : PAGE_LOAD_ERROR_TITLE}
         description={
           isAuthUnavailable

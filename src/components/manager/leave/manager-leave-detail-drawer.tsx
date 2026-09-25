@@ -23,6 +23,7 @@ import {
   rejectTeamLeaveRequestAction,
   requestTeamLeaveInfoAction,
 } from "@/lib/manager/actions/manager-leave-actions";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import {
   formatHalfDayPeriod,
   formatLeaveDate,
@@ -109,6 +110,10 @@ export function ManagerLeaveDetailDrawer({
       toast.success(result.message);
       setActionMode(null);
       setApprovalNotes("");
+      notifyLeaveBalancesChanged({
+        employeeId: detail.employeeId,
+        reason: "approved",
+      });
       onActionComplete?.();
       const refreshed = await fetchTeamLeaveDetailAction(detail.id);
       if (refreshed) detailCacheRef.current.set(detail.id, refreshed);
@@ -133,6 +138,10 @@ export function ManagerLeaveDetailDrawer({
       toast.success(result.message);
       setActionMode(null);
       setApprovalNotes("");
+      notifyLeaveBalancesChanged({
+        employeeId: detail.employeeId,
+        reason: "rejected",
+      });
       onActionComplete?.();
       const refreshed = await fetchTeamLeaveDetailAction(detail.id);
       if (refreshed) detailCacheRef.current.set(detail.id, refreshed);

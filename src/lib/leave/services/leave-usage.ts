@@ -67,6 +67,24 @@ export function paidDaysFromLeaveRequest(request: {
   return roundLeaveDays(Math.max(0, Number(request.total_days ?? 0)));
 }
 
+/** Unpaid / LOP portion from a leave request (duration_breakdown or LOP leave type). */
+export function lopDaysFromLeaveRequest(request: {
+  total_days?: number | string | null;
+  duration_breakdown?: unknown;
+  leaveTypeCode?: string | null;
+}) {
+  const breakdown = request.duration_breakdown as { lopDays?: unknown } | null;
+  if (breakdown && typeof breakdown.lopDays === "number" && Number.isFinite(breakdown.lopDays)) {
+    return roundLeaveDays(Math.max(0, breakdown.lopDays));
+  }
+  if (String(request.leaveTypeCode ?? "").toUpperCase() === "LOP") {
+    return roundLeaveDays(Math.max(0, Number(request.total_days ?? 0)));
+  }
+  const total = roundLeaveDays(Math.max(0, Number(request.total_days ?? 0)));
+  const paid = paidDaysFromLeaveRequest(request);
+  return roundLeaveDays(Math.max(0, total - paid));
+}
+
 /**
  * Paid CL/EL days that fall inside a date range. Uses dayAllocations when present so
  * LOP / sandwich days are never counted as leave entitlement usage.

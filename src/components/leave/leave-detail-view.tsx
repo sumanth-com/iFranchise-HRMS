@@ -16,6 +16,7 @@ import {
   cancelLeaveRequestAction,
   rejectLeaveRequestAction,
 } from "@/lib/leave/actions";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import { APPROVAL_LEVEL_LABELS } from "@/lib/leave/constants";
 import {
   formatHalfDayPeriod,
@@ -95,6 +96,10 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
       setApproveOpen(false);
       setApproveComments("");
       setApproveError(null);
+      notifyLeaveBalancesChanged({
+        employeeId: leave.employeeId,
+        reason: "approved",
+      });
       router.refresh();
     });
   };
@@ -121,6 +126,10 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
       setRejectOpen(false);
       setRejectComments("");
       setRejectError(null);
+      notifyLeaveBalancesChanged({
+        employeeId: leave.employeeId,
+        reason: "rejected",
+      });
       router.refresh();
     });
   };
@@ -136,6 +145,10 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
 
       toast.success("Leave request cancelled");
       setCancelOpen(false);
+      notifyLeaveBalancesChanged({
+        employeeId: leave.employeeId,
+        reason: "cancelled",
+      });
       router.refresh();
     });
   };

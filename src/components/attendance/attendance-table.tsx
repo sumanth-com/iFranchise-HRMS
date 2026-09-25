@@ -62,7 +62,6 @@ import {
 import {
   ATTENDANCE_STATUS_FILTER_ITEMS,
   ATTENDANCE_UI_DISPLAY_LABELS,
-  type ManualAttendanceUiStatus,
 } from "@/lib/attendance/manual-status";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
@@ -895,7 +894,7 @@ export function AttendanceTable({
           {attendanceStatus
             ? ` · ${
                 ATTENDANCE_UI_DISPLAY_LABELS[
-                  attendanceStatus as ManualAttendanceUiStatus
+                  attendanceStatus as keyof typeof ATTENDANCE_UI_DISPLAY_LABELS
                 ] ?? attendanceStatus
               }`
             : " · All statuses"}

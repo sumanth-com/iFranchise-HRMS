@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
+import { LEAVE_ROUTES } from "@/lib/leave/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
   approveTeamLeaveRequest,
@@ -66,6 +68,8 @@ function revalidateLeavePaths() {
   revalidatePath(MANAGER_ROUTES.overview);
   revalidatePath(MANAGER_ROUTES.team);
   revalidatePath(MANAGER_ROUTES.home);
+  revalidatePath(LEAVE_ROUTES.balances);
+  revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
   revalidateCeoDashboardHome();
 }
 

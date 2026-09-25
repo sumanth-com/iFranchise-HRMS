@@ -10,6 +10,7 @@ import {
   type LeaveSummaryFilterKey,
 } from "@/components/leave/leave-summary-cards";
 import { LeaveTable } from "@/components/leave/leave-table";
+import { TeamLeaveBalancesPanel } from "@/components/leave/team-leave-balances-panel";
 import { getLeaveSummaryAction } from "@/lib/leave/actions";
 import { cn } from "@/lib/utils";
 import type {
@@ -20,6 +21,8 @@ import type {
   LeaveSummary,
 } from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
+
+type TeamLeaveSection = "requests" | "balances";
 
 type HrTeamLeaveViewProps = {
   summary: LeaveSummary;
@@ -94,6 +97,8 @@ export function HrTeamLeaveView({
   const [summaryFilter, setSummaryFilter] = useState<LeaveSummaryFilterKey | undefined>(
     initialSummaryFilter,
   );
+  const [section, setSection] = useState<TeamLeaveSection>("requests");
+  const [balancesMounted, setBalancesMounted] = useState(false);
 
   useEffect(() => {
     setSummaryState(summary);
@@ -108,6 +113,11 @@ export function HrTeamLeaveView({
   const applySummaryFilter = useCallback((key: LeaveSummaryFilterKey) => {
     setSummaryFilter((current) => (current === key ? undefined : key));
   }, []);
+
+  function openSection(next: TeamLeaveSection) {
+    setSection(next);
+    if (next === "balances") setBalancesMounted(true);
+  }
 
   return (
     <div className="space-y-6">
@@ -133,45 +143,89 @@ export function HrTeamLeaveView({
         </div>
       ) : null}
 
-      <LeaveSummaryCards
-        summary={summaryState}
-        activeKey={summaryFilter}
-        onSelect={applySummaryFilter}
-      />
+      <div className="flex justify-start">
+        <nav
+          className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
+          aria-label="Team leave sections"
+        >
+          {(
+            [
+              { id: "requests" as const, title: "Leave Requests" },
+              { id: "balances" as const, title: "Leave Balance" },
+            ] as const
+          ).map((item) => {
+            const isActive = section === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openSection(item.id)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm font-semibold"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {item.title}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
-      <LeaveTable
-        records={records}
-        total={total}
-        page={page}
-        pageSize={pageSize}
-        search={search}
-        month={month}
-        year={year}
-        leaveStatus={leaveStatus}
-        leaveTypeId={leaveTypeId}
-        departmentId={departmentId}
-        branchId={branchId}
-        reportingManagerId={reportingManagerId}
-        employeeId={employeeId}
-        summaryFilter={summaryFilter}
-        onSummaryFilterChange={setSummaryFilter}
-        leaveTypes={leaveTypes}
-        departments={departments}
-        branches={branches}
-        employees={employees}
-        managers={managers}
-        canCreate={canCreate}
-        canApprove={canApprove}
-        canReject={canReject}
-        canCancel={canCancel}
-        canDelete={canDelete}
-        embedded={embedded}
-        listBasePath={listBasePath}
-        fetchRecords={fetchRecords}
-        onMutated={() => {
-          void refreshSummary();
-        }}
-      />
+      {section === "requests" ? (
+        <>
+          <LeaveSummaryCards
+            summary={summaryState}
+            activeKey={summaryFilter}
+            onSelect={applySummaryFilter}
+          />
+
+          <LeaveTable
+            records={records}
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            search={search}
+            month={month}
+            year={year}
+            leaveStatus={leaveStatus}
+            leaveTypeId={leaveTypeId}
+            departmentId={departmentId}
+            branchId={branchId}
+            reportingManagerId={reportingManagerId}
+            employeeId={employeeId}
+            summaryFilter={summaryFilter}
+            onSummaryFilterChange={setSummaryFilter}
+            leaveTypes={leaveTypes}
+            departments={departments}
+            branches={branches}
+            employees={employees}
+            managers={managers}
+            canCreate={canCreate}
+            canApprove={canApprove}
+            canReject={canReject}
+            canCancel={canCancel}
+            canDelete={canDelete}
+            embedded={embedded}
+            listBasePath={listBasePath}
+            fetchRecords={fetchRecords}
+            onMutated={() => {
+              void refreshSummary();
+            }}
+          />
+        </>
+      ) : null}
+
+      {balancesMounted ? (
+        <div className={section === "balances" ? "block" : "hidden"}>
+          <TeamLeaveBalancesPanel
+            initialDepartments={departments}
+            initialYear={year}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

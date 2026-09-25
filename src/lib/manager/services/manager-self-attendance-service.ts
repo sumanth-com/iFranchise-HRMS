@@ -38,8 +38,11 @@ import {
   formatAttendanceTime,
   getTodayDateString,
   isAfterOfficeCheckoutTime,
+  mergeAttendancePolicyNotes,
   OFFICE_CHECK_IN_LOCK_TIME,
   OFFICE_TIMEZONE,
+  resolveEffectivePunchAttendanceStatus,
+  resolvePunchAttendanceResult,
   toDisplayAttendanceNotes,
   type AttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
@@ -161,23 +164,13 @@ function resolvePunchStatus(
   rules: AttendanceRules,
   options?: { finalizeHours?: boolean },
 ): AttendanceStatus {
-  const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
-  const workHours = computeWorkHours(checkInAt, checkOutAt);
-  const today = getTodayDateString();
-  // Finalize hours once checkout is recorded, or for past days.
-  const finalizeHours =
-    options?.finalizeHours ?? (Boolean(checkOutAt) || attendanceDate < today);
-
-  // Until checkout is recorded, status follows check-in only (present / late).
-  // After checkout, under 15 minutes is absent (including same-minute punch-out).
-  // Completed days with real hours stay present or late — Half Day is not used.
-  if (finalizeHours && checkOutAt) {
-    const negligibleHours = 0.25;
-    if (workHours < negligibleHours) return "absent";
-  }
-
-  if (lateMinutes > 0) return "late";
-  return "present";
+  return resolvePunchAttendanceResult(
+    checkInAt,
+    checkOutAt,
+    attendanceDate,
+    rules,
+    options,
+  ).status;
 }
 
 function resolveSelfAttendanceDayStatus(input: {
@@ -194,8 +187,20 @@ function resolveSelfAttendanceDayStatus(input: {
     return "on_request";
   }
 
-  // Prefer the stored row status so HR create/edit/manual Present/Absent/On Leave
-  // stays identical on the employee Attendance module and dashboard.
+  // Prefer stored status for HR manual sheet overrides.
+  // Punch rows reconcile from punches so early checkout never stays Late.
+  if (input.attendance?.check_in_at) {
+    return resolveEffectivePunchAttendanceStatus({
+      storedStatus: input.attendance.attendance_status,
+      checkInAt: input.attendance.check_in_at,
+      checkOutAt: input.attendance.check_out_at,
+      attendanceDate: input.date,
+      notes: input.attendance.notes,
+      rules: input.rules,
+      today: input.today,
+    }) as AttendanceStatus;
+  }
+
   if (input.attendance?.attendance_status) {
     return input.attendance.attendance_status;
   }
@@ -273,15 +278,19 @@ function buildTodayPanel(
     ? Number(row.overtime_hours ?? 0)
     : computeOvertimeHours(workHours, rules);
 
-  // Prefer stored status (HR edit / punch write) so portals stay consistent.
-  // Fall back to live punch derivation only when the row has no status yet.
-  const attendanceStatus = row?.attendance_status
-    ? row.attendance_status
-    : checkInAt
-      ? resolvePunchStatus(checkInAt, checkOutAt, attendanceDate, rules)
-      : attendanceDate === getTodayDateString()
-        ? null
-        : null;
+  // Prefer stored status for HR manual overrides; punch rows reconcile live.
+  const attendanceStatus = checkInAt
+    ? (resolveEffectivePunchAttendanceStatus({
+        storedStatus: row?.attendance_status,
+        checkInAt,
+        checkOutAt,
+        attendanceDate,
+        notes: row?.notes,
+        rules,
+      }) as AttendanceStatus)
+    : row?.attendance_status
+      ? row.attendance_status
+      : null;
 
   const locationFlags = resolveAttendanceLocationFlags({
     checkInLatitude: row?.check_in_latitude,
@@ -1269,7 +1278,7 @@ export async function punchManagerAttendance(
       input.accuracy > 100_000
     );
   // Prefer dedicated GPS columns; keep notes free of geo payloads.
-  const geoNote = null;
+  let punchNotes: string | null = null;
 
   if (
     input.latitude != null &&
@@ -1319,7 +1328,9 @@ export async function punchManagerAttendance(
         .eq("employee_id", employeeId);
       if (priorError) throw new Error(priorError.message);
     }
-    status = resolvePunchStatus(nowIso, null, today, rules);
+    const outcome = resolvePunchAttendanceResult(nowIso, null, today, rules);
+    status = outcome.status;
+    punchNotes = mergeAttendancePolicyNotes(existing?.notes, outcome.policyNoteTags);
   } else if (existing?.check_in_at) {
     if (parseISO(nowIso).getTime() < parseISO(existing.check_in_at).getTime()) {
       throw new Error("Checkout cannot be before check-in.");
@@ -1332,12 +1343,14 @@ export async function punchManagerAttendance(
     });
     workHours = Math.round((totalSeconds / 3600) * 100) / 100;
     overtimeHours = computeOvertimeHours(workHours, rules);
-    status = resolvePunchStatus(
+    const outcome = resolvePunchAttendanceResult(
       existing.check_in_at,
       nowIso,
       today,
       rules,
     );
+    status = outcome.status;
+    punchNotes = mergeAttendancePolicyNotes(existing.notes, outcome.policyNoteTags);
   } else {
     // Active row may be missing when only a soft-deleted row exists.
     // The RPC revives that employee's own row and validates check-in.
@@ -1351,7 +1364,7 @@ export async function punchManagerAttendance(
       p_attendance_status: status,
       p_work_hours: workHours,
       p_overtime_hours: overtimeHours,
-      p_notes: geoNote,
+      p_notes: punchNotes,
       p_expected_employee_id: employeeId,
       p_latitude: hasGeo ? input.latitude : null,
       p_longitude: hasGeo ? input.longitude : null,
@@ -1377,12 +1390,20 @@ export async function punchManagerAttendance(
       priorWorkSeconds: existing.prior_work_seconds,
       previousCheckOutAt: existing.check_out_at,
     });
+    const outcome = resolvePunchAttendanceResult(
+      existing.check_in_at,
+      checkOutAt,
+      today,
+      rules,
+    );
     await supabase
       .schema("hrms")
       .from("attendance")
       .update({
         prior_work_seconds: totalSeconds,
         work_hours: Math.round((totalSeconds / 3600) * 100) / 100,
+        attendance_status: outcome.status,
+        notes: mergeAttendancePolicyNotes(existing.notes, outcome.policyNoteTags),
         updated_at: nowIso,
         updated_by: profile.userId,
       })
@@ -1602,7 +1623,7 @@ export async function updateManagerCheckout(
   });
   const workHours = Math.round((totalSeconds / 3600) * 100) / 100;
   const overtimeHours = computeOvertimeHours(workHours, rules);
-  const status = resolvePunchStatus(
+  const outcome = resolvePunchAttendanceResult(
     existing.check_in_at,
     checkOutAt,
     today,
@@ -1617,7 +1638,8 @@ export async function updateManagerCheckout(
       work_hours: workHours,
       prior_work_seconds: totalSeconds,
       overtime_hours: overtimeHours,
-      attendance_status: status,
+      attendance_status: outcome.status,
+      notes: mergeAttendancePolicyNotes(existing.notes, outcome.policyNoteTags),
       updated_by: profile.userId,
     })
     .eq("id", existing.id)

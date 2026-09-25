@@ -1,12 +1,16 @@
 /**
- * Attendance status UI labels for sheet-aligned display (P/A/CL/EL/LOP/H).
+ * Attendance status UI labels for sheet-aligned display (P/A/CL/EL/LOP/H)
+ * plus punch-derived Late (company grace rule).
  * Maps onto existing hrms.attendance_status + `src:` note markers — no new DB enum.
  */
 import { leaveTypeCodeFromAttendanceNotes } from "@/lib/leave/services/leave-attendance-usage";
+import { isEarlyLogoutFullAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
 
 export const ATTENDANCE_UI_DISPLAY_STATUSES = [
   "present",
   "absent",
+  "late",
+  "half_day",
   "casual_leave",
   "earned_leave",
   "lop",
@@ -18,13 +22,15 @@ export type AttendanceUiDisplayStatus = (typeof ATTENDANCE_UI_DISPLAY_STATUSES)[
 export const ATTENDANCE_UI_DISPLAY_LABELS: Record<AttendanceUiDisplayStatus, string> = {
   present: "Present",
   absent: "Absent",
+  late: "Late",
+  half_day: "Half Day",
   casual_leave: "Casual Leave",
   earned_leave: "Earned Leave",
   lop: "LOP",
   holiday: "Holiday",
 };
 
-/** HR manual create/update Status selector — same labels as display. */
+/** HR manual create/update Status selector — sheet codes only (no Late option). */
 export const MANUAL_ATTENDANCE_UI_STATUSES = [
   "present",
   "absent",
@@ -39,7 +45,7 @@ export type ManualAttendanceUiStatus = (typeof MANUAL_ATTENDANCE_UI_STATUSES)[nu
 export const MANUAL_ATTENDANCE_STATUS_ITEMS: ReadonlyArray<{
   value: ManualAttendanceUiStatus;
   label: string;
-}> = ATTENDANCE_UI_DISPLAY_STATUSES.map((value) => ({
+}> = MANUAL_ATTENDANCE_UI_STATUSES.map((value) => ({
   value,
   label: ATTENDANCE_UI_DISPLAY_LABELS[value],
 }));
@@ -67,8 +73,9 @@ export function isHolidayAttendanceNotes(notes: string | null | undefined): bool
 }
 
 /**
- * Resolve the sheet-aligned UI status/label from stored status + notes.
+ * Resolve the UI status/label from stored status + notes.
  * Never collapses CL/EL into "On Leave" or LOP into "Absent".
+ * Late stays Late (check-in after grace); half_day still displays as Present.
  */
 export function resolveAttendanceUiDisplay(
   status: string | null | undefined,
@@ -92,17 +99,25 @@ export function resolveAttendanceUiDisplay(
   }
 
   if (normalized === "absent") {
+    // Early checkout is Absent/incomplete — never display as sheet LOP.
+    if (isEarlyLogoutFullAttendanceNotes(notes)) {
+      return { key: "absent", label: ATTENDANCE_UI_DISPLAY_LABELS.absent };
+    }
     if (isLopAttendanceNotes(notes)) {
       return { key: "lop", label: ATTENDANCE_UI_DISPLAY_LABELS.lop };
     }
     return { key: "absent", label: ATTENDANCE_UI_DISPLAY_LABELS.absent };
   }
 
-  if (
-    normalized === "present" ||
-    normalized === "late" ||
-    normalized === "half_day"
-  ) {
+  if (normalized === "late") {
+    return { key: "late", label: ATTENDANCE_UI_DISPLAY_LABELS.late };
+  }
+
+  if (normalized === "half_day") {
+    return { key: "half_day", label: ATTENDANCE_UI_DISPLAY_LABELS.half_day };
+  }
+
+  if (normalized === "present") {
     return { key: "present", label: ATTENDANCE_UI_DISPLAY_LABELS.present };
   }
 
@@ -148,10 +163,16 @@ export function mapStoredAttendanceToManualUi(
   ) {
     return "";
   }
-  return resolveAttendanceUiDisplay(status, notes).key;
+  // Sheet selector has no Late/Half Day; keep them editable as Present.
+  if (normalized === "late" || normalized === "half_day") {
+    return "present";
+  }
+  const key = resolveAttendanceUiDisplay(status, notes).key;
+  if (key === "late" || key === "half_day") return "present";
+  return key;
 }
 
-/** Whether a row matches a UI status filter (sheet-aligned). */
+/** Whether a row matches a UI status filter. */
 export function matchesAttendanceUiStatusFilter(
   status: string | null | undefined,
   notes: string | null | undefined,
@@ -163,10 +184,8 @@ export function matchesAttendanceUiStatusFilter(
   if (filter === "on_leave") {
     return key === "casual_leave" || key === "earned_leave";
   }
-  // Late/half_day are not sheet display statuses (they render as Present).
-  // Keep the filter precise to the stored status so Late never expands to all Present rows.
   if (filter === "late") {
-    return String(status ?? "") === "late";
+    return String(status ?? "") === "late" || key === "late";
   }
   if (filter === "half_day") {
     return String(status ?? "") === "half_day";

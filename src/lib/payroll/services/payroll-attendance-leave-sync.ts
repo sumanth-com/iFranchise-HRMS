@@ -3,6 +3,8 @@
  * Attendance notes are preferred over leave-request breakdown when both exist.
  */
 import { isLopAttendanceNotes } from "@/lib/attendance/manual-status";
+import { isLateEntryAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
+import { isEarlyLogoutFullAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
 import {
   leaveTypeCodeFromAttendanceNotes,
   mergeAttendanceAndRequestLeaveUsage,
@@ -90,9 +92,17 @@ export function applyPayrollAttendanceDay(
   }
 
   if (normalized === "absent") {
-    // src:LOP is unpaid leave tracked via leave summary — not generic Absent.
-    if (!lopMarker) {
+    // src:LOP sheet markers are unpaid leave (leave.lopDays). Early-checkout
+    // Absent is incomplete attendance and always counts as absentDays.
+    if (isEarlyLogoutFullAttendanceNotes(notes) || !lopMarker) {
       summary.absentDays += 1;
+    }
+    // Early-checkout Absent must not count toward the 3-lates/month penalty.
+    if (
+      isLateEntryAttendanceNotes(notes) &&
+      !isEarlyLogoutFullAttendanceNotes(notes)
+    ) {
+      summary.lateDays += 1;
     }
     return;
   }
@@ -107,6 +117,10 @@ export function applyPayrollAttendanceDay(
       break;
     case "half_day":
       summary.halfDays += 1;
+      // Late check-in + early half-day logout still counts as one late entry.
+      if (isLateEntryAttendanceNotes(notes)) {
+        summary.lateDays += 1;
+      }
       break;
     case "week_off":
       summary.weekOffDays += 1;

@@ -22,6 +22,7 @@ export const CEO_ROUTES = {
   analytics: "/ceo/analytics",
   approvals: "/ceo/approvals",
   approvalsLeave: "/ceo/approvals/leave",
+  approvalsLeaveBalance: "/ceo/approvals/leave-balance",
   approvalsRegularization: "/ceo/approvals/regularization",
   approvalsExit: "/ceo/approvals/exit",
   reports: "/ceo/reports",
@@ -73,6 +74,7 @@ export type CeoQuickActionId = (typeof CEO_QUICK_ACTIONS)[number]["id"];
 export const CEO_APPROVALS_SUB_NAV = [
   { title: "Executive", href: CEO_ROUTES.approvals },
   { title: "Leave", href: CEO_ROUTES.approvalsLeave },
+  { title: "Leave Balance", href: CEO_ROUTES.approvalsLeaveBalance },
   { title: "Regularization", href: CEO_ROUTES.approvalsRegularization },
   { title: "Exit", href: CEO_ROUTES.approvalsExit },
 ] as const;

@@ -119,6 +119,71 @@ export type LeaveBalanceItem = {
   balanceDays: number;
 };
 
+/** Approved leave usage line for Leave Balance hover details. */
+export type TeamLeaveUsageEntry = {
+  startDate: string;
+  endDate: string;
+  leaveTypeName: string;
+  leaveTypeCode: string;
+  days: number;
+  status: string;
+  reason: string | null;
+  /** Optional holiday calendar name when leave type is OH. */
+  holidayName: string | null;
+};
+
+/** One active employee’s leave balances for the HR/CEO Leave Balance grid. */
+export type TeamLeaveBalanceRow = {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  departmentName: string | null;
+  employmentTypeName: string | null;
+  /** Current ledger available balance (not month-scoped). */
+  clAvailable: number;
+  /** Approved CL days in the selected month. */
+  clUsed: number;
+  /** Year-to-date CL used from ledger (hover context only). */
+  clYearUsed: number;
+  elAvailable: number;
+  /** Approved EL days in the selected month. */
+  elUsed: number;
+  /** Year-to-date EL used from ledger (hover context only). */
+  elYearUsed: number;
+  /** Remaining Optional Holiday entitlement (same rules as My Leave). */
+  ohAvailable: number;
+  /** Approved Optional Holiday days in the selected month. */
+  ohUsed: number;
+  /** Yearly Optional Holiday allowance (typically 2). */
+  ohAllowed: number;
+  /** Approved LOP days overlapping the selected month. */
+  lopDays: number;
+  pendingDays: number;
+  clUsage: TeamLeaveUsageEntry[];
+  elUsage: TeamLeaveUsageEntry[];
+  ohUsage: TeamLeaveUsageEntry[];
+  /** Approved / attendance LOP days in the selected month (hover details). */
+  lopUsage: TeamLeaveUsageEntry[];
+};
+
+export type TeamLeaveBalanceFilters = {
+  search?: string;
+  departmentId?: string;
+  employmentTypeId?: string;
+  balanceYear?: number;
+  /** 1–12; defaults to current IST month. */
+  balanceMonth?: number;
+};
+
+export type TeamLeaveBalanceResult = {
+  rows: TeamLeaveBalanceRow[];
+  year: number;
+  month: number;
+  monthLabel: string;
+  departments: LookupOption[];
+  employmentTypes: LookupOption[];
+};
+
 export type LeaveApprovalStep = {
   id: string;
   approvalLevel: number;

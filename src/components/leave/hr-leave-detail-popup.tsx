@@ -16,6 +16,7 @@ import {
   getLeaveDetailAction,
   rejectLeaveRequestAction,
 } from "@/lib/leave/actions";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import {
   formatLeaveDate,
 } from "@/lib/leave/services/leave-utils";
@@ -129,6 +130,10 @@ export function HrLeaveDetailPopup({
     setComments("");
     setActionError(null);
     setDetail(null); // invalidate so next open refetches post-action state
+    notifyLeaveBalancesChanged({
+      reason: result?.status ?? "leave-action",
+      employeeId: detail?.employeeId,
+    });
     onOpenChange(false);
     onActionComplete?.(result);
   }

@@ -12,6 +12,9 @@ export type SendEmailInput = {
     filename: string;
     content: Buffer | Uint8Array;
     contentType?: string;
+    /** Content-ID for inline images (e.g. branded logo in HTML emails). */
+    cid?: string;
+    contentDisposition?: "inline" | "attachment";
   }[];
 };
 
@@ -102,6 +105,18 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   try {
+    const { getIfranchiseEmailLogoAttachment, htmlNeedsIfranchiseEmailLogo } = await import(
+      "@/lib/email/brand-logo-attachment"
+    );
+    const { EMAIL_BRAND_LOGO_CID } = await import("@/lib/brand/constants");
+    const attachments = [...(input.attachments ?? [])];
+    if (
+      htmlNeedsIfranchiseEmailLogo(input.html) &&
+      !attachments.some((file) => file.cid === EMAIL_BRAND_LOGO_CID)
+    ) {
+      attachments.unshift(getIfranchiseEmailLogoAttachment());
+    }
+
     const transporter = getTransporter(config);
     const info = await transporter.sendMail({
       from: config.from,
@@ -110,10 +125,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       html: input.html,
       text: input.text ?? stripHtml(input.html),
       replyTo: input.replyTo ?? config.user,
-      attachments: input.attachments?.map((file) => ({
+      attachments: attachments.map((file) => ({
         filename: file.filename,
         content: Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content),
         contentType: file.contentType ?? "application/octet-stream",
+        cid: file.cid,
+        contentDisposition:
+          file.contentDisposition ?? (file.cid ? "inline" : "attachment"),
       })),
     });
     return { delivered: true, messageId: info.messageId };

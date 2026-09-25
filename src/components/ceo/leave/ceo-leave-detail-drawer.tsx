@@ -22,6 +22,7 @@ import {
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
 import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import {
   formatHalfDayPeriod,
@@ -121,6 +122,10 @@ export function CeoLeaveDetailDrawer({
       toast.success("Leave request approved");
       setApproveOpen(false);
       broadcastApprovalChange("leave");
+      notifyLeaveBalancesChanged({
+        employeeId: detail.employeeId,
+        reason: "approved",
+      });
       loadDetail();
       onActed?.();
     });
@@ -145,6 +150,10 @@ export function CeoLeaveDetailDrawer({
       setRejectOpen(false);
       setRejectComments("");
       broadcastApprovalChange("leave");
+      notifyLeaveBalancesChanged({
+        employeeId: detail.employeeId,
+        reason: "rejected",
+      });
       loadDetail();
       onActed?.();
     });

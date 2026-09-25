@@ -1,4 +1,4 @@
-import { eachDayOfInterval, format, parseISO } from "date-fns";
+import { eachDayOfInterval, format, isValid, parseISO } from "date-fns";
 
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import type { HalfDayPeriod } from "@/types/leave";
@@ -29,7 +29,15 @@ export function getCurrentBalanceYear(date = getTodayDateString()) {
 }
 
 export function formatLeaveDate(value: string) {
-  return format(parseISO(value), "dd MMM yyyy");
+  const raw = String(value ?? "").trim();
+  if (!raw) return "—";
+  try {
+    const parsed = parseISO(raw.length >= 10 ? raw.slice(0, 10) : raw);
+    if (!isValid(parsed)) return raw;
+    return format(parsed, "dd MMM yyyy");
+  } catch {
+    return raw;
+  }
 }
 
 export function formatHalfDayPeriod(period: HalfDayPeriod | null | undefined) {

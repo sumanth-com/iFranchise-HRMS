@@ -4,7 +4,9 @@ import {
   computeLateMinutes,
   computeWorkHours,
   getTodayDateString,
+  mergeAttendancePolicyNotes,
   OFFICE_CHECK_OUT_TIME,
+  resolvePunchAttendanceResult,
 } from "@/lib/attendance/services/attendance-utils";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
@@ -252,6 +254,13 @@ async function reviewAttendanceCorrection(
       0,
       Math.round((workHours - rules.fullDayMinimumHours) * 100) / 100,
     );
+    const attendanceOutcome = resolvePunchAttendanceResult(
+      checkInAt,
+      checkOutAt,
+      attendanceDate,
+      rules,
+      { finalizeHours: true },
+    );
 
     const { error: attendanceError } = await supabase
       .schema("hrms")
@@ -261,7 +270,8 @@ async function reviewAttendanceCorrection(
         check_out_at: checkOutAt,
         work_hours: workHours,
         overtime_hours: overtimeHours,
-        attendance_status: "present",
+        attendance_status: attendanceOutcome.status,
+        notes: mergeAttendancePolicyNotes(null, attendanceOutcome.policyNoteTags),
         updated_by: profile.userId,
       })
       .eq("id", correction.attendance_id);

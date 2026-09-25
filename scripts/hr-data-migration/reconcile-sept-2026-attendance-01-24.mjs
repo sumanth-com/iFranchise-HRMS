@@ -55,7 +55,8 @@ const SHEET_ROWS = [
   {
     name: "Om",
     code: "IF2025002",
-    days: { ...STANDARD, "21": "CL", "23": "EL" },
+    // Sheet screenshots: 21=CL, 23=EL, 24=EL (25–26 are outside this reconcile window).
+    days: { ...STANDARD, "21": "CL", "23": "EL", "24": "EL" },
   },
   { name: "Himani Bhargava Tapadiya", code: "IF2026002", days: { ...STANDARD } },
   { name: "Akshita Potnuru", code: "IF2026012", days: { ...STANDARD } },

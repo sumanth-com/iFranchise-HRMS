@@ -36,6 +36,8 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** Number-only pills for attendance status (today / Sunday use full cell instead). */
 const PILL_STYLES: Record<string, string> = {
   present: "bg-emerald-500 text-white",
+  late: "bg-amber-500 text-white",
+  half_day: "bg-orange-500 text-white",
   casual_leave: "bg-violet-500 text-white",
   earned_leave: "bg-indigo-500 text-white",
   lop: "bg-rose-500 text-white",
@@ -46,6 +48,8 @@ const PILL_STYLES: Record<string, string> = {
 
 const TOOLTIP_STYLES: Record<string, string> = {
   present: "border-emerald-600/30 bg-emerald-600 text-white",
+  late: "border-amber-500/30 bg-amber-500 text-white",
+  half_day: "border-orange-500/30 bg-orange-500 text-white",
   casual_leave: "border-violet-500/30 bg-violet-500 text-white",
   earned_leave: "border-indigo-500/30 bg-indigo-500 text-white",
   lop: "border-rose-500/30 bg-rose-500 text-white",
@@ -57,6 +61,8 @@ const TOOLTIP_STYLES: Record<string, string> = {
 
 const LEGEND = [
   { key: "present", label: "Present", className: "bg-emerald-500" },
+  { key: "late", label: "Late", className: "bg-amber-500" },
+  { key: "half_day", label: "Half Day", className: "bg-orange-500" },
   { key: "absent", label: "Absent", className: "bg-red-500" },
   { key: "casual_leave", label: "Casual Leave", className: "bg-violet-500" },
   { key: "earned_leave", label: "Earned Leave", className: "bg-indigo-500" },

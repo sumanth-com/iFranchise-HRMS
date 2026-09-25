@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { createClient } from "@/lib/supabase/server";
@@ -37,6 +38,7 @@ import {
   listLeaveRequests,
   listOrganizationOptionalHolidays,
 } from "@/lib/leave/services/leave-queries";
+import { listTeamLeaveBalanceRows } from "@/lib/leave/services/leave-team-balances";
 import { optionalHolidaysForList } from "@/lib/leave/optional-holiday";
 import {
   hrLeaveReviewDecisionSchema,
@@ -56,6 +58,8 @@ import type {
   LeaveListResult,
   LeaveLookups,
   LeaveSummary,
+  TeamLeaveBalanceFilters,
+  TeamLeaveBalanceResult,
 } from "@/types/leave";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { calendarWithEmployeeNonWorkingDates } from "@/lib/leave/services/leave-calendar-engine";
@@ -73,7 +77,11 @@ async function getAuthenticatedSupabase() {
 function revalidateLeaveSelfServicePaths(leaveRequestId?: string) {
   revalidatePath(EMPLOYEE_ROUTES.leave);
   revalidatePath(SELF_LEAVE_ROUTES.list);
+  revalidatePath(SELF_LEAVE_ROUTES.team);
   revalidatePath(LEAVE_ROUTES.list);
+  revalidatePath(LEAVE_ROUTES.balances);
+  revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
+  revalidatePath(CEO_ROUTES.approvalsLeave);
   if (leaveRequestId) {
     revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
   }
@@ -408,6 +416,32 @@ export async function getLeaveBalancesAction(
     return {
       success: false,
       message: toUserFriendlyError(error, "Failed to load leave balances"),
+    };
+  }
+}
+
+/** Team Leave Balance grid — HR (leave.view / leave_balance.view) or CEO portal. */
+export async function listTeamLeaveBalancesAction(
+  filters: TeamLeaveBalanceFilters = {},
+): Promise<LeaveActionResult<TeamLeaveBalanceResult>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "leave.view",
+      "leave_balance.view",
+      "leave.approve",
+      PORTAL_PERMISSIONS.ceo,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const data = await listTeamLeaveBalanceRows(supabase, profile, filters);
+    return { success: true, data };
+  } catch (error) {
+    console.error("[leave] listTeamLeaveBalancesAction failed", error);
+    return {
+      success: false,
+      message: toUserFriendlyError(
+        error,
+        "We couldn't load leave balance data. Please try again.",
+      ),
     };
   }
 }

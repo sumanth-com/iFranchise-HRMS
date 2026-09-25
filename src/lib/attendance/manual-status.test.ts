@@ -36,11 +36,25 @@ describe("attendance status display", () => {
     assert.equal(resolveAttendanceUiDisplay("absent", "src:A").label, "Absent");
   });
 
+  it("early checkout Absent stays Absent even with a legacy src:LOP tag", () => {
+    assert.equal(
+      resolveAttendanceUiDisplay("absent", "src:LOP|early-logout:full").label,
+      "Absent",
+    );
+    assert.equal(
+      resolveAttendanceUiDisplay("absent", "early-logout:full").key,
+      "absent",
+    );
+  });
+
   it("maps sheet codes to display labels", () => {
     assert.equal(resolveAttendanceUiDisplay("present", "src:P").label, "Present");
     assert.equal(resolveAttendanceUiDisplay("holiday", "src:H").label, "Holiday");
     assert.equal(resolveAttendanceUiDisplay("week_off", null).label, "Holiday");
-    assert.equal(resolveAttendanceUiDisplay("late", null).label, "Present");
+    assert.equal(resolveAttendanceUiDisplay("late", null).label, "Late");
+    assert.equal(resolveAttendanceUiDisplay("late", null).key, "late");
+    assert.equal(resolveAttendanceUiDisplay("half_day", null).label, "Half Day");
+    assert.equal(resolveAttendanceUiDisplay("half_day", null).key, "half_day");
   });
 
   it("maps UI selector values onto existing stored status + src markers", () => {

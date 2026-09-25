@@ -6,6 +6,7 @@ import {
   DEFAULT_ATTENDANCE_RULES,
   formatAttendanceTime,
   getTodayDateString,
+  resolveEffectivePunchAttendanceStatus,
 } from "@/lib/attendance/services/attendance-utils";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import {
@@ -163,7 +164,20 @@ async function loadAttendanceRows(
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []) as LooseRow[];
+  return ((data ?? []) as LooseRow[]).map((row) => {
+    const attendanceDate = String(row.attendance_date ?? "").slice(0, 10);
+    return {
+      ...row,
+      attendance_status: resolveEffectivePunchAttendanceStatus({
+        storedStatus: row.attendance_status,
+        checkInAt: row.check_in_at,
+        checkOutAt: row.check_out_at,
+        attendanceDate,
+        notes: row.notes,
+        rules: DEFAULT_ATTENDANCE_RULES,
+      }),
+    } as LooseRow;
+  });
 }
 
 function isWorking(status: AttendanceStatus) {

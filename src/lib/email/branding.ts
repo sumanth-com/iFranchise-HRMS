@@ -1,4 +1,9 @@
-import { BRAND_LOGO_FULL_PATH, BRAND_NAME } from "@/lib/brand/constants";
+import {
+  BRAND_NAME,
+  DEFAULT_BRAND_LOGO_PATH,
+  EMAIL_BRAND_LOGO_CID_SRC,
+  EMAIL_BRAND_LOGO_DISPLAY_WIDTH,
+} from "@/lib/brand/constants";
 import {
   PRODUCTION_CANONICAL_APP_URL,
   resolveAppOrigin,
@@ -31,7 +36,7 @@ export type EmailDetailRow = {
 };
 
 /**
- * Absolute URL for the official iFranchise lockup in HTML emails.
+ * Absolute HTTPS URL for `src/assets/iF-Logo.png` (public copy) when CID is unavailable.
  * Never uses localhost / loopback — those break when the message is opened in Gmail.
  */
 export function resolveEmailBrandLogoUrl(): string {
@@ -41,7 +46,7 @@ export function resolveEmailBrandLogoUrl(): string {
     lower.includes("localhost") || lower.includes("127.0.0.1")
       ? PRODUCTION_CANONICAL_APP_URL
       : origin;
-  return `${safeOrigin}${BRAND_LOGO_FULL_PATH}`;
+  return `${safeOrigin}${DEFAULT_BRAND_LOGO_PATH}`;
 }
 
 function buttonBackground(variant: EmailButton["variant"]): string {
@@ -116,7 +121,10 @@ export type BrandedEmailOptions = {
   subheading?: string;
   contentHtml: string;
   footerNote?: string;
-  /** Optional logo URL override (defaults to production-safe full iFranchise lockup). */
+  /**
+   * Override logo URL. Defaults to the shared CID (`cid:ifranchise-logo`) so
+   * `sendEmail` can attach `src/assets/iF-Logo.png` inline for Gmail.
+   */
   logoUrl?: string;
 };
 
@@ -125,9 +133,10 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
   const preheader = options.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${options.preheader}</div>`
     : "";
-  // Full horizontal lockup (IF + iFranchise), not the compact IF mark.
-  // Width-only sizing keeps aspect ratio; centered in the header.
-  const logoUrl = options.logoUrl ?? resolveEmailBrandLogoUrl();
+  // Single email logo: src/assets/iF-Logo.png via CID (sendEmail attaches the file).
+  // Width-only sizing keeps aspect ratio; centered once in the header.
+  const logoUrl = options.logoUrl ?? EMAIL_BRAND_LOGO_CID_SRC;
+  const logoWidth = EMAIL_BRAND_LOGO_DISPLAY_WIDTH;
 
   return `<!doctype html>
 <html lang="en">
@@ -142,7 +151,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
         .email-pad { padding: 22px 16px !important; }
         .email-header { padding: 28px 16px 24px !important; }
         .email-heading { font-size: 22px !important; }
-        .email-brand-logo { width: 168px !important; max-width: 78% !important; }
+        .email-brand-logo { width: 96px !important; max-width: 40% !important; }
         .email-btn-table, .email-btn-table tbody, .email-btn-table tr { display: block !important; width: 100% !important; }
         .email-btn-cell { display: block !important; width: 100% !important; padding: 0 0 10px 0 !important; }
         .email-btn { min-height: 48px !important; padding: 16px 18px !important; font-size: 16px !important; }
@@ -162,8 +171,8 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
               <td class="email-header" align="center" style="background:linear-gradient(135deg,${COLORS.headerFrom},${COLORS.headerTo});padding:32px 28px 28px;color:#ffffff;text-align:center;">
                 <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto 16px;">
                   <tr>
-                    <td align="center" style="background:#ffffff;border-radius:14px;padding:10px 18px;">
-                      <img class="email-brand-logo" src="${logoUrl}" width="200" alt="${BRAND_NAME}" style="display:block;width:200px;height:auto;max-width:200px;border:0;margin:0 auto;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
+                    <td align="center" style="background:#ffffff;border-radius:14px;padding:12px 16px;">
+                      <img class="email-brand-logo" src="${logoUrl}" width="${logoWidth}" alt="${BRAND_NAME}" style="display:block;width:${logoWidth}px;height:auto;max-width:${logoWidth}px;border:0;margin:0 auto;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />
                     </td>
                   </tr>
                 </table>

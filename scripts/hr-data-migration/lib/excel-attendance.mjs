@@ -11,6 +11,7 @@ export const ATTENDANCE_STATUS_MAP = {
   CL: "on_leave",
   PL: "on_leave",
   EL: "on_leave",
+  OH: "on_leave",
   SL: "on_leave",
   ML: "on_leave",
   CO: "on_leave",

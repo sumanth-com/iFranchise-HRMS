@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Info, Wallet } from "lucide-react";
+import { AlertCircle, Loader2, Info, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { createLeaveRequestAction, getLeaveApplyContextAction, updateLeaveRequestAction } from "@/lib/leave/actions";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import {
   clearStaleServerActionReloadFlag,
   isStaleServerActionError,
@@ -82,11 +83,26 @@ function explainLeaveSubmitError(message: string): {
       hint: "You can still submit this request for approval.",
     };
   }
-  if (normalized.includes("overlap")) {
+  if (
+    normalized.includes("overlap") ||
+    normalized.includes("already have") ||
+    normalized.includes("duplicate")
+  ) {
     return {
       title: "These dates already have leave",
       body: "You already have a pending or approved leave on one or more of these dates.",
       hint: "Choose different dates, or cancel the existing request first, then try again.",
+    };
+  }
+  if (
+    normalized.includes("insufficient") ||
+    normalized.includes("not enough") ||
+    normalized.includes("balance")
+  ) {
+    return {
+      title: "Not enough leave balance",
+      body: message,
+      hint: "Reduce the leave duration, choose another leave type, or contact HR.",
     };
   }
   if (normalized.includes("notice") || normalized.includes("tomorrow")) {
@@ -95,8 +111,30 @@ function explainLeaveSubmitError(message: string): {
       body: message,
     };
   }
+  if (
+    normalized.includes("network") ||
+    normalized.includes("fetch") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("timeout")
+  ) {
+    return {
+      title: "Connection problem",
+      body: "We couldn't reach the server. Check your connection and try again.",
+    };
+  }
+  if (
+    normalized.includes("server") ||
+    normalized.includes("database") ||
+    normalized.includes("unexpected")
+  ) {
+    return {
+      title: "Something went wrong",
+      body: "We couldn't submit your leave request right now. Please try again in a moment.",
+      hint: "If this keeps happening, contact HR.",
+    };
+  }
   return {
-    title: "Please check your leave details",
+    title: "Couldn't submit leave request",
     body: message,
   };
 }
@@ -140,14 +178,15 @@ export function LeaveForm({
   onCancel,
 }: LeaveFormProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const submitLockRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(initialApplyContext);
   const [balancesLoading, setBalancesLoading] = useState(!initialApplyContext && initialBalances.length === 0);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isSelfService = variant === "self";
+  const isPending = isSubmitting;
 
   const employeeItems = lookups.employees.map((employee) => ({
     value: employee.id,
@@ -339,76 +378,85 @@ export function LeaveForm({
     };
   }, [selectedEmployeeId, initialApplyContext, initialBalances.length]);
 
-  const showErrorsInForm = isSelfService || Boolean(onCancel);
-
+  // Always surface submission failures in the form (never toast-only / silent).
   useEffect(() => {
     setSubmitError(null);
   }, [selectedLeaveTypeId, startDate, endDate, isHalfDay]);
 
-  const onSubmit = form.handleSubmit((values) => {
-    if (isPending || submitLockRef.current) return;
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (isSubmitting || submitLockRef.current) return;
     submitLockRef.current = true;
+    setIsSubmitting(true);
     setSubmitError(null);
-    startTransition(async () => {
-      try {
-        const payload = {
-          ...values,
-          isHalfDay: values.isHalfDay,
-          halfDayPeriod: values.isHalfDay ? "afternoon" : "",
-        };
-        const result = isEdit
-          ? await updateLeaveRequestAction(initialRequest!.id, payload)
-          : await createLeaveRequestAction(payload);
 
-        if (!result.success) {
-          submitLockRef.current = false;
-          if (showErrorsInForm) {
-            setSubmitError(result.message);
-          } else {
-            toast.error(result.message);
-          }
-          return;
-        }
+    let createdId: string | null = null;
+    let succeeded = false;
+    try {
+      const payload = {
+        ...values,
+        isHalfDay: values.isHalfDay,
+        halfDayPeriod: values.isHalfDay ? "afternoon" : "",
+      };
+      const result = isEdit
+        ? await updateLeaveRequestAction(initialRequest!.id, payload)
+        : await createLeaveRequestAction(payload);
 
-        toast.success(
-          hrReviewReasonFromIssues(applyPreview?.issues ?? [])
-            ? HR_REVIEW_SUBMITTED_MESSAGE
-            : isEdit
-              ? "Leave request updated"
-              : "Leave request submitted successfully",
-        );
-
-        if (onSuccess) {
-          onSuccess();
-          return;
-        }
-
-        if (redirectPath) {
-          router.push(redirectPath);
-          return;
-        }
-
-        if (!isEdit && result.data) {
-          router.push(LEAVE_ROUTES.detail(result.data));
-          return;
-        }
-
-        router.push(LEAVE_ROUTES.list);
-      } catch (error) {
-        submitLockRef.current = false;
-        if (isStaleServerActionError(error)) {
-          reloadForStaleServerAction();
-          return;
-        }
-        const message =
-          error instanceof Error ? error.message : "Failed to submit leave request";
-        if (showErrorsInForm) {
-          setSubmitError(message);
-        } else {
-          toast.error(message);
-        }
+      if (!result.success) {
+        setSubmitError(result.message);
+        toast.error(result.message);
+        return;
       }
-    });
+
+      succeeded = true;
+      if (!isEdit && typeof result.data === "string") {
+        createdId = result.data;
+      }
+      notifyLeaveBalancesChanged({
+        employeeId: values.employeeId,
+        reason: isEdit ? "edited" : "created",
+      });
+      toast.success(
+        hrReviewReasonFromIssues(applyPreview?.issues ?? [])
+          ? HR_REVIEW_SUBMITTED_MESSAGE
+          : isEdit
+            ? "Leave request updated"
+            : "Leave request submitted successfully",
+      );
+    } catch (error) {
+      if (isStaleServerActionError(error)) {
+        reloadForStaleServerAction();
+        return;
+      }
+      const message =
+        error instanceof Error ? error.message : "Failed to submit leave request";
+      setSubmitError(message);
+      toast.error(message);
+    } finally {
+      // Guaranteed cleanup — never leave the button stuck on "Submitting…".
+      submitLockRef.current = false;
+      setIsSubmitting(false);
+    }
+
+    if (!succeeded) return;
+
+    // Success side-effects AFTER pending is cleared so refresh/navigation
+    // cannot keep the submit button in a loading state.
+    if (onSuccess) {
+      onSuccess();
+      return;
+    }
+
+    if (redirectPath) {
+      router.push(redirectPath);
+      return;
+    }
+
+    if (createdId) {
+      router.push(LEAVE_ROUTES.detail(createdId));
+      return;
+    }
+
+    router.push(LEAVE_ROUTES.list);
   });
 
   const applyPreview =
@@ -765,19 +813,19 @@ export function LeaveForm({
         ) : null}
         {submitErrorCopy ? (
           <div
-            role="status"
-            className="flex gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5"
+            role="alert"
+            className="flex gap-2.5 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5"
           >
-            <Info className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
             <div className="min-w-0 space-y-1">
-              <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+              <p className="text-sm font-medium text-destructive">
                 {submitErrorCopy.title}
               </p>
-              <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/80">
+              <p className="text-xs leading-relaxed text-destructive/90">
                 {submitErrorCopy.body}
               </p>
               {submitErrorCopy.hint ? (
-                <p className="text-xs leading-relaxed text-amber-900/75 dark:text-amber-100/65">
+                <p className="text-xs leading-relaxed text-destructive/75">
                   {submitErrorCopy.hint}
                 </p>
               ) : null}

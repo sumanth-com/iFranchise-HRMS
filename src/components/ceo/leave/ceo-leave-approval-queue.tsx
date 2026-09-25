@@ -23,6 +23,7 @@ import {
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
 import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import { formatHalfDayPeriod } from "@/lib/leave/services/leave-utils";
 import type { CeoApprovalQueueItem } from "@/types/ceo-leave";
@@ -91,6 +92,10 @@ export function CeoLeaveApprovalQueue({
       toast.success("Leave request approved");
       closeModal();
       broadcastApprovalChange("leave");
+      notifyLeaveBalancesChanged({
+        employeeId: item.employeeId,
+        reason: "approved",
+      });
       onActed(item, "approved");
     });
   };
@@ -114,6 +119,10 @@ export function CeoLeaveApprovalQueue({
       toast.success("Leave request rejected");
       closeModal();
       broadcastApprovalChange("leave");
+      notifyLeaveBalancesChanged({
+        employeeId: item.employeeId,
+        reason: "rejected",
+      });
       onActed(item, "rejected");
     });
   };
@@ -135,6 +144,7 @@ export function CeoLeaveApprovalQueue({
       closeModal();
       selection.clearSelection();
       broadcastApprovalChange("leave");
+      notifyLeaveBalancesChanged({ reason: "bulk-approved" });
       onActed();
     });
   };
@@ -161,6 +171,7 @@ export function CeoLeaveApprovalQueue({
       closeModal();
       selection.clearSelection();
       broadcastApprovalChange("leave");
+      notifyLeaveBalancesChanged({ reason: "bulk-rejected" });
       onActed();
     });
   };

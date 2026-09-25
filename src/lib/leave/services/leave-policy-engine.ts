@@ -409,10 +409,18 @@ export function splitLeaveDaysByBalance(input: {
 }
 
 /**
- * Walks counted leave days in date order. Working days consume paid balance first;
- * sandwich days consume paid balance only when both adjacent working days are paid.
- * If either adjacent working day is LOP (or the leave type is unpaid), the sandwich
- * day is processed as LOP.
+ * Walks counted leave days in date order. Working days consume the selected
+ * paid leave balance first; sandwich (weekly-off / intervening) days then
+ * consume remaining balance of that same leave type.
+ *
+ * Sandwich → LOP only when:
+ * - the leave type is unpaid, or
+ * - an adjacent counted working leave day is already LOP, or
+ * - no paid balance remains.
+ *
+ * A one-sided weekly off (e.g. Saturday-only or Monday-only request) must NOT
+ * force LOP solely because the other adjacent working day is absent — if
+ * balance remains, that Sunday/weekly off consumes the selected leave type.
  */
 export function allocateLeaveDaysByBalance(
   duration: LeaveDurationBreakdown,
@@ -422,6 +430,7 @@ export function allocateLeaveDaysByBalance(
     calendar?: LeaveCalendarContext;
   },
 ): LeaveDayAllocation[] {
+  void options?.calendar;
   const isPaidLeaveType = options?.isPaidLeaveType !== false;
   let remainingPaid = roundLeaveDays(Math.max(0, paidDays));
   const sorted = [...duration.days].sort((left, right) =>
@@ -456,11 +465,9 @@ export function allocateLeaveDaysByBalance(
     const after = workingLeaveDays.find((entry) => entry.date > day.date);
     const beforeKind = before ? allocationByDate.get(before.date) : undefined;
     const afterKind = after ? allocationByDate.get(after.date) : undefined;
-    const adjacentLop =
-      beforeKind === "lop" ||
-      afterKind === "lop" ||
-      beforeKind == null ||
-      afterKind == null;
+    // Only force LOP when an existing adjacent working leave day is unpaid LOP.
+    // Missing adjacent (one-sided weekly-off sandwich) still allows paid consumption.
+    const adjacentLop = beforeKind === "lop" || afterKind === "lop";
 
     if (!isPaidLeaveType || adjacentLop) {
       allocationByDate.set(day.date, "lop");
@@ -527,7 +534,9 @@ export function calendarMarkForAllocation(
   leaveTypeCode: string | null | undefined,
 ): string | null {
   if (kind === "none") return null;
-  if (kind === "sandwich") return "Sandwich";
+  // Paid sandwich days consume the selected leave type balance — label as that
+  // leave type, not "Sandwich". Sandwich → LOP only when kind is already "lop".
+  if (kind === "sandwich") return paidLeaveTypeDisplayName(leaveTypeCode);
   if (kind === "lop") return "LOP";
   return paidLeaveTypeDisplayName(leaveTypeCode);
 }

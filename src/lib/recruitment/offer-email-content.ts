@@ -1,3 +1,6 @@
+import { siteConfig } from "@/config/site";
+import { renderBrandedEmail, renderParagraph } from "@/lib/email/branding";
+
 const HR_EMAIL = "hr@ifranchise.in";
 const HR_PHONE = "+91-9247 536532";
 
@@ -73,12 +76,13 @@ export function buildOfferEmailHtmlFromMessage(message: string): string {
   const paragraphs = message
     .split(/\n\n+/)
     .filter((block) => block.trim().length > 0)
-    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, "<br>")}</p>`)
+    .map((block) => renderParagraph(escapeHtml(block).replace(/\n/g, "<br>")))
     .join("");
 
-  return `
-    <div style="font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #1a1a1a;">
-      ${paragraphs}
-    </div>
-  `.trim();
+  return renderBrandedEmail({
+    title: siteConfig.name,
+    heading: siteConfig.name,
+    contentHtml: paragraphs,
+    footerNote: `${siteConfig.name} · Confidential`,
+  });
 }

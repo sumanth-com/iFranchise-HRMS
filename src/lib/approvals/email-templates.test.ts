@@ -5,6 +5,11 @@ import {
   assertLeaveApprovalEmailHtml,
   renderLeaveApprovalRequestEmail,
 } from "@/lib/approvals/email-templates";
+import {
+  EMAIL_BRAND_LOGO_CID,
+  EMAIL_BRAND_LOGO_CID_SRC,
+} from "@/lib/brand/constants";
+import { getIfranchiseEmailLogoAttachment } from "@/lib/email/brand-logo-attachment";
 import type { ApprovalRequestSummary } from "@/lib/approvals/types";
 
 const summary: ApprovalRequestSummary = {
@@ -64,5 +69,31 @@ describe("leave approval email template", () => {
     assert.match(html, /2 Sep 2026/);
     assert.match(html, /2 days/);
     assert.match(html, /Family event/);
+  });
+
+  it("embeds the official iFranchise logo via CID (not text branding)", () => {
+    const html = renderLeaveApprovalRequestEmail({
+      summary,
+      approverName: "HR Admin",
+      approveUrl: "https://example.com/a",
+      rejectUrl: "https://example.com/r",
+      expiresInHours: 48,
+    });
+
+    assert.match(html, new RegExp(`src="${EMAIL_BRAND_LOGO_CID_SRC}"`));
+    assert.match(html, /alt="iFranchise"/);
+    assert.match(html, /class="email-brand-logo"/);
+    // Tagline lives in the PNG lockup, not as HTML text replacement for the logo.
+    assert.doesNotMatch(html, /CONNECT\. EXPAND\. GROW\./);
+
+    const attachment = getIfranchiseEmailLogoAttachment();
+    assert.equal(attachment.cid, EMAIL_BRAND_LOGO_CID);
+    assert.equal(attachment.contentDisposition, "inline");
+    assert.equal(attachment.contentType, "image/png");
+    assert.equal(attachment.filename, "iF-Logo.png");
+    assert.ok(
+      Buffer.isBuffer(attachment.content) || attachment.content instanceof Uint8Array,
+    );
+    assert.ok(attachment.content.byteLength > 1000);
   });
 });

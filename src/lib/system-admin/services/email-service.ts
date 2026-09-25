@@ -159,7 +159,13 @@ export async function sendTestEmail(
   toEmail: string,
 ): Promise<{ success: boolean; message: string }> {
   const subject = "iFranchise HRMS — SMTP Test";
-  const html = `<p>This is a test email from System Administration.</p><p>Sent at ${new Date().toISOString()}</p>`;
+  const { renderBrandedEmail, renderParagraph } = await import("@/lib/email/branding");
+  const html = renderBrandedEmail({
+    title: subject,
+    heading: "SMTP Test",
+    contentHtml: `${renderParagraph("This is a test email from System Administration.")}${renderParagraph(`Sent at ${new Date().toISOString()}`)}`,
+    footerNote: "iFranchise HRMS · System Administration",
+  });
 
   await logEmail(supabase, profile.employee.organizationId, {
     toEmail,

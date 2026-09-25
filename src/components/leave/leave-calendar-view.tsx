@@ -244,8 +244,7 @@ export function LeaveCalendarView({
   function leavePillTone(leave: LeaveCalendarEntry, date: string) {
     const allocation = leave.dayAllocations?.find((item) => item.date === date);
     if (allocation?.kind === "lop") return "bg-slate-500";
-    if (allocation?.kind === "sandwich") return LEAVE_CALENDAR_LEGEND.sandwich.className;
-    if (leave.isHalfDay) return LEAVE_STATUS_COLORS[leave.leaveStatus];
+    // Paid sandwich days are covered by the selected leave balance — same tone as paid leave.
     return LEAVE_STATUS_COLORS[leave.leaveStatus];
   }
 

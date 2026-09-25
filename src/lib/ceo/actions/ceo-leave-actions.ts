@@ -221,6 +221,7 @@ export async function approveCeoLeaveAction(
     );
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
     revalidatePath(CEO_ROUTES.leave);
     revalidateCeoDashboardHome();
 
@@ -249,6 +250,7 @@ export async function rejectCeoLeaveAction(
     );
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
     revalidatePath(CEO_ROUTES.leave);
     revalidateCeoDashboardHome();
 
@@ -295,6 +297,7 @@ export async function bulkApproveCeoLeaveAction(
     }
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
     revalidatePath(CEO_ROUTES.leave);
     revalidateCeoDashboardHome();
 
@@ -344,6 +347,7 @@ export async function bulkRejectCeoLeaveAction(
     }
 
     revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
     revalidatePath(CEO_ROUTES.leave);
     revalidateCeoDashboardHome();
 

@@ -50,6 +50,7 @@ export class ClientSectionBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <ErrorState
+          variant="muted"
           title={this.props.title ?? SECTION_LOAD_ERROR_TITLE}
           description={this.props.description ?? SECTION_LOAD_ERROR_DESCRIPTION}
           onRetry={this.handleRetry}

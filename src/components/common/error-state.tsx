@@ -11,6 +11,11 @@ type ErrorStateProps = {
   retryLabel?: string;
   onRetry?: () => void;
   className?: string;
+  /**
+   * `muted` — calm inline module fallback (preferred for unexpected load failures).
+   * `destructive` — reserved for rare blocking page failures.
+   */
+  variant?: "muted" | "destructive";
 };
 
 export function ErrorState({
@@ -20,16 +25,28 @@ export function ErrorState({
   retryLabel = "Retry",
   onRetry,
   className,
+  variant = "muted",
 }: ErrorStateProps) {
+  const isDestructive = variant === "destructive";
   return (
     <div
       role="alert"
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-10 text-center",
+        "flex flex-col items-center justify-center gap-3 rounded-lg border p-10 text-center",
+        isDestructive
+          ? "border-destructive/20 bg-destructive/5"
+          : "border-border bg-muted/30",
         className,
       )}
     >
-      <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+      <div
+        className={cn(
+          "flex size-12 items-center justify-center rounded-full",
+          isDestructive
+            ? "bg-destructive/10 text-destructive"
+            : "bg-muted text-muted-foreground",
+        )}
+      >
         {icon ?? <AlertCircle className="size-6" />}
       </div>
       <div className="space-y-1">

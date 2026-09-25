@@ -11,6 +11,10 @@ const STATUS_STYLES: Record<AttendanceUiDisplayStatus | "upcoming" | "on_request
     "bg-emerald-500/15 text-emerald-800 ring-1 ring-inset ring-emerald-500/25 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/35",
   absent:
     "bg-red-500/15 text-red-800 ring-1 ring-inset ring-red-500/25 dark:bg-red-500/20 dark:text-red-200 dark:ring-red-400/35",
+  late:
+    "bg-amber-500/15 text-amber-900 ring-1 ring-inset ring-amber-500/25 dark:bg-amber-500/20 dark:text-amber-100 dark:ring-amber-400/35",
+  half_day:
+    "bg-orange-500/15 text-orange-900 ring-1 ring-inset ring-orange-500/25 dark:bg-orange-500/20 dark:text-orange-100 dark:ring-orange-400/35",
   casual_leave:
     "bg-violet-500/15 text-violet-800 ring-1 ring-inset ring-violet-500/25 dark:bg-violet-500/20 dark:text-violet-200 dark:ring-violet-400/35",
   earned_leave:

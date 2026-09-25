@@ -91,7 +91,7 @@ describe("official sandwich leave policy", () => {
     assert.equal(duration.totalLeaveDays, 1);
   });
 
-  it("TEST 4b: Saturday-only leave sandwiches the following Sunday as LOP", () => {
+  it("TEST 4b: Saturday-only leave with sufficient CL covers Sunday from CL (not Sandwich LOP)", () => {
     const duration = calculateLeaveDuration({
       startDate: "2026-09-26",
       endDate: "2026-09-26",
@@ -107,6 +107,26 @@ describe("official sandwich leave policy", () => {
       isPaidLeaveType: true,
     });
     const split = splitLeaveDaysFromAllocations(allocations, true);
+    assert.equal(split.paidDays, 2);
+    assert.equal(split.lopDays, 0);
+    assert.equal(
+      allocations.filter((day) => day.date === "2026-09-27" && day.kind === "sandwich").length,
+      1,
+    );
+  });
+
+  it("TEST 4b-insufficient: Saturday-only with 1 CL → Sunday becomes LOP", () => {
+    const duration = calculateLeaveDuration({
+      startDate: "2026-09-26",
+      endDate: "2026-09-26",
+      isHalfDay: false,
+      calendar: calendar(),
+    });
+    const allocations = allocateLeaveDaysByBalance(duration, 1, {
+      calendar: calendar(),
+      isPaidLeaveType: true,
+    });
+    const split = splitLeaveDaysFromAllocations(allocations, true);
     assert.equal(split.paidDays, 1);
     assert.equal(split.lopDays, 1);
     assert.equal(
@@ -115,7 +135,7 @@ describe("official sandwich leave policy", () => {
     );
   });
 
-  it("TEST 4c: Monday-only leave sandwiches the preceding Sunday as LOP", () => {
+  it("TEST 4c: Monday-only leave with sufficient CL covers preceding Sunday from CL", () => {
     const duration = calculateLeaveDuration({
       startDate: "2026-09-14",
       endDate: "2026-09-14",
@@ -127,6 +147,26 @@ describe("official sandwich leave policy", () => {
     assert.equal(duration.totalLeaveDays, 2);
 
     const allocations = allocateLeaveDaysByBalance(duration, 2, {
+      calendar: calendar(),
+      isPaidLeaveType: true,
+    });
+    const split = splitLeaveDaysFromAllocations(allocations, true);
+    assert.equal(split.paidDays, 2);
+    assert.equal(split.lopDays, 0);
+    assert.equal(
+      allocations.filter((day) => day.date === "2026-09-13" && day.kind === "sandwich").length,
+      1,
+    );
+  });
+
+  it("TEST 4c-insufficient: Monday-only with 1 CL → Sunday becomes LOP", () => {
+    const duration = calculateLeaveDuration({
+      startDate: "2026-09-14",
+      endDate: "2026-09-14",
+      isHalfDay: false,
+      calendar: calendar(),
+    });
+    const allocations = allocateLeaveDaysByBalance(duration, 1, {
       calendar: calendar(),
       isPaidLeaveType: true,
     });

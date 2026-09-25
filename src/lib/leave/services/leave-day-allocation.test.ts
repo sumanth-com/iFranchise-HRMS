@@ -138,6 +138,147 @@ describe("calendar day allocation", () => {
     assert.equal(calendarMarkForAllocation(result.find((day) => day.date === "2026-09-21")!.kind, "CL"), "LOP");
   });
 
+  it("covers one-sided Sunday with CL when balance is sufficient (no double deduct)", () => {
+    const result = allocateLeaveDaysByBalance(
+      duration([
+        {
+          date: "2026-09-26",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+        {
+          date: "2026-09-27",
+          kind: "sandwich",
+          class: "weekly_off",
+          counted: 1,
+          inRequestedRange: false,
+        },
+      ]),
+      2,
+    );
+
+    assert.equal(result.find((day) => day.date === "2026-09-26")!.kind, "paid");
+    assert.equal(result.find((day) => day.date === "2026-09-27")!.kind, "sandwich");
+    assert.equal(
+      result.filter((day) => day.kind === "paid" || day.kind === "sandwich").length,
+      2,
+    );
+    assert.equal(result.filter((day) => day.kind === "lop").length, 0);
+  });
+
+  it("covers one-sided Sunday with EL when balance is sufficient", () => {
+    const result = allocateLeaveDaysByBalance(
+      duration([
+        {
+          date: "2026-09-14",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+        {
+          date: "2026-09-13",
+          kind: "sandwich",
+          class: "weekly_off",
+          counted: 1,
+          inRequestedRange: false,
+        },
+      ]),
+      2,
+    );
+
+    assert.equal(calendarMarkForAllocation(result.find((day) => day.date === "2026-09-14")!.kind, "EL"), "Earned Leave");
+    assert.equal(result.find((day) => day.date === "2026-09-13")!.kind, "sandwich");
+    assert.equal(calendarMarkForAllocation(result.find((day) => day.date === "2026-09-13")!.kind, "EL"), "Earned Leave");
+  });
+
+  it("one-sided Sunday becomes LOP when selected leave balance is only 1", () => {
+    const result = allocateLeaveDaysByBalance(
+      duration([
+        {
+          date: "2026-09-26",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+        {
+          date: "2026-09-27",
+          kind: "sandwich",
+          class: "weekly_off",
+          counted: 1,
+          inRequestedRange: false,
+        },
+      ]),
+      1,
+    );
+
+    assert.equal(result.find((day) => day.date === "2026-09-26")!.kind, "paid");
+    assert.equal(result.find((day) => day.date === "2026-09-27")!.kind, "lop");
+  });
+
+  it("keeps sandwich as LOP when an adjacent working leave day is already LOP", () => {
+    const result = allocateLeaveDaysByBalance(
+      duration([
+        {
+          date: "2026-09-19",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+        {
+          date: "2026-09-20",
+          kind: "sandwich",
+          class: "weekly_off",
+          counted: 1,
+          inRequestedRange: false,
+        },
+        {
+          date: "2026-09-21",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+      ]),
+      1,
+    );
+
+    assert.equal(result.find((day) => day.date === "2026-09-19")!.kind, "paid");
+    assert.equal(result.find((day) => day.date === "2026-09-21")!.kind, "lop");
+    assert.equal(result.find((day) => day.date === "2026-09-20")!.kind, "lop");
+  });
+
+  it("weekday-only leave is unchanged (no sandwich)", () => {
+    const result = allocateLeaveDaysByBalance(
+      duration([
+        {
+          date: "2026-09-15",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+        {
+          date: "2026-09-16",
+          kind: "working",
+          class: "working",
+          counted: 1,
+          inRequestedRange: true,
+        },
+      ]),
+      2,
+    );
+
+    assert.deepEqual(
+      result.map((day) => day.kind),
+      ["paid", "paid"],
+    );
+  });
+
   it("labels earned leave paid days with the full name", () => {
     const result = allocateLeaveDaysByBalance(
       duration([

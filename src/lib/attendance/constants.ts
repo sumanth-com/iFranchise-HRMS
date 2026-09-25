@@ -34,8 +34,8 @@ export function attendanceTeamListUrl(
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: "Present",
   absent: "Absent",
-  late: "Present",
-  half_day: "Present",
+  late: "Late",
+  half_day: "Half Day",
   on_leave: "Casual Leave",
   holiday: "Holiday",
   week_off: "Holiday",
@@ -59,6 +59,6 @@ export const ATTENDANCE_SUMMARY_LABELS = {
   presentToday: "Present",
   absentToday: "Absent",
   lateToday: "Late",
-  halfDayToday: "Present",
+  halfDayToday: "Half Day",
   totalEmployees: "Total Employees",
 } as const;

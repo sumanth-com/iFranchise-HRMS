@@ -12,7 +12,9 @@ import { attendanceListParamsSchema } from "@/lib/validations/attendance";
 import {
   getTodayDateString,
   isAfterOfficeCheckoutTime,
+  resolveEffectivePunchAttendanceStatus,
 } from "@/lib/attendance/services/attendance-utils";
+import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { completedWorkHoursFromPunches } from "@/lib/employee/attendance-format";
 import {
@@ -208,7 +210,7 @@ async function loadAttendanceRosterUncached(
     attQuery = attQuery.eq("employee_id", employeeId);
   }
 
-  const [empRes, attRes, leavesRes] = await Promise.all([
+  const [empRes, attRes, leavesRes, rules] = await Promise.all([
     empQuery,
     attQuery,
     (async () => {
@@ -231,6 +233,7 @@ async function loadAttendanceRosterUncached(
         return { data: [] as LooseRow[], error: null };
       }
     })(),
+    getOrganizationAttendanceRules(supabase, organizationId),
   ]);
 
   if (empRes.error) {
@@ -313,11 +316,20 @@ async function loadAttendanceRosterUncached(
               })
             : 0;
 
-      // Prefer the stored row status so HR manual overrides stick.
-      // Punch flows already write present/late/absent; re-deriving from punches
-      // (e.g. <15m work → absent) was snapping HR overrides back after refresh.
+      // Prefer stored status for HR manual sheet overrides.
+      // Punch rows are reconciled from punches so early checkout never stays Late.
       let status: AttendanceDisplayStatus;
-      if (att?.attendance_status) {
+      if (att?.check_in_at) {
+        status = resolveEffectivePunchAttendanceStatus({
+          storedStatus: att.attendance_status,
+          checkInAt: checkInAt,
+          checkOutAt: checkOutAt,
+          attendanceDate: rosterDate,
+          notes: att.notes,
+          rules,
+          today: todayStr,
+        }) as AttendanceStatus;
+      } else if (att?.attendance_status) {
         status = att.attendance_status as AttendanceStatus;
       } else if (hasApprovedLeave) {
         status = "on_leave";
@@ -584,17 +596,24 @@ export async function getAttendanceSummary(
     else if (row.attendanceStatus === "on_leave") onLeaveToday += 1;
   }
 
-  // Sheet-aligned KPIs: late/half_day display as Present (see resolveAttendanceUiDisplay).
-  // Fold into Present and zero Late/Half-day so summary cards never disagree with badges,
-  // and downstream present+late+half aggregations do not double-count.
-  const presentLike = presentToday + halfDayToday + lateToday;
+  if (employeeId) {
+    return {
+      date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
+      presentToday: presentToday + halfDayToday + lateToday,
+      absentToday,
+      lateToday,
+      halfDayToday,
+      onLeaveToday,
+      totalEmployees: employeeIds.size,
+    };
+  }
 
   return {
     date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-    presentToday: presentLike,
-    absentToday: employeeId ? absentToday : absentToday + onLeaveToday,
-    lateToday: 0,
-    halfDayToday: 0,
+    presentToday: presentToday + halfDayToday,
+    absentToday: absentToday + onLeaveToday,
+    lateToday,
+    halfDayToday,
     onLeaveToday,
     totalEmployees: employeeIds.size,
   };

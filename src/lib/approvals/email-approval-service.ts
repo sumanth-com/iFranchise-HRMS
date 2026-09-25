@@ -201,6 +201,7 @@ export async function dispatchApprovalEmails(params: {
 // Lazily import the mailer so client bundles never pull nodemailer in.
 async function sendApprovalMail(to: string, subject: string, html: string) {
   const { sendEmail } = await import("@/lib/email/mailer");
+  // sendEmail auto-attaches src/assets/iF-Logo.png when the HTML uses the shared CID.
   return sendEmail({ to, subject, html });
 }
 

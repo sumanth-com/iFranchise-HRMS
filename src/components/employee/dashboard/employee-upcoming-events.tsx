@@ -254,7 +254,7 @@ function HolidaySlide({
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-3 py-4 text-center ring-1 ring-violet-500/15 sm:px-5 sm:py-5">
-      <span className="mx-auto aspect-square w-[min(100%,7.25rem)] max-w-full shrink-0 sm:w-[min(100%,9rem)]">
+      <span className="mx-auto aspect-square w-[min(100%,8rem)] max-h-[min(9rem,42%)] min-h-[5rem] shrink-0 sm:w-[min(100%,9.5rem)]">
         <HolidayGlyph name={event.title} className="size-full max-h-full max-w-full" />
       </span>
 
@@ -703,9 +703,16 @@ export function EmployeeUpcomingEvents({
 
   if (showImportantNotices) {
     return (
-      <section className={cn(employeeSectionClass, "flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-clip overflow-y-hidden", className)}>
-        <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
+      <section
+        className={cn(
+          employeeSectionClass,
+          // Override section overflow-hidden so holiday art/title are never clipped.
+          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-visible overflow-y-auto",
+          className,
+        )}
+      >
+        <div className="mb-3 flex min-w-0 flex-wrap items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             <Button
               type="button"
               size="xs"
@@ -773,16 +780,16 @@ export function EmployeeUpcomingEvents({
             </Button>
           ) : null}
         </div>
-        <p className="mb-3 text-xs text-muted-foreground">
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">
           {announcementsOpen
             ? "Company notices shared with you."
             : panel === "notices"
               ? "Quick notes from HR and leadership."
               : "Highlights for today and this week."}
         </p>
-        <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-x-clip">
+        <div className="relative min-h-0 w-full min-w-0 flex-1">
           <div
-            className="flex h-full min-w-0 transition-transform duration-500 ease-out"
+            className="flex h-full min-h-[14rem] min-w-0 transition-transform duration-500 ease-out"
             style={{
               width: "200%",
               transform: noticesActive ? "translateX(-50%)" : "translateX(0)",

@@ -1,10 +1,10 @@
 /**
  * Pure CEO home KPI derivation from authoritative attendance summary fields.
  *
- * `getAttendanceSummary` (org-wide, sheet-aligned) returns:
- * - presentToday = present + half_day + late
+ * `getAttendanceSummary` (org-wide) returns:
+ * - presentToday = present + half_day
  * - absentToday = absent + on_leave
- * - lateToday = 0 (late displays as Present; not a separate roster KPI)
+ * - lateToday / halfDayToday / onLeaveToday as raw counts
  * - totalEmployees = active attendance workforce (directory-aligned roster)
  */
 

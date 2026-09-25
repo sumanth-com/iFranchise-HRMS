@@ -6,6 +6,7 @@ import {
   computeLateMinutes,
   getTodayDateString,
   isAfterOfficeCheckoutTime,
+  resolveEffectivePunchAttendanceStatus,
 } from "@/lib/attendance/services/attendance-utils";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
@@ -66,7 +67,9 @@ export async function getTeamAttendanceSummary(
     supabase
       .schema("hrms")
       .from("attendance")
-      .select("employee_id, attendance_status, notes, branches:branch_id (name)")
+      .select(
+        "employee_id, attendance_date, attendance_status, check_in_at, check_out_at, notes, branches:branch_id (name)",
+      )
       .eq("organization_id", organizationId)
       .in("employee_id", teamIds)
       .gte("attendance_date", fromDate)
@@ -85,6 +88,7 @@ export async function getTeamAttendanceSummary(
   if (attendanceResult.error) throw new Error(attendanceResult.error.message);
   if (correctionsResult.error) throw new Error(correctionsResult.error.message);
 
+  const rules = await getOrganizationAttendanceRules(supabase, organizationId);
   let presentToday = 0;
   let absentToday = 0;
   let lateToday = 0;
@@ -92,7 +96,15 @@ export async function getTeamAttendanceSummary(
   let workFromHomeToday = 0;
 
   for (const row of attendanceResult.data ?? []) {
-    switch (row.attendance_status as AttendanceStatus) {
+    const status = resolveEffectivePunchAttendanceStatus({
+      storedStatus: row.attendance_status,
+      checkInAt: row.check_in_at,
+      checkOutAt: row.check_out_at,
+      attendanceDate: String(row.attendance_date ?? fromDate).slice(0, 10),
+      notes: row.notes,
+      rules,
+    }) as AttendanceStatus;
+    switch (status) {
       case "present":
         presentToday += 1;
         break;
@@ -116,15 +128,12 @@ export async function getTeamAttendanceSummary(
     }
   }
 
-  // Sheet-aligned: late/half_day display as Present — fold into Present, Late = 0.
-  const presentLike = presentToday + halfDayToday + lateToday;
-
   return {
     dateLabel: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-    presentToday: presentLike,
+    presentToday: presentToday + halfDayToday,
     absentToday,
-    lateToday: 0,
-    halfDayToday: 0,
+    lateToday,
+    halfDayToday,
     workFromHomeToday,
     pendingRegularizations: correctionsResult.count ?? 0,
   };
@@ -302,7 +311,15 @@ export async function listTeamAttendance(
 
       let status: AttendanceDisplayStatus;
       if (att?.check_in_at) {
-        status = att.attendance_status as AttendanceStatus;
+        status = resolveEffectivePunchAttendanceStatus({
+          storedStatus: att.attendance_status,
+          checkInAt: att.check_in_at,
+          checkOutAt: att.check_out_at,
+          attendanceDate: targetSingleDate,
+          notes: att.notes,
+          rules,
+          today: todayStr,
+        }) as AttendanceStatus;
       } else if (hasApprovedLeave) {
         status = "on_leave";
       } else if (att?.attendance_status) {
@@ -512,7 +529,14 @@ export async function listTeamAttendance(
       const department = unwrap(employee?.departments ?? null);
       const designation = unwrap(employee?.designations ?? null);
       const employmentType = unwrap(employee?.employment_types ?? null);
-      const attendanceStatus = row.attendance_status as AttendanceStatus;
+      const attendanceStatus = resolveEffectivePunchAttendanceStatus({
+        storedStatus: row.attendance_status,
+        checkInAt: row.check_in_at,
+        checkOutAt: row.check_out_at,
+        attendanceDate: String(row.attendance_date).slice(0, 10),
+        notes: row.notes,
+        rules,
+      }) as AttendanceStatus;
       const lateMinutes = computeLateMinutes(
         row.check_in_at,
         row.attendance_date,
@@ -610,7 +634,9 @@ export async function getTeamMonthlyAttendanceSummary(
   const { data: attendanceRows, error: attendanceError } = await supabase
     .schema("hrms")
     .from("attendance")
-    .select("employee_id, attendance_status, work_hours, notes, branches:branch_id (name)")
+    .select(
+      "employee_id, attendance_date, attendance_status, check_in_at, check_out_at, work_hours, notes, branches:branch_id (name)",
+    )
     .eq("organization_id", organizationId)
     .in("employee_id", teamIds)
     .gte("attendance_date", monthStart)
@@ -618,6 +644,8 @@ export async function getTeamMonthlyAttendanceSummary(
     .is("deleted_at", null);
 
   if (attendanceError) throw new Error(attendanceError.message);
+
+  const rules = await getOrganizationAttendanceRules(supabase, organizationId);
 
   const statsByEmployee = new Map<
     string,
@@ -648,7 +676,16 @@ export async function getTeamMonthlyAttendanceSummary(
     const stats = statsByEmployee.get(row.employee_id);
     if (!stats) continue;
 
-    switch (row.attendance_status as AttendanceStatus) {
+    const status = resolveEffectivePunchAttendanceStatus({
+      storedStatus: row.attendance_status,
+      checkInAt: row.check_in_at,
+      checkOutAt: row.check_out_at,
+      attendanceDate: String(row.attendance_date).slice(0, 10),
+      notes: row.notes,
+      rules,
+    }) as AttendanceStatus;
+
+    switch (status) {
       case "present":
       case "half_day":
         stats.presentDays += 1;

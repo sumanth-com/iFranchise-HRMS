@@ -61,6 +61,7 @@ import {
   fetchLeaveRequestsAction,
   rejectLeaveRequestAction,
 } from "@/lib/leave/actions";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import {
   LEAVE_ROUTES,
   LEAVE_STATUS_LABELS,
@@ -288,6 +289,7 @@ export function LeaveTable({
         patchRecordStatus(leaveRequestId, nextStatus);
       }
       await reloadTable();
+      notifyLeaveBalancesChanged({ reason: nextStatus });
       onMutated?.();
     },
     [onMutated, patchRecordStatus, reloadTable],

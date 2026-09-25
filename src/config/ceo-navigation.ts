@@ -35,24 +35,6 @@ export const ceoNavItems: NavigationItem[] = [
     permissions: ["employee.view", "employee.directory.view", "portal.ceo.access"],
   },
   {
-    title: "Organization",
-    href: CEO_ROUTES.organization,
-    icon: Building2,
-    permissions: ["organization.view", "employee.view"],
-  },
-  {
-    title: "Recruitment",
-    href: CEO_ROUTES.recruitment,
-    icon: BriefcaseBusiness,
-    permissions: ["recruitment.view"],
-  },
-  {
-    title: "Performance",
-    href: CEO_ROUTES.performance,
-    icon: Target,
-    permissions: ["performance.view"],
-  },
-  {
     title: "Attendance",
     href: CEO_ROUTES.attendance,
     icon: CalendarCheck,
@@ -69,6 +51,29 @@ export const ceoNavItems: NavigationItem[] = [
     icon: Wallet,
   },
   {
+    title: "Performance",
+    href: CEO_ROUTES.performance,
+    icon: Target,
+    permissions: ["performance.view"],
+  },
+  {
+    title: "Recruitment",
+    href: CEO_ROUTES.recruitment,
+    icon: BriefcaseBusiness,
+    permissions: ["recruitment.view"],
+  },
+  {
+    title: "User Provisioning",
+    href: CEO_ROUTES.userProvisioning,
+    icon: UserRoundPlus,
+  },
+  {
+    title: "Organization",
+    href: CEO_ROUTES.organization,
+    icon: Building2,
+    permissions: ["organization.view", "employee.view"],
+  },
+  {
     title: "Reports",
     href: CEO_ROUTES.reports,
     icon: BarChart3,
@@ -78,11 +83,6 @@ export const ceoNavItems: NavigationItem[] = [
     href: CEO_ROUTES.notifications,
     icon: Bell,
     permissions: ["notifications.view", "notification.view"],
-  },
-  {
-    title: "User Provisioning",
-    href: CEO_ROUTES.userProvisioning,
-    icon: UserRoundPlus,
   },
   {
     title: "Settings",

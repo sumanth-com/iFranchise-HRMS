@@ -22,6 +22,7 @@ import {
   fetchTeamLeaveSummaryAction,
   rejectTeamLeaveRequestAction,
 } from "@/lib/manager/actions/manager-leave-actions";
+import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
 import type {
   ManagerTeamLeavePageData,
   TeamLeaveListParams,
@@ -165,6 +166,7 @@ export function ManagerLeaveView({
       toast.success(result.message);
       setPendingAction(null);
       setActionNotes("");
+      notifyLeaveBalancesChanged({ reason: pendingAction.mode === "approve" ? "approved" : "rejected" });
       refreshRequests(filters);
       if (viewMode === "calendar") {
         refreshCalendar(calendarMonth, calendarYear);

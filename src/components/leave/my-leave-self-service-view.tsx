@@ -651,9 +651,10 @@ export function MyLeaveSelfServiceView({
           lookups={applyLeaveLookups}
           balances={annualBalances}
           onSubmitted={() => {
-            router.refresh();
+            // Soft refresh of leave data only — form pending is already cleared.
             loadMonth(month, year);
             refreshAnnualBalances(year);
+            router.refresh();
           }}
         />
       ) : null}

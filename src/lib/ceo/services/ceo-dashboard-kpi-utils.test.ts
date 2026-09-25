@@ -52,17 +52,17 @@ describe("CEO dashboard attendance KPIs", () => {
   });
 
   it("counts late as Present for % and Today's Workforce Present", () => {
-    // Sheet-aligned org summary: presentToday already includes half_day + late; lateToday is 0.
+    // Org summary: presentToday already includes half_day; late is separate.
     const kpis = deriveCeoAttendanceKpis({
-      presentToday: 14,
+      presentToday: 12,
       absentToday: 3,
-      lateToday: 0,
-      halfDayToday: 0,
+      lateToday: 2,
+      halfDayToday: 1,
       onLeaveToday: 0,
       totalEmployees: 17,
     });
     assert.equal(kpis.presentCount, 14);
-    assert.equal(kpis.lateToday, 0);
+    assert.equal(kpis.lateToday, 2);
     assert.equal(kpis.attendancePercent, 82.35);
   });
 

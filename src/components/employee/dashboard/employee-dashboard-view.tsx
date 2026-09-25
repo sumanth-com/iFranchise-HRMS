@@ -48,8 +48,12 @@ export function EmployeeDashboardView({
               <EmployeeDashboardKpiCards kpis={kpis} today={today} />
             </div>
 
-            <div className="grid w-full min-w-0 flex-1 gap-3 max-xl:flex-none xl:min-h-0 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:items-stretch">
-              <div className="flex min-h-0 min-w-0 flex-col gap-3 xl:h-full">
+            {/*
+              Two-column desktop layout: left grows, right keeps a real min-width so
+              Celebrations tabs + holiday art never collapse at 100% zoom.
+            */}
+            <div className="grid w-full min-w-0 flex-1 gap-3 max-lg:flex-none lg:min-h-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,minmax(0,1fr))] lg:items-stretch xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,minmax(0,1fr))]">
+              <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full">
                 <div className="w-full min-w-0 shrink-0">
                   <SelfAttendanceTodayCard
                     firstName={greeting.firstName}
@@ -62,7 +66,7 @@ export function EmployeeDashboardView({
                   lastName={greeting.lastName}
                   personKey={greeting.employeeId}
                   referenceDate={referenceDate}
-                  className="min-h-[11.5rem] w-full min-w-0 max-xl:min-h-0 xl:h-full xl:min-h-0 xl:flex-1"
+                  className="min-h-[11.5rem] w-full min-w-0 max-lg:min-h-0 lg:h-full lg:min-h-0 lg:flex-1"
                 />
               </div>
               <EmployeeUpcomingEvents
@@ -71,7 +75,7 @@ export function EmployeeDashboardView({
                 canManageAnnouncements={canManageAnnouncements}
                 pairHolidayBirthday={pairHolidayBirthday}
                 showImportantNotices={showImportantNotices}
-                className="min-h-[16rem] w-full min-w-0 max-xl:h-auto xl:h-full xl:min-h-0"
+                className="min-h-[16rem] w-full min-w-0 max-lg:h-auto lg:h-full lg:min-h-0"
               />
             </div>
           </div>

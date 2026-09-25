@@ -790,21 +790,62 @@ function EmployeePayrollTable({
   return (
     <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:bg-input">
       <table className="w-full min-w-[78rem] bg-white text-sm dark:bg-input">
-        <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
+        <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
-            <th className={cn("left-0 z-40 h-11 min-w-[16rem] whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white", stickyCellClass(true))}>Employee</th>
-            <th className={cn("left-[16rem] z-40 h-11 min-w-[10rem] whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white", stickyCellClass(true))}>Department</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Present / Paid</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Holiday</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">CL</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">EL</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Monthly salary</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross Earning</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">PT / Deductions</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Reimbursement</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Final payable</th>
-            <th className={cn(TABLE_HEADER_CELL_CLASS, "sticky right-0 z-40 bg-blue-600 text-right")}>Actions</th>
+            <th
+              className={cn(
+                "left-0 z-40 h-11 min-w-[16rem] whitespace-nowrap px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
+                stickyCellClass(true),
+              )}
+            >
+              Employee
+            </th>
+            <th
+              className={cn(
+                "left-[16rem] z-40 h-11 min-w-[10rem] whitespace-nowrap px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
+                stickyCellClass(true),
+              )}
+            >
+              Department
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              Present / Paid
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              Holiday
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              CL
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              EL
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              LOP
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              Monthly salary
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              Gross Earning
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              PT / Deductions
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              Reimbursement
+            </th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
+              Final payable
+            </th>
+            <th
+              className={cn(
+                TABLE_HEADER_CELL_CLASS,
+                "sticky right-0 z-40 bg-blue-600 text-center",
+              )}
+            >
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-input">
@@ -813,29 +854,65 @@ function EmployeePayrollTable({
               key={row.payrollItemId ?? row.id}
               className="group border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:bg-input dark:hover:bg-input/80"
             >
-              <td className={cn("left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80", stickyCellClass())}>
+              <td
+                className={cn(
+                  "left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+                  stickyCellClass(),
+                )}
+              >
                 <div className="truncate whitespace-nowrap font-medium" title={row.name}>
                   {row.name}
                 </div>
-                <div className="truncate whitespace-nowrap text-xs text-muted-foreground" title={row.code}>
+                <div
+                  className="truncate whitespace-nowrap text-xs text-muted-foreground"
+                  title={row.code}
+                >
                   {row.code}
                 </div>
               </td>
-              <td className={cn("left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80", stickyCellClass())}>{row.department ?? "—"}</td>
-              <td className="px-3 py-2.5 tabular-nums" title={`Paid working days: ${row.paidDays}`}>
+              <td
+                className={cn(
+                  "left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+                  stickyCellClass(),
+                )}
+              >
+                {row.department ?? "—"}
+              </td>
+              <td
+                className="px-3 py-2.5 text-center align-middle tabular-nums"
+                title={`Paid working days: ${row.paidDays}`}
+              >
                 {row.presentDays}
               </td>
-              <td className="px-3 py-2.5 tabular-nums">{row.holidayDays}</td>
-              <td className="px-3 py-2.5 tabular-nums">{row.clDays}</td>
-              <td className="px-3 py-2.5 tabular-nums">{row.elDays}</td>
-              <td className="px-3 py-2.5 tabular-nums">{row.lopDays}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.monthlySalary)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.attendanceEarnings)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.deductions)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.reimbursement)}</td>
-              <td className="px-3 py-2.5 tabular-nums font-medium">{formatCurrency(row.finalPayable)}</td>
-              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-right shadow-[-1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80">
-                <div className="flex justify-end gap-1.5">
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {row.holidayDays}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {row.clDays}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {row.elDays}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {row.lopDays}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {formatCurrency(row.monthlySalary)}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {formatCurrency(row.attendanceEarnings)}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {formatCurrency(row.deductions)}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+                {formatOptionalPayrollAmount(row.reimbursement)}
+              </td>
+              <td className="px-3 py-2.5 text-center align-middle font-medium tabular-nums">
+                {formatCurrency(row.finalPayable)}
+              </td>
+              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80">
+                <div className="inline-flex justify-center gap-1.5">
                   <Button
                     type="button"
                     variant="outline"
