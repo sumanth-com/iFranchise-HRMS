@@ -709,8 +709,7 @@ export function EmployeeUpcomingEvents({
       <section
         className={cn(
           employeeSectionClass,
-          // Override section overflow-hidden so holiday art/title are never clipped.
-          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-visible overflow-y-auto",
+          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-y-auto",
           className,
         )}
       >
@@ -790,7 +789,7 @@ export function EmployeeUpcomingEvents({
               ? "Quick notes from HR and leadership."
               : "Highlights for today and this week."}
         </p>
-        <div className="relative min-h-0 w-full min-w-0 flex-1">
+        <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-x-clip">
           <div
             className="flex h-full min-h-[14rem] min-w-0 transition-transform duration-500 ease-out"
             style={{
@@ -798,8 +797,22 @@ export function EmployeeUpcomingEvents({
               transform: noticesActive ? "translateX(-50%)" : "translateX(0)",
             }}
           >
-            <div className="flex h-full w-1/2 min-w-0 flex-col pr-1">{celebrationsBody}</div>
-            <div className="flex h-full w-1/2 min-w-0 flex-col pl-1">
+            <div
+              className={cn(
+                "flex h-full w-1/2 min-w-0 flex-col pr-1 transition-opacity duration-300",
+                noticesActive && "pointer-events-none opacity-0",
+              )}
+              aria-hidden={noticesActive}
+            >
+              {celebrationsBody}
+            </div>
+            <div
+              className={cn(
+                "flex h-full w-1/2 min-w-0 flex-col pl-1 transition-opacity duration-300",
+                !noticesActive && "pointer-events-none opacity-0",
+              )}
+              aria-hidden={!noticesActive}
+            >
               <TeamUpdatesPanel events={teamUpdates} />
             </div>
           </div>

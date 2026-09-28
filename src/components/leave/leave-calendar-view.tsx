@@ -498,6 +498,7 @@ export function LeaveCalendarView({
 
             const holiday = holidayMap.get(day.date);
             const companyHoliday = holiday && !holiday.isOptional ? holiday : undefined;
+            const shownHoliday = day.isCurrentMonth ? holiday : undefined;
             const dayLeaves = leavesByDate.get(day.date) ?? [];
             const dayClass = classifyCalendarDay(day.date, calendarWithHolidays);
             const isWeeklyHoliday = dayClass === "weekly_off";
@@ -509,8 +510,10 @@ export function LeaveCalendarView({
                 ? leaveCellHighlight(dayLeaves)
                 : null;
             const holidayHighlight =
-              Boolean(companyHoliday) && day.isCurrentMonth && !leaveHighlight
-                ? "bg-violet-500/10 ring-1 ring-inset ring-violet-500/25"
+              shownHoliday && !leaveHighlight
+                ? shownHoliday.isOptional
+                  ? "bg-violet-500/[0.06] ring-1 ring-inset ring-violet-500/20"
+                  : "bg-violet-500/10 ring-1 ring-inset ring-violet-500/25"
                 : null;
 
             return (
@@ -573,13 +576,17 @@ export function LeaveCalendarView({
                       : "flex flex-col gap-1",
                   )}
                 >
-                  {companyHoliday && day.isCurrentMonth ? (
+                  {shownHoliday ? (
                     <div
                       className={cn(
                         "flex min-w-0 max-w-full items-center gap-1 text-violet-700 dark:text-violet-200",
                         compact ? "justify-center text-[10px]" : "text-xs",
                       )}
-                      title={companyHoliday.name}
+                      title={
+                        shownHoliday.isOptional
+                          ? `${shownHoliday.name} (Optional holiday)`
+                          : shownHoliday.name
+                      }
                     >
                       <CalendarHeart
                         className={cn(
@@ -589,7 +596,7 @@ export function LeaveCalendarView({
                         aria-hidden
                       />
                       <span className="truncate font-bold leading-tight">
-                        {companyHoliday.name}
+                        {shownHoliday.name}
                       </span>
                     </div>
                   ) : null}
