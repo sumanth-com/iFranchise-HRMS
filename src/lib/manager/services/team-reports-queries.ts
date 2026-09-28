@@ -1,6 +1,7 @@
 import { format, startOfMonth, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { LEAVE_REPORT_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import { getManagerRecruitmentContext } from "@/lib/manager/services/manager-recruitment-context";
 import { getTeamAttendanceSummary } from "@/lib/manager/services/team-attendance-queries";
 import { getTeamLeaveSummary } from "@/lib/manager/services/team-leave-queries";
@@ -71,9 +72,10 @@ export async function getManagerReportsLookups(
     supabase
       .schema("hrms")
       .from("leave_types")
-      .select("id, name")
+      .select("id, code, name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .in("code", [...LEAVE_REPORT_TYPE_CODES])
       .order("name"),
   ]);
 
@@ -83,7 +85,7 @@ export async function getManagerReportsLookups(
     departments: teamLookups.departments,
     designations: teamLookups.designations,
     employees,
-    leaveTypes: (leaveTypes.data ?? []).map((row) => ({
+    leaveTypes: sortByLeaveTypeCode(leaveTypes.data ?? []).map((row) => ({
       id: String(row.id),
       label: String(row.name),
     })),

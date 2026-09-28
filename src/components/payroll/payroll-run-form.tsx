@@ -130,7 +130,7 @@ function attendanceFactsFromBreakdown(breakdown: PayrollBreakdown) {
 
 function stickyCellClass(isHeader = false) {
   return cn(
-    isHeader ? "bg-blue-600" : "bg-white table-sticky-solid",
+    isHeader ? "bg-blue-600" : "bg-white table-sticky-card",
     "sticky z-20",
   );
 }
@@ -712,13 +712,13 @@ function PayrollTotals({
 }) {
   return (
     <div className="grid w-full grid-cols-4 gap-3">
-      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:border-border dark:bg-card">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Employees
         </p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums">{employeeCount}</p>
       </div>
-      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:border-border dark:bg-card">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Gross Earning
         </p>
@@ -726,7 +726,7 @@ function PayrollTotals({
           {formatCurrency(totalGross)}
         </p>
       </div>
-      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:border-border dark:bg-card">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Deductions
         </p>
@@ -734,7 +734,7 @@ function PayrollTotals({
           {formatCurrency(totalDeductions)}
         </p>
       </div>
-      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:border-border dark:bg-card">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Final Payable
         </p>
@@ -779,7 +779,7 @@ function EmployeePayrollTable({
 
   if (filteredRows.length === 0) {
     return (
-      <div className="rounded-lg border border-input bg-white px-4 py-10 text-center text-sm text-muted-foreground dark:bg-input">
+      <div className="rounded-lg border border-input bg-white px-4 py-10 text-center text-sm text-muted-foreground dark:border-border dark:bg-card">
         {rows.length === 0
           ? "No employees in this payroll run."
           : "No employees match your filter."}
@@ -788,8 +788,8 @@ function EmployeePayrollTable({
   }
 
   return (
-    <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:bg-input">
-      <table className="w-full min-w-[78rem] bg-white text-sm dark:bg-input">
+    <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:border-border dark:bg-card">
+      <table className="w-full min-w-[78rem] bg-white text-sm dark:bg-transparent">
         <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
             <th
@@ -848,15 +848,15 @@ function EmployeePayrollTable({
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-input">
+        <tbody className="bg-white dark:bg-transparent">
           {filteredRows.map((row) => (
             <tr
               key={row.payrollItemId ?? row.id}
-              className="group border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:bg-input dark:hover:bg-input/80"
+              className="group border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:border-border/60 dark:bg-transparent dark:hover:bg-white/[0.04]"
             >
               <td
                 className={cn(
-                  "left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
+                  "left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
                   stickyCellClass(),
                 )}
               >
@@ -872,7 +872,7 @@ function EmployeePayrollTable({
               </td>
               <td
                 className={cn(
-                  "left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
+                  "left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
                   stickyCellClass(),
                 )}
               >
@@ -911,7 +911,7 @@ function EmployeePayrollTable({
               <td className="px-3 py-2.5 text-center align-middle font-medium tabular-nums">
                 {formatCurrency(row.finalPayable)}
               </td>
-              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50">
+              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] table-sticky-card group-hover:bg-zinc-50">
                 <div className="inline-flex justify-center gap-1.5">
                   <Button
                     type="button"

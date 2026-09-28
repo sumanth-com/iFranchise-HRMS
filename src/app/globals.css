@@ -361,6 +361,16 @@ html:not(.dark) .dashboard-surface:hover {
     linear-gradient(var(--input), var(--input));
 }
 
+/* Frozen columns on tables whose dark surface is the plain card colour. */
+.dark .table-sticky-card {
+  background-color: var(--card);
+  background-image: none;
+}
+
+.dark .group:hover .table-sticky-card {
+  background-image: linear-gradient(oklch(1 0 0 / 4%), oklch(1 0 0 / 4%));
+}
+
 /*
   Attendance panels: blue/violet “wave” glow (top-right + soft bottom-left).
   Hover stays clean — outline only, wave unchanged.

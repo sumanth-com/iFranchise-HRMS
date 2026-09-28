@@ -7,7 +7,9 @@ import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils
 import { getAssetsReports, getAssetActivityFeed, getAssetsSummary } from "@/lib/assets/services/asset-queries";
 import { ASSET_ACTIVITY_FILTER_ITEMS } from "@/lib/assets/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
+import { LEAVE_REPORT_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
+import { listTeamLeaveBalanceRows } from "@/lib/leave/services/leave-team-balances";
 import { getPayrollSummary } from "@/lib/payroll/services/payroll-queries";
 import { getPerformanceSummary } from "@/lib/performance/services/performance-queries";
 import {
@@ -32,6 +34,7 @@ import type {
   ExecutiveDashboard,
   ReportFilters,
   ReportKey,
+  ReportColumn,
   ReportResult,
   ReportsLookups,
 } from "@/types/reports";
@@ -168,9 +171,10 @@ export async function getReportsLookups(
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "leave_types")
-      .select("id, name")
+      .select("id, code, name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .in("code", [...LEAVE_REPORT_TYPE_CODES])
       .order("name"),
   ]);
 
@@ -207,7 +211,7 @@ export async function getReportsLookups(
         id: e.id,
         label: `${e.employee_code} — ${formatEmployeeName(e.first_name, e.last_name)}`,
       })),
-    leaveTypes: (leaveTypes.data ?? []).map((row: ReportRowLoose) => ({
+    leaveTypes: sortByLeaveTypeCode((leaveTypes.data ?? []) as ReportRowLoose[]).map((row) => ({
       id: row.id,
       label: row.name,
     })),
@@ -608,67 +612,156 @@ async function runAttendanceReport(
   );
 }
 
+/** Months (1–12 + year) covered by an inclusive yyyy-MM-dd range, capped at 12. */
+function monthsInRange(dateFrom: string, dateTo: string) {
+  const months: { year: number; month: number }[] = [];
+  let year = Number.parseInt(dateFrom.slice(0, 4), 10);
+  let month = Number.parseInt(dateFrom.slice(5, 7), 10);
+  const endYear = Number.parseInt(dateTo.slice(0, 4), 10);
+  const endMonth = Number.parseInt(dateTo.slice(5, 7), 10);
+  while ((year < endYear || (year === endYear && month <= endMonth)) && months.length < 12) {
+    months.push({ year, month });
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  if (months.length === 0) months.push({ year: endYear, month: endMonth });
+  return months;
+}
+
+const LEAVE_BALANCE_REPORT_CODES = LEAVE_REPORT_TYPE_CODES;
+type LeaveBalanceReportCode = (typeof LEAVE_BALANCE_REPORT_CODES)[number];
+
+function isLeaveBalanceReportCode(code: string): code is LeaveBalanceReportCode {
+  return (LEAVE_BALANCE_REPORT_CODES as readonly string[]).includes(code);
+}
+
+/**
+ * Same figures as the HR/CEO Leave Balance page: one row per active employee,
+ * Used = approved + attendance leave days in the selected period, Remaining = ledger balance.
+ */
+async function runLeaveBalanceReport(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  key: ReportKey,
+  title: string,
+  filters: ReportFilters,
+  dateFrom: string,
+  dateTo: string,
+): Promise<ReportResult> {
+  let selectedCode: LeaveBalanceReportCode | null = null;
+  if (filters.leaveTypeId) {
+    const { data, error } = await fromHrms(supabase, "leave_types")
+      .select("code")
+      .eq("id", filters.leaveTypeId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const code = String((data as ReportRowLoose | null)?.code ?? "").toUpperCase();
+    selectedCode = isLeaveBalanceReportCode(code) ? code : null;
+  }
+
+  const teamIds = filters.teamEmployeeIds?.length ? new Set(filters.teamEmployeeIds) : null;
+  const inScope = (employeeId: string) =>
+    (!filters.employeeId || employeeId === filters.employeeId) && (!teamIds || teamIds.has(employeeId));
+
+  const months = monthsInRange(dateFrom, dateTo);
+  const results = await Promise.all(
+    months.map(({ year, month }) =>
+      listTeamLeaveBalanceRows(supabase, profile, {
+        departmentId: filters.departmentId,
+        balanceYear: year,
+        balanceMonth: month,
+      }),
+    ),
+  );
+
+  type Totals = {
+    employeeCode: string;
+    employeeName: string;
+    department: string;
+    clUsed: number;
+    clRemaining: number;
+    elUsed: number;
+    elRemaining: number;
+    ohUsed: number;
+    ohRemaining: number;
+    lopDays: number;
+  };
+  const byEmployee = new Map<string, Totals>();
+  for (const result of results) {
+    for (const row of result.rows) {
+      if (!inScope(row.employeeId)) continue;
+      const current = byEmployee.get(row.employeeId);
+      byEmployee.set(row.employeeId, {
+        employeeCode: row.employeeCode,
+        employeeName: row.employeeName,
+        department: row.departmentName ?? "—",
+        clUsed: (current?.clUsed ?? 0) + row.clUsed,
+        elUsed: (current?.elUsed ?? 0) + row.elUsed,
+        ohUsed: (current?.ohUsed ?? 0) + row.ohUsed,
+        lopDays: (current?.lopDays ?? 0) + row.lopDays,
+        clRemaining: row.clAvailable,
+        elRemaining: row.elAvailable,
+        ohRemaining: row.ohAvailable,
+      });
+    }
+  }
+
+  const round = (value: number) => Math.round(value * 100) / 100;
+  const rows = Array.from(byEmployee.values())
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName))
+    .map((row) => ({
+      ...row,
+      clUsed: round(row.clUsed),
+      elUsed: round(row.elUsed),
+      ohUsed: round(row.ohUsed),
+      lopDays: round(row.lopDays),
+    }));
+
+  const typeColumns: Record<LeaveBalanceReportCode, ReportColumn[]> = {
+    CL: [
+      { key: "clUsed", header: "CL Used", align: "center" },
+      { key: "clRemaining", header: "CL Remaining", align: "center" },
+    ],
+    EL: [
+      { key: "elUsed", header: "EL Used", align: "center" },
+      { key: "elRemaining", header: "EL Remaining", align: "center" },
+    ],
+    OH: [
+      { key: "ohUsed", header: "OH Used", align: "center" },
+      { key: "ohRemaining", header: "OH Remaining", align: "center" },
+    ],
+    LOP: [{ key: "lopDays", header: "LOP Days", align: "center" }],
+  };
+  const codes = selectedCode ? [selectedCode] : [...LEAVE_BALANCE_REPORT_CODES];
+
+  return buildResult(
+    key,
+    title,
+    [
+      { key: "employeeCode", header: "Code" },
+      { key: "employeeName", header: "Employee" },
+      { key: "department", header: "Department" },
+      ...codes.flatMap((code) => typeColumns[code]),
+    ],
+    rows,
+  );
+}
+
 async function runLeaveReport(
   supabase: AuthSupabaseClient,
-  organizationId: string,
+  profile: UserProfile,
   key: ReportKey,
   filters: ReportFilters,
 ): Promise<ReportResult> {
+  const organizationId = profile.employee.organizationId;
   const title = REPORT_KEY_LABELS[key];
   const { dateFrom, dateTo } = resolveDates(filters);
 
   if (key === "leave_balance") {
-    let query = fromHrms(supabase, "leave_balances")
-      .select(
-        `
-        leave_type_id,
-        balance_days, used_days, allocated_days,
-        employees:employee_id!inner(employee_code, first_name, last_name, department_id, organization_id),
-        leave_types:leave_type_id(name)
-      `,
-      )
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null)
-      .limit(3000);
-    if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
-    if (filters.leaveTypeId) query = query.eq("leave_type_id", filters.leaveTypeId);
-    if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    const rows = ((data ?? []) as ReportRowLoose[])
-      .filter((row) => {
-        if (!filters.leaveTypeId) return true;
-        return String(row.leave_type_id ?? "") === String(filters.leaveTypeId);
-      })
-      .filter((row) => {
-        if (!filters.departmentId) return true;
-        return unwrapRelation(row.employees)?.department_id === filters.departmentId;
-      })
-      .map((row) => {
-        const emp = unwrapRelation(row.employees);
-        const type = unwrapRelation(row.leave_types);
-        return {
-          employeeCode: emp?.employee_code ?? "—",
-          employeeName: formatEmployeeName(emp?.first_name, emp?.last_name),
-          leaveType: type?.name ?? "—",
-          allocated: Number(row.allocated_days ?? 0),
-          used: Number(row.used_days ?? 0),
-          balance: Number(row.balance_days ?? 0),
-        };
-      });
-    return buildResult(
-      key,
-      title,
-      [
-        { key: "employeeCode", header: "Code" },
-        { key: "employeeName", header: "Employee" },
-        { key: "leaveType", header: "Leave Type" },
-        { key: "allocated", header: "Allocated" },
-        { key: "used", header: "Used" },
-        { key: "balance", header: "Balance" },
-      ],
-      rows,
-    );
+    return runLeaveBalanceReport(supabase, profile, key, title, filters, dateFrom, dateTo);
   }
 
   let query = fromHrms(supabase, "leave_requests")
@@ -1688,7 +1781,7 @@ export async function runReport(
   if (key.startsWith("attendance_")) {
     return runAttendanceReport(supabase, profile, key, filters);
   }
-  if (key.startsWith("leave_")) return runLeaveReport(supabase, organizationId, key, filters);
+  if (key.startsWith("leave_")) return runLeaveReport(supabase, profile, key, filters);
   if (key.startsWith("payroll_")) {
     return runPayrollReport(supabase, organizationId, key, filters);
   }

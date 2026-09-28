@@ -257,8 +257,8 @@ function showFiltersFor(module: ReportModuleKey) {
   return {
     reportType: module !== "attendance" && module !== "leave" && module !== "assets",
     assetAction: module === "assets",
-    dates: module !== "payroll" && module !== "performance",
-    monthYear: module === "payroll" || module === "performance",
+    dates: module !== "payroll" && module !== "performance" && module !== "leave",
+    monthYear: module === "payroll" || module === "performance" || module === "leave",
     status: module !== "leave" && module !== "payroll" && module !== "assets",
     department: module === "attendance",
     designation: module === "hr",
@@ -721,7 +721,10 @@ export function ModuleReportsView({
               <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
                 <tr className="border-b border-white/10">
                   {result.columns.map((col) => (
-                    <th key={col.key} className="px-4 py-3 font-medium whitespace-nowrap text-white">
+                    <th
+                      key={col.key}
+                      className={`px-4 py-3 font-medium whitespace-nowrap text-white ${col.align === "center" ? "text-center" : ""}`}
+                    >
                       {col.header}
                     </th>
                   ))}
@@ -733,7 +736,10 @@ export function ModuleReportsView({
                     {result.columns.map((col) => {
                       const value = row[col.key];
                       return (
-                        <td key={col.key} className="px-4 py-2.5 whitespace-nowrap">
+                        <td
+                          key={col.key}
+                          className={`px-4 py-2.5 whitespace-nowrap ${col.align === "center" ? "text-center tabular-nums" : ""}`}
+                        >
                           {value == null || value === "" ? "—" : String(value)}
                         </td>
                       );

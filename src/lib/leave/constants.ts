@@ -88,6 +88,9 @@ export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as
 /** Types available in Apply Leave — CL/EL monthly accrual; OH from the company list; PL when eligible; LOP unpaid. SL not offered. */
 export const LEAVE_APPLY_TYPE_CODES = ["CL", "EL", "OH", "PL", "LOP"] as const;
 
+/** Leave Report types — same set as the HR/CEO Leave Balance page. */
+export const LEAVE_REPORT_TYPE_CODES = ["CL", "EL", "OH", "LOP"] as const;
+
 /** Types that cannot be applied through the normal leave form. */
 export const NON_APPLY_LEAVE_TYPE_CODES = [] as const;
 
