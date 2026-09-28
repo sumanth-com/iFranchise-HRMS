@@ -25,7 +25,7 @@ import {
   EmployeeSectionCard,
   EmployeeStatCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
-import { ASSETS_ROUTES } from "@/lib/assets/constants";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { DASHBOARD_ACTION_LINKS, DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import type { HrDashboardData } from "@/types/dashboard";
@@ -219,7 +219,7 @@ export function HrDashboard({ data, error }: Props) {
                 tone="amber"
                 accent="text-amber-600 dark:text-amber-400"
                 iconBg="bg-amber-500/10"
-                href={ASSETS_ROUTES.dashboard}
+                href={HR_HUB_ROUTES.teamAssets}
               />
               <EmployeeStatCard
                 tall

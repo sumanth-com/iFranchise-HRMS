@@ -6,6 +6,7 @@ import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queri
 import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { DASHBOARD_ACTION_LINKS } from "@/lib/dashboard/constants";
+import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { countEmployeeModuleListTotal } from "@/lib/employees/services/employee-queries";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
@@ -17,6 +18,18 @@ import { getOnboardingDashboardStats } from "@/lib/onboarding/services/onboardin
 import { formatEmployeeName, fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
 import type { HrDashboardData } from "@/types/dashboard";
+
+type AssignedAssetEmployee = {
+  employee_code: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
+
+type AssignedAssetRow = {
+  asset_id: string;
+  employees: AssignedAssetEmployee | AssignedAssetEmployee[] | null;
+};
 
 const ACTIVE_EMPLOYMENT_STATUSES = ["active", "probation", "on_leave"];
 
@@ -142,11 +155,18 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .eq("interview_date", today)
       .is("deleted_at", null),
     getOnboardingDashboardStats(supabase, organizationId),
-    fromHrms(supabase, "assets")
-      .select("id", { count: "exact", head: true })
+    fromHrms(supabase, "asset_assignments")
+      .select(
+        `asset_id,
+         assets:asset_id!inner(deleted_at),
+         employees:employee_id!inner(employee_code, first_name, last_name, email, employment_status, deleted_at)`,
+      )
       .eq("organization_id", organizationId)
-      .eq("asset_status", "assigned")
-      .is("deleted_at", null),
+      .eq("assignment_status", "active")
+      .is("deleted_at", null)
+      .is("assets.deleted_at", null)
+      .is("employees.deleted_at", null)
+      .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES),
   ]);
 
   if (probationCountRes.error) throw new Error(probationCountRes.error.message);
@@ -244,7 +264,22 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       probationEndingSoon,
       documentsExpiring: 0,
       assetsPendingReturn: 0,
-      assignedAssetsCount: assignedAssetsRes.count ?? 0,
+      assignedAssetsCount: new Set(
+        ((assignedAssetsRes.data ?? []) as AssignedAssetRow[])
+          .filter((row) => {
+            const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
+            return (
+              employee &&
+              !isExcludedFromAttendanceWorkforce(employee.employee_code, {
+                employeeCode: employee.employee_code,
+                firstName: employee.first_name,
+                lastName: employee.last_name,
+                email: employee.email,
+              })
+            );
+          })
+          .map((row) => String(row.asset_id)),
+      ).size,
       interviewsToday,
       birthdaysToday: upcomingBirthdays.filter((event) => event.date === today).length,
       exitClearancePending: 0,
