@@ -158,7 +158,7 @@ export function LeaveApplicationSummary({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col gap-1 rounded-xl border bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="flex flex-col gap-1 rounded-xl border bg-white px-3 py-2 dark:bg-card sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p className="text-sm">
           <span className="font-semibold text-foreground">Leave Balance Used:</span>{" "}
           <span className="font-bold tabular-nums text-foreground">
@@ -171,7 +171,7 @@ export function LeaveApplicationSummary({
         </p>
       </div>
 
-      <div className="rounded-xl border bg-white px-3 py-2.5">
+      <div className="rounded-xl border bg-white px-3 py-2.5 dark:bg-card">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Leave Summary
         </p>

@@ -155,13 +155,13 @@ export function SystemDatabasePulse({
             ))}
           </div>
 
-          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-[10px] font-semibold tracking-wide text-emerald-700 shadow-[0_4px_14px_rgba(16,185,129,0.18)]">
+          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 rounded-full border border-emerald-200 bg-white px-3 py-1 dark:border-emerald-500/30 dark:bg-card dark:text-emerald-400 text-[10px] font-semibold tracking-wide text-emerald-700 shadow-[0_4px_14px_rgba(16,185,129,0.18)]">
             STREAMING · {responseMs}ms
           </div>
         </div>
 
         <div className="grid min-h-0 flex-1 gap-3 sm:grid-cols-2">
-          <div className="flex min-h-0 flex-col rounded-xl border border-emerald-100/80 bg-white p-3 transition-colors duration-300 hover:border-emerald-200 hover:bg-gradient-to-b hover:from-white hover:to-emerald-50/80">
+          <div className="flex min-h-0 flex-col rounded-xl border border-emerald-100/80 bg-white p-3 transition-colors duration-300 hover:border-emerald-200 hover:bg-gradient-to-b hover:from-white hover:to-emerald-50/80 dark:border-emerald-500/20 dark:bg-card dark:hover:border-emerald-500/40 dark:hover:from-card dark:hover:to-emerald-500/10">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 Throughput
@@ -170,7 +170,7 @@ export function SystemDatabasePulse({
                 {responseMs}ms
               </p>
             </div>
-            <div className="relative flex min-h-[4.5rem] flex-1 items-end gap-[3px] overflow-hidden rounded-lg border border-emerald-50 bg-emerald-50/40 px-2 py-2">
+            <div className="relative flex min-h-[4.5rem] flex-1 items-end gap-[3px] overflow-hidden rounded-lg border border-emerald-50 bg-emerald-50/40 px-2 py-2 dark:border-emerald-500/15 dark:bg-emerald-500/5">
               {Array.from({ length: 24 }).map((_, i) => (
                 <span
                   key={i}
@@ -185,13 +185,13 @@ export function SystemDatabasePulse({
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-emerald-100/80 bg-white transition-colors duration-300 hover:border-emerald-200 hover:bg-gradient-to-b hover:from-white hover:to-emerald-50/70">
-            <div className="border-b border-emerald-50 px-3 py-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-emerald-100/80 bg-white transition-colors duration-300 hover:border-emerald-200 hover:bg-gradient-to-b hover:from-white hover:to-emerald-50/70 dark:border-emerald-500/20 dark:bg-card dark:hover:border-emerald-500/40 dark:hover:from-card dark:hover:to-emerald-500/10">
+            <div className="border-b border-emerald-50 px-3 py-2 dark:border-emerald-500/15">
               <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 Connections
               </p>
             </div>
-            <ul className="min-h-0 flex-1 divide-y divide-emerald-50/80 overflow-y-auto">
+            <ul className="min-h-0 flex-1 divide-y divide-emerald-50/80 overflow-y-auto dark:divide-emerald-500/15">
               {CONNECTIONS.map((item, i) => (
                 <li key={item.label} className="flex items-center gap-2.5 px-3 py-2">
                   <span
@@ -203,7 +203,7 @@ export function SystemDatabasePulse({
                       <p className="truncate text-sm text-foreground">{item.label}</p>
                       <p className="text-[11px] font-medium text-emerald-600">{item.load}%</p>
                     </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-emerald-50">
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-emerald-50 dark:bg-emerald-500/10">
                       <div
                         className="sys-db-load h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
                         style={{
@@ -219,7 +219,7 @@ export function SystemDatabasePulse({
           </div>
         </div>
 
-        <div className="sys-db-ticker shrink-0 overflow-hidden rounded-lg border border-emerald-100 bg-gradient-to-r from-white via-emerald-50/70 to-white px-3 py-2 font-mono text-[10px] text-emerald-700 transition-colors duration-300 hover:from-emerald-50 hover:via-emerald-100/80 hover:to-emerald-50">
+        <div className="sys-db-ticker shrink-0 overflow-hidden rounded-lg border border-emerald-100 bg-gradient-to-r from-white via-emerald-50/70 to-white px-3 py-2 dark:border-emerald-500/20 dark:from-card dark:via-emerald-500/10 dark:to-card dark:text-emerald-400 font-mono text-[10px] text-emerald-700 transition-colors duration-300 hover:from-emerald-50 hover:via-emerald-100/80 hover:to-emerald-50">
           <div className="sys-db-ticker-track flex gap-10 whitespace-nowrap">
             <span>SELECT employees · {activeEmployees} active</span>
             <span>INSERT audit_logs · {auditEvents24h}/24h</span>
@@ -253,7 +253,7 @@ function MetricChip({
   healthy: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-emerald-100/70 bg-white px-3 py-2 shadow-sm transition-all duration-300 hover:border-emerald-200 hover:bg-gradient-to-b hover:from-white hover:to-emerald-50">
+    <div className="rounded-xl border border-emerald-100/70 bg-white px-3 py-2 shadow-sm transition-all duration-300 hover:border-emerald-200 hover:bg-gradient-to-b hover:from-white hover:to-emerald-50 dark:border-emerald-500/20 dark:bg-card dark:shadow-none dark:hover:border-emerald-500/40 dark:hover:from-card dark:hover:to-emerald-500/10">
       <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>

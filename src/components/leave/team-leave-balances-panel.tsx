@@ -89,7 +89,7 @@ const DEPARTMENT_LABEL = "All Departments";
 const EMPLOYMENT_TYPE_LABEL = "All Employment Types";
 
 const USAGE_TOOLTIP_CLASS =
-  "max-h-[min(20rem,55vh)] max-w-[18rem] flex-col items-stretch gap-0 overflow-y-auto whitespace-normal border border-border bg-white px-3 py-2.5 text-left text-xs text-foreground shadow-md";
+  "max-h-[min(20rem,55vh)] max-w-[18rem] flex-col items-stretch gap-0 overflow-y-auto whitespace-normal border border-border bg-white px-3 py-2.5 text-left text-xs text-foreground shadow-md dark:bg-popover";
 
 const LEAVE_BALANCE_LOAD_TITLE = "We couldn't load leave balance data.";
 const LEAVE_BALANCE_LOAD_DESCRIPTION = "Please try again.";

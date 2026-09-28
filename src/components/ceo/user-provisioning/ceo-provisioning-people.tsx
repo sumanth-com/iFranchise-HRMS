@@ -180,7 +180,7 @@ function PersonCard({
         : "Update HR contact";
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
+    <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md dark:bg-card dark:shadow-none dark:hover:border-primary/40">
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu>
           <DropdownMenuTrigger
