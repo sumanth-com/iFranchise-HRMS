@@ -29,8 +29,8 @@ export function payrollStickyHeaderCellClass(extra?: string) {
 
 export function payrollStickyEmployeeBodyClass(width = "min-w-[14rem]") {
   return cn(
-    "sticky left-0 z-20 border-r border-input/40 bg-white px-4 py-3 align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:bg-input",
-    "group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+    "sticky left-0 z-20 border-r border-input/40 bg-white px-4 py-3 align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid",
+    "group-hover:bg-zinc-50",
     width,
   );
 }
@@ -44,8 +44,8 @@ export function payrollStickyActionsHeaderClass() {
 
 export function payrollStickyActionsBodyClass() {
   return cn(
-    "sticky right-0 z-20 bg-white px-4 py-3 text-right align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] dark:bg-input",
-    "group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+    "sticky right-0 z-20 bg-white px-4 py-3 text-right align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid",
+    "group-hover:bg-zinc-50",
   );
 }
 

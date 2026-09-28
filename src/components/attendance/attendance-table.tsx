@@ -171,7 +171,7 @@ const STICKY_HEADER_SELECT_CLASS = cn(
 );
 const STICKY_BODY_SELECT_CLASS = cn(
   TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white px-2 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  "sticky z-20 border-r border-input/40 bg-white px-2 shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
   STICKY_SELECT_LEFT,
   STICKY_SELECT_WIDTH,
 );
@@ -201,25 +201,25 @@ const STICKY_HEADER_NAME_WITH_SELECT_CLASS = cn(
 );
 const STICKY_BODY_ID_CLASS = cn(
   TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
   STICKY_ID_LEFT,
   STICKY_ID_WIDTH,
 );
 const STICKY_BODY_ID_WITH_SELECT_CLASS = cn(
   TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
   STICKY_ID_LEFT_WITH_SELECT,
   STICKY_ID_WIDTH,
 );
 const STICKY_BODY_NAME_CLASS = cn(
   TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
   STICKY_NAME_LEFT,
   STICKY_NAME_WIDTH,
 );
 const STICKY_BODY_NAME_WITH_SELECT_CLASS = cn(
   TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
   STICKY_NAME_LEFT_WITH_SELECT,
   STICKY_NAME_WIDTH,
 );

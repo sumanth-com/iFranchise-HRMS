@@ -354,7 +354,7 @@ function PayslipTable({
               {showSelect ? (
                 <td
                   className={cn(
-                    "sticky left-0 z-20 w-[2.75rem] min-w-[2.75rem] border-r border-input/40 bg-white px-2 py-3 dark:bg-input",
+                    "sticky left-0 z-20 w-[2.75rem] min-w-[2.75rem] border-r border-input/40 bg-white px-2 py-3 table-sticky-solid",
                     "group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
                   )}
                 >

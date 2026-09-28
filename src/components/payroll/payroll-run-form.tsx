@@ -130,7 +130,7 @@ function attendanceFactsFromBreakdown(breakdown: PayrollBreakdown) {
 
 function stickyCellClass(isHeader = false) {
   return cn(
-    isHeader ? "bg-blue-600" : "bg-white dark:bg-input",
+    isHeader ? "bg-blue-600" : "bg-white table-sticky-solid",
     "sticky z-20",
   );
 }
@@ -856,7 +856,7 @@ function EmployeePayrollTable({
             >
               <td
                 className={cn(
-                  "left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+                  "left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
                   stickyCellClass(),
                 )}
               >
@@ -872,7 +872,7 @@ function EmployeePayrollTable({
               </td>
               <td
                 className={cn(
-                  "left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+                  "left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 text-left align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
                   stickyCellClass(),
                 )}
               >
@@ -911,7 +911,7 @@ function EmployeePayrollTable({
               <td className="px-3 py-2.5 text-center align-middle font-medium tabular-nums">
                 {formatCurrency(row.finalPayable)}
               </td>
-              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80">
+              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50">
                 <div className="inline-flex justify-center gap-1.5">
                   <Button
                     type="button"

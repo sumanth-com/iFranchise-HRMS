@@ -346,6 +346,21 @@ html:not(.dark) .dashboard-surface:hover {
     0 12px 28px -18px rgba(0, 0, 0, 0.75) !important;
 }
 
+/* Frozen table columns: --input is translucent in dark mode, so layer it over an opaque card base. */
+.dark .table-sticky-solid {
+  background-color: var(--card);
+  background-image:
+    linear-gradient(var(--input), var(--input)),
+    linear-gradient(var(--input), var(--input));
+}
+
+.dark .group:hover .table-sticky-solid {
+  background-image:
+    linear-gradient(oklch(1 0 0 / 5%), oklch(1 0 0 / 5%)),
+    linear-gradient(var(--input), var(--input)),
+    linear-gradient(var(--input), var(--input));
+}
+
 /*
   Attendance panels: blue/violet “wave” glow (top-right + soft bottom-left).
   Hover stays clean — outline only, wave unchanged.

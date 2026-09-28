@@ -3,6 +3,7 @@ import { format, startOfMonth, subMonths } from "date-fns";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
+import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import { getAssetsReports, getAssetActivityFeed, getAssetsSummary } from "@/lib/assets/services/asset-queries";
 import { ASSET_ACTIVITY_FILTER_ITEMS } from "@/lib/assets/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
@@ -578,19 +579,14 @@ async function runAttendanceReport(
         week_off: "Week Off",
         on_leave: "On Leave",
       };
-      const fmtTs = (ts: string | null) => {
-        if (!ts) return "—";
-        const d = new Date(ts);
-        return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
-      };
       return {
         date: row.attendance_date,
         employeeCode: emp?.employee_code ?? "—",
         employeeName: formatEmployeeName(emp?.first_name, emp?.last_name),
         department: dept?.name ?? "—",
         status: statusMap[row.attendance_status] ?? row.attendance_status,
-        checkIn: fmtTs(row.check_in_at),
-        checkOut: fmtTs(row.check_out_at),
+        checkIn: formatAttendanceTime(row.check_in_at),
+        checkOut: formatAttendanceTime(row.check_out_at),
         overtimeHours: Number(row.overtime_hours ?? 0) > 0 ? `${Number(row.overtime_hours).toFixed(1)} hrs` : "—",
       };
     });
