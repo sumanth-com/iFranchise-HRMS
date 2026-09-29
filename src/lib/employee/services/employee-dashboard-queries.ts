@@ -7,6 +7,7 @@ import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/da
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { getDirectoryAssetPhotoUrl } from "@/lib/employee/directory-asset-photos";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
@@ -134,8 +135,6 @@ function upcomingWithinDays(
   return null;
 }
 
-const ACTIVE_EMPLOYMENT = ["active", "probation", "on_leave"] as const;
-
 export async function loadUpcomingCelebrations(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -162,7 +161,7 @@ export async function loadUpcomingCelebrations(
       .from("employees")
       .select("id, employee_code, first_name, last_name, employment_status")
       .eq("organization_id", organizationId)
-      .in("employment_status", [...ACTIVE_EMPLOYMENT])
+      .in("employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null),
   ]);
 

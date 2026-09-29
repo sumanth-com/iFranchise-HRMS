@@ -10,6 +10,7 @@ import {
 } from "@/lib/attendance/services/attendance-utils";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   computeMonitoringFlags,
   getDefaultBreakMinutes,
@@ -183,7 +184,7 @@ export async function listTeamAttendance(
       .eq("organization_id", organizationId)
       .in("id", teamIds)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"]);
+      .in("employment_status", activeEmploymentStatusFilter());
 
     if (parsed.employeeId) empQuery = empQuery.eq("id", parsed.employeeId);
     if (parsed.departmentId) empQuery = empQuery.eq("department_id", parsed.departmentId);

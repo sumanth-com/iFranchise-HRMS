@@ -7,6 +7,11 @@ import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils
 import { getAssetsReports, getAssetActivityFeed, getAssetsSummary } from "@/lib/assets/services/asset-queries";
 import { ASSET_ACTIVITY_FILTER_ITEMS } from "@/lib/assets/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
+import {
+  activeEmploymentStatusFilter,
+  formerEmploymentStatusFilter,
+  isActiveEmploymentStatus,
+} from "@/lib/employees/employment-eligibility";
 import { LEAVE_REPORT_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
 import { listTeamLeaveBalanceRows } from "@/lib/leave/services/leave-team-balances";
@@ -163,7 +168,7 @@ export async function getReportsLookups(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"])
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name")
       .limit(500),
     fromHrms(supabase, "user_roles")
@@ -270,7 +275,7 @@ export async function getExecutiveDashboard(
       .select("id, date_of_leaving, employment_status")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["resigned", "terminated"])
+      .in("employment_status", formerEmploymentStatusFilter())
       .gte("date_of_leaving", monthStart)
       .lte("date_of_leaving", monthEnd),
     fromHrms(supabase, "attendance")
@@ -290,8 +295,7 @@ export async function getExecutiveDashboard(
   if (employees.error) throw new Error(employees.error.message);
 
   const empRows = (employees.data ?? []) as ReportRowLoose[];
-  const activeStatuses = new Set(["active", "probation", "on_leave"]);
-  const totalEmployees = empRows.filter((e) => activeStatuses.has(e.employment_status)).length;
+  const totalEmployees = empRows.filter((e) => isActiveEmploymentStatus(e.employment_status)).length;
 
   const growthMap = new Map<string, number>();
   for (let i = 11; i >= 0; i--) {
@@ -306,7 +310,7 @@ export async function getExecutiveDashboard(
 
   const deptMap = new Map<string, number>();
   for (const e of empRows) {
-    if (!activeStatuses.has(e.employment_status)) continue;
+    if (!isActiveEmploymentStatus(e.employment_status)) continue;
     const dept = unwrapRelation(e.departments)?.name ?? "Unassigned";
     deptMap.set(dept, (deptMap.get(dept) ?? 0) + 1);
   }
@@ -436,7 +440,7 @@ async function runHrReport(
   if (key === "hr_department") {
     const map = new Map<string, number>();
     for (const e of periodEmployees.filter((x) =>
-      ["active", "probation", "on_leave"].includes(x.employmentStatus),
+      isActiveEmploymentStatus(x.employmentStatus),
     )) {
       map.set(e.department, (map.get(e.department) ?? 0) + 1);
     }
@@ -454,7 +458,7 @@ async function runHrReport(
   if (key === "hr_designation") {
     const map = new Map<string, number>();
     for (const e of periodEmployees.filter((x) =>
-      ["active", "probation", "on_leave"].includes(x.employmentStatus),
+      isActiveEmploymentStatus(x.employmentStatus),
     )) {
       map.set(e.designation, (map.get(e.designation) ?? 0) + 1);
     }

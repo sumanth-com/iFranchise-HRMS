@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import type { UserProfile } from "@/types/auth";
 import type {
   BonusListResult,
@@ -296,7 +297,7 @@ export async function getPayrollLookups(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"])
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name")
       .limit(250),
     getOccupiedDepartments(supabase, organizationId),
@@ -706,7 +707,7 @@ export async function listSalaryStructures(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"]);
+    .in("employment_status", activeEmploymentStatusFilter());
 
   if (employeeId) {
     empQuery = empQuery.eq("id", employeeId);

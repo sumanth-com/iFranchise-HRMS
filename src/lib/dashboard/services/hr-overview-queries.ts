@@ -8,6 +8,7 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { DASHBOARD_ACTION_LINKS } from "@/lib/dashboard/constants";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { countEmployeeModuleListTotal } from "@/lib/employees/services/employee-queries";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
 import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
@@ -30,8 +31,6 @@ type AssignedAssetRow = {
   asset_id: string;
   employees: AssignedAssetEmployee | AssignedAssetEmployee[] | null;
 };
-
-const ACTIVE_EMPLOYMENT_STATUSES = ["active", "probation", "on_leave"];
 
 function employeeHref(row: {
   employee_code?: string;
@@ -129,7 +128,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     fromHrms(supabase, "employees")
       .select("id, employee_code, first_name, last_name, employment_status, date_of_joining")
       .eq("organization_id", organizationId)
-      .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .in("employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null)
       .not("date_of_joining", "is", null),
     fromHrms(supabase, "employee_profiles")
@@ -140,7 +139,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
          )`,
       )
       .eq("employees.organization_id", organizationId)
-      .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .in("employees.employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null)
       .not("date_of_birth", "is", null),
     fromHrms(supabase, "payrolls")
@@ -166,7 +165,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .is("deleted_at", null)
       .is("assets.deleted_at", null)
       .is("employees.deleted_at", null)
-      .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES),
+      .in("employees.employment_status", activeEmploymentStatusFilter()),
   ]);
 
   if (probationCountRes.error) throw new Error(probationCountRes.error.message);

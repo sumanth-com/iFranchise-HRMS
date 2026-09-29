@@ -21,6 +21,7 @@ import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
   isExcludedFromAttendanceWorkforce,
 } from "@/lib/employee/directory-listing";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { excludeItSystemAccountFromEmployeeQuery } from "@/lib/employees/it-system-account";
 import { formatCleanEmployeeName, cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import { getBranches, getOccupiedDepartments } from "@/lib/employees/services/employee-queries";
@@ -150,7 +151,7 @@ async function loadAttendanceRosterUncached(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"]),
+      .in("employment_status", activeEmploymentStatusFilter()),
   );
 
   const hiddenCodes = [...DIRECTORY_HIDDEN_EMPLOYEE_CODES];
@@ -632,7 +633,7 @@ export async function getAttendanceLookups(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name")
     .limit(250);
 

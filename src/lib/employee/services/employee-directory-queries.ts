@@ -6,12 +6,11 @@ import {
   isHiddenFromEmployeeDirectory,
 } from "@/lib/employee/directory-listing";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
-
-const ACTIVE_STATUSES = new Set(["active", "probation", "on_leave"]);
 
 const DIRECTORY_SELECT = `
   id,
@@ -107,7 +106,7 @@ export async function listEmployeeDirectory(
     .select(DIRECTORY_SELECT)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .in("employment_status", [...ACTIVE_STATUSES])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name", { ascending: true })
     .order("last_name", { ascending: true });
 

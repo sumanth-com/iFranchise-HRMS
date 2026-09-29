@@ -16,6 +16,7 @@ import type {
   LeaveSummary,
 } from "@/types/leave";
 import { leaveListParamsSchema } from "@/lib/validations/leave";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import {
@@ -1753,7 +1754,7 @@ export async function getLeaveLookups(
             .select("id, first_name, last_name, employee_code, designations:designation_id (title)")
             .eq("organization_id", organizationId)
             .is("deleted_at", null)
-            .in("employment_status", ["active", "probation", "on_leave"])
+            .in("employment_status", activeEmploymentStatusFilter())
             .order("first_name")
             .limit(FILTER_EMPLOYEE_LOOKUP_LIMIT),
       selfApplicant

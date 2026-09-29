@@ -21,7 +21,27 @@ import {
   type ManualAttendanceUiStatus,
   type StoredManualAttendanceStatus,
 } from "@/lib/attendance/manual-status";
+import { isActiveEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
+
+async function assertActiveWorkforceEmployee(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+) {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("employment_status")
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!isActiveEmploymentStatus(data?.employment_status)) {
+    throw new Error("This employee is not in the active workforce.");
+  }
+}
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
@@ -86,6 +106,12 @@ export async function createAttendance(
   profile: UserProfile,
   input: AttendanceFormInput,
 ): Promise<string> {
+  await assertActiveWorkforceEmployee(
+    supabase,
+    profile.employee.organizationId,
+    input.employeeId,
+  );
+
   const duplicate = await attendanceExistsForEmployeeDate(
     supabase,
     input.employeeId,

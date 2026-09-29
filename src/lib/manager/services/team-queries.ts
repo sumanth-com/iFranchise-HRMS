@@ -10,6 +10,7 @@ import {
   EMPLOYEE_STORAGE_BUCKETS,
   EMPLOYMENT_STATUS_LABELS,
 } from "@/lib/employees/constants";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import { getManagerTeamContext } from "@/lib/manager/services/team-hierarchy";
 import { buildHierarchyTree } from "@/lib/organization/services/org-queries";
@@ -29,7 +30,6 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
-const ACTIVE_EMPLOYMENT = ["active", "probation", "on_leave"] as const;
 const CURRENT_YEAR = new Date().getFullYear();
 
 function unwrap<T>(value: T | T[] | null | undefined): T | null {
@@ -418,7 +418,7 @@ export async function listTeamEmployees(
   if (employmentStatus) {
     query = query.eq("employment_status", employmentStatus);
   } else {
-    query = query.in("employment_status", [...ACTIVE_EMPLOYMENT]);
+    query = query.in("employment_status", activeEmploymentStatusFilter());
   }
   if (employmentTypeId) query = query.eq("employment_type_id", employmentTypeId);
 
@@ -541,7 +541,7 @@ export async function getTeamMemberOptions(
     .select("id, first_name, last_name, employee_code")
     .eq("organization_id", organizationId)
     .in("id", teamIds)
-    .in("employment_status", [...ACTIVE_EMPLOYMENT])
+    .in("employment_status", activeEmploymentStatusFilter())
     .is("deleted_at", null)
     .order("first_name");
 

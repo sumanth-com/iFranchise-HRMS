@@ -3,6 +3,7 @@ import {
   extractMeetingLinkFromAgenda,
 } from "@/lib/performance/services/performance-meeting-link";
 import { isEmployeeAppVisible } from "@/lib/employees/app-hidden";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   excludeItSystemAccountFromEmployeeQuery,
   isItSystemAccount,
@@ -108,7 +109,7 @@ export async function getPerformanceLookups(
       .select("id, first_name, last_name, employee_code")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"])
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name"),
   );
 

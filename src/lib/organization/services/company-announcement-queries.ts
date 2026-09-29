@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   COMPANY_ANNOUNCEMENT_BUCKET,
 } from "@/lib/organization/company-announcement-constants";
@@ -18,7 +19,7 @@ import { COMPANY_ANNOUNCEMENT_ICON_KEYS } from "@/types/company-announcement";
 
 type LooseRow = Record<string, unknown>;
 
-const AUDIENCE_EMPLOYMENT_STATUSES = ["active", "probation", "on_leave"];
+const AUDIENCE_EMPLOYMENT_STATUSES = activeEmploymentStatusFilter();
 
 function asString(value: unknown) {
   return typeof value === "string" ? value : "";

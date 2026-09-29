@@ -1,6 +1,7 @@
 import { addDays, format, startOfDay } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import type { UserProfile } from "@/types/auth";
 import { DASHBOARD_CHART_TYPES } from "@/lib/documents/constants";
 import {
@@ -514,7 +515,7 @@ export async function listDocumentEmployeeCards(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .eq("status", "active")
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name")
     .order("last_name")
     .limit(500);

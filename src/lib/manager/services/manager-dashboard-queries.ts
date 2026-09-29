@@ -9,6 +9,7 @@ import {
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { MANAGER_DASHBOARD_KPI_LINKS, MANAGER_ROUTES } from "@/lib/manager/constants";
 import { getManagerTeamContext } from "@/lib/manager/services/team-hierarchy";
 import { listHolidays } from "@/lib/organization/services/org-queries";
@@ -36,7 +37,6 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
-const ACTIVE_EMPLOYMENT = ["active", "probation", "on_leave"] as const;
 const REVIEW_PENDING_STATUSES = ["pending", "in_progress", "submitted"] as const;
 const ACTION_LIMIT = 5;
 const ACTIVITY_LIMIT = 8;
@@ -535,7 +535,7 @@ export async function getManagerDashboardData(
       .select("id, first_name, last_name, employee_code, employment_status, date_of_joining")
       .eq("organization_id", organizationId)
       .in("id", teamIds)
-      .in("employment_status", [...ACTIVE_EMPLOYMENT])
+      .in("employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null),
     fromHrms(supabase, "salary_structures")
       .select("employee_id, components")

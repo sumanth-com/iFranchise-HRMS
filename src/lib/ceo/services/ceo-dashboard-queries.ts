@@ -17,6 +17,7 @@ import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
 import { loadUpcomingCelebrations } from "@/lib/employee/services/employee-dashboard-queries";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
+import { formerEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
 import type { CeoActivityItem, CeoDashboardData } from "@/types/ceo-dashboard";
@@ -112,7 +113,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .in("employment_status", ["resigned", "terminated"])
+      .in("employment_status", formerEmploymentStatusFilter())
       .gte("date_of_leaving", monthStart)
       .is("deleted_at", null),
     // Match Approvals → Executive (promotion-scoped queue), not all request types.

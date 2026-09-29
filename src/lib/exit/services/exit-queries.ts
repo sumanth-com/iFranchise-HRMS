@@ -1,6 +1,7 @@
 import { format, startOfMonth } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import type { UserProfile } from "@/types/auth";
 import {
   ExitRow,
@@ -343,7 +344,7 @@ export async function getExitLookups(
     .select("id, employee_code, first_name, last_name")
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name")
     .limit(500);
 

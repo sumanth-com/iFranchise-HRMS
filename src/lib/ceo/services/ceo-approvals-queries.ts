@@ -1,6 +1,7 @@
 import { format, parseISO, startOfMonth, startOfWeek, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   CEO_ACTIONABLE_APPROVAL_STATUSES,
   CEO_APPROVALS_SOURCE,
@@ -140,7 +141,7 @@ export async function getCeoApprovalsFilterLookups(
       .select("id, first_name, last_name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"])
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name")
       .limit(200),
   ]);

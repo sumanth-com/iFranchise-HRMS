@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import type { HierarchyEmployee } from "@/types/organization";
 
 export type TeamMemberSummary = {
@@ -109,7 +110,7 @@ async function listManagerSubtreeEmployees(
       .eq("organization_id", organizationId)
       .in("reporting_manager_id", frontier)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"])
+      .in("employment_status", activeEmploymentStatusFilter())
       .order("first_name");
 
     if (error) throw new Error(error.message);

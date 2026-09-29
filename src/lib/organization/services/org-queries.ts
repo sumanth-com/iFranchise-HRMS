@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   IT_SYSTEM_ACCOUNT_CODE,
   IT_SYSTEM_ACCOUNT_EMAIL,
@@ -799,7 +800,7 @@ export async function listHierarchyEmployees(
     .is("deleted_at", null)
     .neq("email", IT_SYSTEM_ACCOUNT_EMAIL)
     .neq("employee_code", IT_SYSTEM_ACCOUNT_CODE)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name");
 
   if (error) throw new Error(error.message);

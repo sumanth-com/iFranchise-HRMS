@@ -13,6 +13,10 @@ import {
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
+  activeEmploymentStatusFilter,
+  isActiveEmploymentStatus,
+} from "@/lib/employees/employment-eligibility";
+import {
   getTodayDateString,
 } from "@/lib/attendance/services/attendance-utils";
 import { isWorkFromHomeBranch } from "@/lib/manager/services/attendance-correction-service";
@@ -44,7 +48,6 @@ import type { ReportResult } from "@/types/reports";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
-const ACTIVE_STATUSES = new Set(["active", "probation", "on_leave"]);
 const WORKING: AttendanceStatus[] = ["present", "late", "half_day"];
 const FUNNEL_STAGES = [
   "applied",
@@ -224,7 +227,7 @@ export async function getCeoAnalyticsFilterLookups(
       .select("id, first_name, last_name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"]),
+      .in("employment_status", activeEmploymentStatusFilter()),
   ]);
 
   if (departments.error) throw new Error(departments.error.message);
@@ -267,7 +270,7 @@ async function buildWorkforce(
   dateFrom: string,
   dateTo: string,
 ): Promise<CeoAnalyticsWorkforce> {
-  const active = employees.filter((row) => ACTIVE_STATUSES.has(row.employment_status));
+  const active = employees.filter((row) => isActiveEmploymentStatus(row.employment_status));
   const months = monthKeys(dateFrom, dateTo);
 
   const headcountGrowth = months.map((date) => {
@@ -892,7 +895,7 @@ function buildKpis(input: {
   const { employees, dateFrom, dateTo, hiring, performance, attendance, payroll, satisfaction } =
     input;
 
-  const activeNow = employees.filter((row) => ACTIVE_STATUSES.has(row.employment_status)).length;
+  const activeNow = employees.filter((row) => isActiveEmploymentStatus(row.employment_status)).length;
   const joinedInRange = employees.filter(
     (row) =>
       row.date_of_joining &&

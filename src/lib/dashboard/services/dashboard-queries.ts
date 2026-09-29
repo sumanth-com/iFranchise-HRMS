@@ -18,6 +18,7 @@ import { DASHBOARD_ACTION_LINKS } from "@/lib/dashboard/constants";
 import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import { getExpiringSummary } from "@/lib/documents/services/document-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
 import { LEAVE_ROUTES } from "@/lib/leave/constants";
@@ -53,8 +54,6 @@ import type { PayrollStatus } from "@/types/payroll";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
-
-const ACTIVE_EMPLOYMENT_STATUSES = ["active", "probation", "on_leave"];
 
 function employeeHref(row: {
   employee_code?: string;
@@ -260,14 +259,14 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
         "id, employee_code, first_name, last_name, employment_status, date_of_joining, department_id, employment_type_id",
       )
       .eq("organization_id", organizationId)
-      .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .in("employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null),
     fromHrms(supabase, "employee_profiles")
       .select(
         "employee_id, date_of_birth, gender, employees:employee_id!inner(organization_id, employment_status)",
       )
       .eq("employees.organization_id", organizationId)
-      .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .in("employees.employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null),
     fromHrms(supabase, "departments")
       .select("id, name")

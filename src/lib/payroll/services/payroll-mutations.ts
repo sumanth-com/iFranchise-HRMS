@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   canRewritePayrollHeader,
@@ -211,7 +212,7 @@ async function getActiveEmployees(
       `,
     )
     .eq("organization_id", organizationId)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .is("deleted_at", null)
     .is("app_hidden_at", null)
     .order("employee_code", { ascending: true });

@@ -18,6 +18,7 @@ import {
 } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { isActiveEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
@@ -1261,6 +1262,18 @@ export async function punchManagerAttendance(
 ) {
   const today = getTodayDateString();
   const employeeId = profile.employee.id;
+  const { data: employmentRow, error: employmentError } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("employment_status")
+    .eq("id", employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (employmentError) throw new Error(employmentError.message);
+  if (!isActiveEmploymentStatus(employmentRow?.employment_status)) {
+    throw new Error("This employee is not in the active workforce.");
+  }
   const rules = await getOrganizationAttendanceRules(
     supabase,
     profile.employee.organizationId,

@@ -12,6 +12,7 @@ import {
   SELF_SERVICE_MAX_LEAVE_DAYS,
   isLeaveTypeAllowedForBand,
 } from "@/lib/leave/leave-eligibility";
+import { isFormerEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import { shouldBlockInternProbationFirstMonthLeave } from "@/lib/leave/leave-entitlement";
 
 export const PERIOD_LEAVE_CODE = "PL";
@@ -166,12 +167,15 @@ export function validateLeavePolicy(input: {
   const isPl = code === PERIOD_LEAVE_CODE;
   const isCl = code === CASUAL_LEAVE_CODE;
   const isFemale = String(input.employee.gender ?? "").toLowerCase() === "female";
-  const blockedStatus = ["terminated", "resigned", "draft", "suspended"];
   const eligibilityBand =
     input.employee.leaveEligibilityBand ??
     (input.employee.employmentStatus === "probation" ? "cl_only" : "full_time_confirmed");
 
-  if (blockedStatus.includes(input.employee.employmentStatus)) {
+  if (
+    isFormerEmploymentStatus(input.employee.employmentStatus) ||
+    input.employee.employmentStatus === "draft" ||
+    input.employee.employmentStatus === "suspended"
+  ) {
     issues.push({
       code: "employee_status",
       message: "Leave cannot be applied for this employee status.",

@@ -1,5 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { isExcludedFromTeamPayslips } from "@/lib/employee/directory-listing";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { resolveEmployeeBankName } from "@/lib/payroll/services/ifsc-bank-names";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -121,7 +122,7 @@ export async function listEmployeeAccounts(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .is("app_hidden_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .order("first_name")
     .order("last_name");
 

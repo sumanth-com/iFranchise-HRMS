@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import type {
   PermissionCatalogItem,
   PermissionMatrixModule,
@@ -604,7 +605,7 @@ export async function getAssignableEmployees(
     .select("id, employee_code, first_name, last_name, email, user_id")
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"])
+    .in("employment_status", activeEmploymentStatusFilter())
     .not("user_id", "is", null)
     .order("first_name");
 

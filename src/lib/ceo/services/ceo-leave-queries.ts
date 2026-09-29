@@ -22,6 +22,7 @@ import type {
 } from "@/types/ceo-leave";
 import type { HalfDayPeriod, LeaveLookups, LeaveStatus } from "@/types/leave";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   getCurrentBalanceYear,
@@ -615,7 +616,7 @@ export async function getCeoDepartmentLeaveOverview(
       .from("employees")
       .select("department_id")
       .eq("organization_id", organizationId)
-      .in("employment_status", ["active", "probation", "on_leave"])
+      .in("employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null),
     supabase
       .schema("hrms")
@@ -927,7 +928,7 @@ export async function getCeoForwardTargets(
     )
     .eq("employees.organization_id", organizationId)
     .in("roles.code", FORWARD_ROLE_CODES)
-    .in("employees.employment_status", ["active", "probation", "on_leave"])
+    .in("employees.employment_status", activeEmploymentStatusFilter())
     .is("employees.deleted_at", null);
 
   if (error) throw new Error(error.message);

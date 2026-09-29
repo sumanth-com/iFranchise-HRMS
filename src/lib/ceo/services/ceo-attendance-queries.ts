@@ -14,6 +14,7 @@ import {
   isWorkFromHomeBranch,
 } from "@/lib/manager/services/attendance-correction-service";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
+import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   formatEmployeeName,
   fromHrms,
@@ -118,7 +119,7 @@ async function loadScopedEmployees(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
-    .in("employment_status", ["active", "probation", "on_leave"]);
+    .in("employment_status", activeEmploymentStatusFilter());
 
   if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
   if (filters.managerId) query = query.eq("reporting_manager_id", filters.managerId);
@@ -222,7 +223,7 @@ export async function getCeoAttendanceFilterLookups(
       .select("id, first_name, last_name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"]),
+      .in("employment_status", activeEmploymentStatusFilter()),
     fromHrms(supabase, "branches")
       .select("id, name")
       .eq("organization_id", organizationId)

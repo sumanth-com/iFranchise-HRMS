@@ -1,6 +1,7 @@
 import { format, startOfMonth, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { isActiveEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import { LEAVE_REPORT_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import { getManagerRecruitmentContext } from "@/lib/manager/services/manager-recruitment-context";
 import { getTeamAttendanceSummary } from "@/lib/manager/services/team-attendance-queries";
@@ -472,7 +473,7 @@ export async function getManagerTeamReportSummary(
   const employees = employeesRes.data ?? [];
   return {
     activeMembers: employees.filter((row) =>
-      ["active", "probation", "on_leave"].includes(String(row.employment_status)),
+      isActiveEmploymentStatus(String(row.employment_status)),
     ).length,
     onProbation: employees.filter((row) => row.employment_status === "probation").length,
     onLeaveToday: attendanceTodayRes.data?.length ?? 0,
