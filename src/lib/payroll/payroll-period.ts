@@ -47,11 +47,15 @@ export function resolvePayrollApplicablePeriod(
     kind = "current";
   }
 
-  // Team Payroll / monthly salary calc uses the COMPLETE selected calendar month.
-  // Do not cap periodEnd at "today" for open months — Sundays, holidays, and
-  // payable-day windows must cover the full month (e.g. all 4 Sundays in Sep).
+  // Closed months use the full calendar month. The open month stops at today so
+  // future dates are not treated as Present, Absent, LOP, leave, or holidays.
   let periodStart = monthRange.startDate;
-  let periodEnd = kind === "future" ? monthRange.startDate : monthRange.endDate;
+  let periodEnd =
+    kind === "future"
+      ? monthRange.startDate
+      : kind === "current"
+        ? todayStr
+        : monthRange.endDate;
 
   if (options?.joiningDate) {
     const joined = options.joiningDate.slice(0, 10);

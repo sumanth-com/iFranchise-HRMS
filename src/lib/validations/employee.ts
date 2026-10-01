@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
+import {
+  employeeExitDateError,
+  normalizeEmployeeExitDate,
+} from "@/lib/employees/exit-date";
 import { optionalPastOrTodayDateSchema } from "@/lib/validations/date";
 import {
   optionalPhoneSchema,
@@ -296,6 +300,24 @@ export const employeeUpdateSchema = z
         message: "Enter a designation",
         path: ["customDesignationTitle"],
       });
+    }
+
+    const exitDate = normalizeEmployeeExitDate(data.dateOfLeaving);
+    if (data.dateOfLeaving?.trim() && !exitDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid exit date",
+        path: ["dateOfLeaving"],
+      });
+    } else if (exitDate) {
+      const dateError = employeeExitDateError(exitDate, data.dateOfJoining);
+      if (dateError) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: dateError,
+          path: ["dateOfLeaving"],
+        });
+      }
     }
   });
 

@@ -652,8 +652,7 @@ async function getAttendanceSummary(
       : null;
   }
 
-  // Official holidays + Sundays credit for the COMPLETE applicable month window
-  // (open months use month end — not capped at today).
+  // Holidays and Sundays credit only through the applicable window (today when open).
   const holidayCreditEnd = queryEnd;
 
   const [leaveRequestSummary, officialHolidays] = await Promise.all([

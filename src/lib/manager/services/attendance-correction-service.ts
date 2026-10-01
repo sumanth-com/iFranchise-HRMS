@@ -307,6 +307,18 @@ async function reviewAttendanceCorrection(
   }
 
   revalidateSelfAttendancePaths();
+  try {
+    const { refreshDraftPayrollItemsForEmployee } = await import(
+      "@/lib/payroll/services/payroll-mutations"
+    );
+    const { revalidateOpenPayrollPaths } = await import(
+      "@/lib/payroll/revalidate-open-payroll"
+    );
+    await refreshDraftPayrollItemsForEmployee(supabase, profile, correction.employee_id);
+    revalidateOpenPayrollPaths();
+  } catch (payrollError) {
+    console.error("[attendance-correction] payroll refresh failed", payrollError);
+  }
 
   return { success: true as const, message: `Regularization ${decision}.` };
 }

@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
+import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { buildEmployeeRouteRef } from "@/lib/employees/routing";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireAuthenticatedProfile,
@@ -109,6 +116,29 @@ async function revalidateEmployeeAccountPaths(employeeId: string) {
     revalidatePath(EMPLOYEE_ROUTES.detail(employee));
     revalidatePath(EMPLOYEE_ROUTES.edit(employee));
   }
+}
+
+/** Active workforce lists that drop an employee once their exit date is saved. */
+function revalidateWorkforceListsAfterExit(employee: {
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+}) {
+  const ref = buildEmployeeRouteRef(employee);
+  revalidatePath(EMPLOYEE_ROUTES.list);
+  revalidatePath(`${CEO_ROUTES.employees}/${ref}`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.employees}/${ref}`);
+  revalidatePath(HR_OVERVIEW_ROUTES.overview);
+  revalidatePath(ATTENDANCE_ROUTES.list);
+  revalidatePath(SELF_ATTENDANCE_ROUTES.team);
+  revalidatePath(CEO_ROUTES.attendance);
+  revalidatePath(SELF_LEAVE_ROUTES.team);
+  revalidatePath(LEAVE_ROUTES.balances);
+  revalidatePath(CEO_ROUTES.approvalsLeaveBalance);
+  revalidatePath(SELF_PAYROLL_ROUTES.team);
+  revalidatePath(PAYROLL_ROUTES.dashboard);
+  revalidatePath(CEO_ROUTES.payrollRun);
+  revalidateCeoDashboardHome();
 }
 
 function revalidateSelfProfilePaths() {
@@ -259,12 +289,12 @@ export async function createEmployeeAction(
 export async function updateEmployeeAction(
   employeeId: string,
   payload: unknown,
-): Promise<EmployeeActionResult> {
+): Promise<EmployeeActionResult<{ exitDatePreserved: boolean }>> {
   try {
     const profile = await requireServerPermission("employee.edit");
     const parsed = employeeUpdateSchema.parse(payload);
     const supabase = await getAuthenticatedSupabase();
-    await updateEmployee(supabase, profile, employeeId, parsed);
+    const updated = await updateEmployee(supabase, profile, employeeId, parsed);
 
     const employee = await getEmployeeById(supabase, employeeId);
 
@@ -276,9 +306,15 @@ export async function updateEmployeeAction(
     if (employee) {
       revalidatePath(EMPLOYEE_ROUTES.detail(employee));
       revalidatePath(EMPLOYEE_ROUTES.edit(employee));
+      if (updated.exitApplied) {
+        revalidateWorkforceListsAfterExit(employee);
+      }
     }
 
-    return { success: true, data: undefined };
+    return {
+      success: true,
+      data: { exitDatePreserved: updated.exitDatePreserved },
+    };
   } catch (error) {
     return {
       success: false,

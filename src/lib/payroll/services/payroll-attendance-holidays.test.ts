@@ -237,6 +237,31 @@ describe("official holiday attendance facts", () => {
     assert.equal(EXCEL_PAYROLL_DAY_DENOMINATOR, 30);
   });
 
+  it("does not credit October Sundays that have not occurred on day 1", () => {
+    const summary = emptySummary();
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate: new Map(),
+      periodStart: "2026-10-01",
+      periodEnd: "2026-10-01",
+    });
+    assert.equal(summary.holidayDays, 0);
+    assert.equal(listSundaysInRange("2026-10-01", "2026-10-31")[0], "2026-10-04");
+  });
+
+  it("credits only Sundays that have occurred by mid-month", () => {
+    const summary = emptySummary();
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate: new Map(),
+      periodStart: "2026-10-01",
+      periodEnd: "2026-10-15",
+    });
+    assert.deepEqual(listSundaysInRange("2026-10-01", "2026-10-15"), [
+      "2026-10-04",
+      "2026-10-11",
+    ]);
+    assert.equal(summary.holidayDays, 2);
+  });
+
   it("does not credit official holidays after the as-of period end", () => {
     const summary = {
       ...emptySummary(),

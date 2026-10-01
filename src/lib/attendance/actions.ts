@@ -11,6 +11,7 @@ import { requireServerAnyPermission, requireServerPermission } from "@/lib/permi
 import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { revalidateOpenPayrollPaths } from "@/lib/payroll/revalidate-open-payroll";
 import { refreshDraftPayrollItemsForEmployee } from "@/lib/payroll/services/payroll-mutations";
 import {
   getAttendanceById,
@@ -150,7 +151,13 @@ export async function createAttendanceAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = attendanceFormSchema.parse(input);
     const id = await createAttendance(supabase, profile, parsed);
+    try {
+      await refreshDraftPayrollItemsForEmployee(supabase, profile, parsed.employeeId);
+    } catch (payrollError) {
+      console.error("[createAttendanceAction] payroll refresh failed", payrollError);
+    }
     revalidateSelfAttendancePaths();
+    revalidateOpenPayrollPaths();
     return { success: true, data: { id } };
   } catch (error) {
     return {
@@ -170,9 +177,15 @@ export async function updateAttendanceAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = attendanceFormSchema.parse(input);
     await updateAttendance(supabase, profile, attendanceId, parsed);
+    try {
+      await refreshDraftPayrollItemsForEmployee(supabase, profile, parsed.employeeId);
+    } catch (payrollError) {
+      console.error("[updateAttendanceAction] payroll refresh failed", payrollError);
+    }
     revalidatePath(ATTENDANCE_ROUTES.detail(attendanceId));
     revalidatePath(ATTENDANCE_ROUTES.edit(attendanceId));
     revalidateSelfAttendancePaths();
+    revalidateOpenPayrollPaths();
     return { success: true, data: null };
   } catch (error) {
     return {
@@ -211,6 +224,7 @@ export async function setManualAttendanceStatusAction(
     }
 
     revalidateSelfAttendancePaths();
+    revalidateOpenPayrollPaths();
     revalidatePath(EMPLOYEE_ROUTES.payroll);
     revalidatePath(PAYROLL_ROUTES.run);
     revalidatePath(PAYROLL_ROUTES.payslips);
@@ -236,8 +250,26 @@ export async function deleteAttendanceAction(
   try {
     const profile = await requireServerPermission("attendance.delete");
     const supabase = await getAuthenticatedSupabase();
+    const { data: existing } = await supabase
+      .schema("hrms")
+      .from("attendance")
+      .select("employee_id")
+      .eq("id", attendanceId)
+      .maybeSingle();
     await softDeleteAttendance(supabase, profile, attendanceId);
+    if (existing?.employee_id) {
+      try {
+        await refreshDraftPayrollItemsForEmployee(
+          supabase,
+          profile,
+          String(existing.employee_id),
+        );
+      } catch (payrollError) {
+        console.error("[deleteAttendanceAction] payroll refresh failed", payrollError);
+      }
+    }
     revalidateSelfAttendancePaths();
+    revalidateOpenPayrollPaths();
     return { success: true, data: null };
   } catch (error) {
     return {

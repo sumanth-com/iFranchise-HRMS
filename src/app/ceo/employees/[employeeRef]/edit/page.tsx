@@ -11,6 +11,7 @@ import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-r
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { buildEmployeeModuleRoutes } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
+import { canManageEmployeeExit } from "@/lib/employees/exit-date-access";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,7 @@ export default async function CeoEmployeeEditPage({
           employee={employee}
           lookups={lookups}
           routesBasePath={CEO_ROUTES.employees}
+          canManageExit={canManageEmployeeExit(profile.permissionCodes)}
         />
       </div>
     </PageScroll>

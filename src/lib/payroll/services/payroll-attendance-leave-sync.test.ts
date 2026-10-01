@@ -11,8 +11,10 @@ import {
   type AttendanceSummary,
 } from "@/lib/payroll/services/payroll-calculator";
 import {
+  mapPayrollDisplayAmounts,
   resolveFinalPayableAmount,
   roundCurrency,
+  sumDisplayedPayrollRowTotals,
   sumPayrollEmployeeRowTotals,
 } from "@/lib/payroll/services/payroll-utils";
 
@@ -220,5 +222,92 @@ describe("payroll attendance ↔ leave sync", () => {
     );
     assert.equal(om.grossSalary, 20_833.33);
     assert.equal(diksha.grossSalary, 40_000);
+  });
+
+  it("counts early logout as unpaid absence and three late markers as half-day LOP", () => {
+    const summary = emptySummary();
+    applyPayrollAttendanceDay(summary, "absent", 0, "early-logout:full");
+    applyPayrollAttendanceDay(summary, "late", 0, "late-entry");
+    applyPayrollAttendanceDay(summary, "late", 0, "late-entry");
+    applyPayrollAttendanceDay(summary, "half_day", 0, "late-entry");
+
+    assert.equal(summary.absentDays, 1);
+    assert.equal(summary.presentDays, 2);
+    assert.equal(summary.halfDays, 1);
+    assert.equal(summary.lateDays, 3);
+
+    const result = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-15"),
+      salaryStructure: structure(30_000),
+      attendance: summary,
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [{ amount: 250, category: "travel" }],
+    });
+
+    assert.equal(result.breakdown.attendance.paidDays, 2.5);
+    assert.equal(result.breakdown.attendance.lopDays, 2);
+    assert.equal(result.grossSalary, 2_500);
+    const displayed = [result, result].map((row) => {
+      const amounts = mapPayrollDisplayAmounts({
+        basicSalary: row.basicSalary,
+        grossSalary: row.grossSalary,
+        netSalary: row.netSalary,
+        totalDeductions: row.totalDeductions,
+        totalAllowances: row.totalAllowances,
+        breakdown: row.breakdown,
+      });
+      return {
+        grossEarnings: amounts.attendanceEarnings,
+        deductions: amounts.deductions,
+        finalPayable: amounts.finalPayable,
+      };
+    });
+    const cards = sumDisplayedPayrollRowTotals(displayed);
+    assert.equal(
+      cards.totalGross,
+      roundCurrency(displayed.reduce((sum, row) => sum + row.grossEarnings, 0)),
+    );
+    assert.equal(
+      cards.totalDeductions,
+      roundCurrency(displayed.reduce((sum, row) => sum + row.deductions, 0)),
+    );
+    assert.equal(
+      cards.totalFinalPayable,
+      roundCurrency(displayed.reduce((sum, row) => sum + row.finalPayable, 0)),
+    );
+  });
+
+  it("counts approved CL and EL as paid days and keeps LOP unpaid", () => {
+    const summary = emptySummary();
+    applyPayrollAttendanceDay(summary, "on_leave", 0, "src:CL");
+    applyPayrollAttendanceDay(summary, "on_leave", 0, "src:EL");
+    applyPayrollAttendanceDay(summary, "absent", 0, "src:LOP");
+    const leave = mergePayrollLeaveSummary({
+      attendanceRows: [
+        { attendance_status: "on_leave", notes: "src:CL" },
+        { attendance_status: "on_leave", notes: "src:EL" },
+        { attendance_status: "absent", notes: "src:LOP" },
+      ],
+      requestSummary: { lopDays: 0, paidLeaveDays: 0 },
+    });
+    const result = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-15"),
+      salaryStructure: structure(30_000),
+      attendance: summary,
+      leaveSummary: leave,
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(leave.clDays, 1);
+    assert.equal(leave.elDays, 1);
+    assert.equal(leave.lopDays, 1);
+    assert.equal(result.breakdown.attendance.paidDays, 2);
+    assert.equal(result.grossSalary, 2_000);
+    assert.equal(result.breakdown.attendance.lopDays, 1);
   });
 });

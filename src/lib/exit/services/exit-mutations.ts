@@ -21,7 +21,14 @@ import type {
   ResignationFormValues,
   SettlementFormValues,
 } from "@/lib/validations/exit";
+import { canManageEmployeeExit } from "@/lib/employees/exit-date-access";
+import {
+  employeeExitDateError,
+  normalizeEmployeeExitDate,
+} from "@/lib/employees/exit-date";
 import { deactivateEmployeeAccount } from "@/lib/employees/services/employee-account";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { hasPermission } from "@/lib/permissions/utils";
 import type { ExitStatus } from "@/types/exit";
 
 async function addTimeline(
@@ -74,7 +81,6 @@ async function finalizeResignationAfterCeoApproval(
   },
   remarks: string | null,
 ) {
-  const organizationId = profile.employee.organizationId;
   const now = new Date().toISOString();
 
   await setResignationStatus(supabase, row.id, profile.userId, "completed", {
@@ -84,25 +90,200 @@ async function finalizeResignationAfterCeoApproval(
     completed_at: now,
   });
 
-  await fromHrms(supabase, "employees")
+  await applyExitedEmploymentRecord(
+    supabase,
+    profile,
+    row.employee_id,
+    row.last_working_day,
+    "resigned",
+  );
+}
+
+const CLOSED_EXIT_STATUSES = new Set(["completed", "rejected", "withdrawn"]);
+
+/**
+ * Shared employment archive used by CEO exit approval and the HR/CEO exit date.
+ * Sets former employment, last working day, and inactive login. Does not delete history.
+ */
+async function applyExitedEmploymentRecord(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  lastWorkingDay: string,
+  employmentStatus: "resigned" | "terminated",
+) {
+  const organizationId = profile.employee.organizationId;
+  const { error } = await fromHrms(supabase, "employees")
     .update({
-      employment_status: "resigned",
-      date_of_leaving: row.last_working_day,
+      employment_status: employmentStatus,
+      date_of_leaving: lastWorkingDay,
       status: "inactive",
       updated_by: profile.userId,
     })
-    .eq("id", row.employee_id)
-    .eq("organization_id", organizationId);
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
 
   try {
-    await deactivateEmployeeAccount(supabase, profile, row.employee_id);
+    await deactivateEmployeeAccount(supabase, profile, employeeId);
   } catch (error) {
-    // A repeat approve click or an already-inactive account must not fail the flow.
     const message = error instanceof Error ? error.message : "";
     if (!message.includes("Only active accounts can be deactivated")) {
       throw error;
     }
   }
+}
+
+/**
+ * Record or update a completed exit from the employee profile.
+ * Reuses the exit resignation row and the same archive fields as CEO approval.
+ * Does not start a new approval flow and does not delete historical records.
+ */
+export async function syncEmployeeExitDate(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  exitDate: string,
+): Promise<{ changed: boolean }> {
+  if (!canManageEmployeeExit(profile.permissionCodes)) {
+    throw new Error("You do not have permission to change the exit date");
+  }
+
+  const organizationId = profile.employee.organizationId;
+  const { data: employee, error: employeeError } = await fromHrms(supabase, "employees")
+    .select("id, employment_status, date_of_leaving, date_of_joining, status")
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (employeeError) throw new Error(employeeError.message);
+  if (!employee) throw new Error("Employee not found");
+
+  const validated = normalizeEmployeeExitDate(exitDate);
+  const dateError = employeeExitDateError(validated, employee.date_of_joining);
+  if (dateError) throw new Error(dateError);
+
+  const employmentStatus =
+    employee.employment_status === "terminated" ? "terminated" : "resigned";
+
+  const { data: resignations, error: resignationError } = await fromHrms(
+    supabase,
+    "exit_resignations",
+  )
+    .select("id, exit_status, last_working_day, resignation_date")
+    .eq("organization_id", organizationId)
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  if (resignationError) throw new Error(resignationError.message);
+
+  const rows = (resignations ?? []) as Array<{
+    id: string;
+    exit_status: string;
+    last_working_day: string | null;
+    resignation_date: string | null;
+  }>;
+  const openRow = rows.find((row) => !CLOSED_EXIT_STATUSES.has(row.exit_status));
+  const completedRow = rows.find((row) => row.exit_status === "completed");
+  const target = openRow ?? completedRow ?? null;
+
+  const alreadyRecorded =
+    target?.exit_status === "completed" &&
+    normalizeEmployeeExitDate(target.last_working_day) === validated &&
+    employee.employment_status === employmentStatus &&
+    normalizeEmployeeExitDate(employee.date_of_leaving) === validated &&
+    employee.status === "inactive";
+
+  if (alreadyRecorded) {
+    try {
+      await deactivateEmployeeAccount(supabase, profile, employeeId);
+      return { changed: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!message.includes("Only active accounts can be deactivated")) {
+        throw error;
+      }
+      return { changed: false };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const actorFields: Record<string, unknown> = {};
+  if (!target || target.exit_status !== "completed") {
+    actorFields.completed_at = now;
+    if (hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr)) {
+      actorFields.hr_acted_at = now;
+      actorFields.hr_acted_by = profile.userId;
+    } else if (hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.ceo)) {
+      actorFields.ceo_acted_at = now;
+      actorFields.ceo_acted_by = profile.userId;
+    }
+  }
+
+  let resignationId = target?.id ?? "";
+  if (target) {
+    const resignationDate = normalizeEmployeeExitDate(target.resignation_date);
+    await setResignationStatus(supabase, target.id, profile.userId, "completed", {
+      last_working_day: validated,
+      ...(resignationDate && validated < resignationDate
+        ? { resignation_date: validated }
+        : {}),
+      ...actorFields,
+    });
+  } else {
+    const { data: inserted, error: insertError } = await fromHrms(
+      supabase,
+      "exit_resignations",
+    )
+      .insert({
+        organization_id: organizationId,
+        employee_id: employeeId,
+        resignation_date: validated,
+        last_working_day: validated,
+        notice_period_days: 0,
+        reason: "Exit date recorded from the employee profile",
+        exit_status: "completed",
+        completed_at: now,
+        status: "active",
+        created_by: profile.userId,
+        updated_by: profile.userId,
+        ...actorFields,
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !inserted) {
+      throw new Error(insertError?.message ?? "Failed to record the exit date");
+    }
+    resignationId = inserted.id as string;
+  }
+
+  await applyExitedEmploymentRecord(
+    supabase,
+    profile,
+    employeeId,
+    validated,
+    employmentStatus,
+  );
+
+  const previousDay = normalizeEmployeeExitDate(employee.date_of_leaving);
+  await addTimeline(
+    supabase,
+    organizationId,
+    resignationId,
+    profile.userId,
+    "completed",
+    previousDay && previousDay !== validated ? "Exit date updated" : "Exit completed",
+    previousDay && previousDay !== validated
+      ? `Last working day updated to ${validated}.`
+      : "Exit date recorded from the employee profile.",
+  );
+
+  return { changed: true };
 }
 
 async function seedClearanceAndAssets(

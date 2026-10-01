@@ -10,6 +10,7 @@ import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
 import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import { buildEmployeeModuleRoutes } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
+import { canManageEmployeeExit } from "@/lib/employees/exit-date-access";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,7 @@ export default async function SuperAdminEmployeeEditPage({
           employee={employee}
           lookups={lookups}
           routesBasePath={SYSTEM_EMPLOYEE_LIST}
+          canManageExit={canManageEmployeeExit(profile.permissionCodes)}
         />
       </div>
     </PageScroll>

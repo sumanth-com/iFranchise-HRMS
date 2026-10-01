@@ -45,6 +45,7 @@ import type { EmployeeAssetsData } from "@/types/employee-assets";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import { cn } from "@/lib/utils";
 import type { LeaveStatus } from "@/types/leave";
+import { canManageEmployeeExit } from "@/lib/employees/exit-date-access";
 import { hasPermission } from "@/lib/permissions/utils";
 
 type EmployeeDetailViewProps = {
@@ -232,6 +233,7 @@ export function EmployeeDetailView({
   activeTab,
 }: EmployeeDetailViewProps) {
   const canEditEmployee = hasPermission(permissionCodes, "employee.edit");
+  const canManageExit = canManageEmployeeExit(permissionCodes);
   const statutory = salaryStructure?.components ?? {};
   const employeeFullName = `${employee.firstName} ${employee.lastName}`.trim();
   const accountDeactivated = isEmployeeAccountDeactivated(employee.accountStatus);
@@ -285,6 +287,7 @@ export function EmployeeDetailView({
                   onEmploymentTypeChange={setPreviewEmploymentTypeName}
                   onDesignationChange={setPreviewDesignationTitle}
                   routesBasePath={routesBasePath}
+                  canManageExit={canManageExit}
                 />
               </div>
             ) : (

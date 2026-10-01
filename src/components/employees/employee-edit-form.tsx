@@ -21,6 +21,7 @@ import {
 } from "@/components/common/select";
 import { toEmployeeSelectItems, toLookupSelectItems } from "@/components/payroll/select-utils";
 import { updateEmployeeAction } from "@/lib/employees/actions";
+import { isFormerEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import {
   DESIGNATION_OTHER_VALUE,
   resolveEmployeeModuleRoutes,
@@ -61,6 +62,8 @@ type EmployeeEditFormProps = {
   routesBasePath?: string;
   /** Client-to-client only. Prefer `routesBasePath` when rendering from a server page. */
   routes?: EmployeeModuleRoutes;
+  /** HR and CEO only. The server rejects exit-date changes from anyone else. */
+  canManageExit?: boolean;
 };
 
 export function EmployeeEditForm({
@@ -73,6 +76,7 @@ export function EmployeeEditForm({
   onSaved,
   onEmploymentTypeChange,
   onDesignationChange,
+  canManageExit = false,
 }: EmployeeEditFormProps) {
   const routes = routesProp ?? resolveEmployeeModuleRoutes(routesBasePath);
   const router = useRouter();
@@ -138,7 +142,7 @@ export function EmployeeEditForm({
       assignedHrEmployeeId: employee.assignedHrEmployeeId ?? "",
       employmentStatus: employee.employmentStatus,
       dateOfJoining: employee.dateOfJoining ?? "",
-      dateOfLeaving: employee.dateOfLeaving ?? "",
+      dateOfLeaving: canManageExit ? (employee.dateOfLeaving ?? "") : undefined,
       dateOfBirth: employee.profile?.dateOfBirth ?? "",
       gender: employee.profile?.gender ?? undefined,
       maritalStatus: employee.profile?.maritalStatus ?? undefined,
@@ -257,7 +261,11 @@ export function EmployeeEditForm({
           return;
         }
 
-        toast.success("Employee updated successfully");
+        toast.success(
+          result.data?.exitDatePreserved
+            ? "Employee updated. The exit date was kept so existing exit history stays in place."
+            : "Employee updated successfully",
+        );
         if (variant === "inline") {
           onSaved?.();
           router.refresh();
@@ -439,11 +447,41 @@ export function EmployeeEditForm({
           <Label htmlFor="dateOfJoining">Date of joining</Label>
           <Input id="dateOfJoining" type="date" {...form.register("dateOfJoining")} />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="dateOfLeaving">Date of leaving</Label>
-          <Input id="dateOfLeaving" type="date" {...form.register("dateOfLeaving")} />
-        </div>
       </div>
+
+      {canManageExit ? (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Exit / Employment Exit</h2>
+            <p className="text-sm text-muted-foreground">
+              {isFormerEmploymentStatus(employee.employmentStatus)
+                ? "This employee is already a former employee. Update the exit date to change the last working day."
+                : "Saving an exit date marks this employee as a former employee and removes them from active workforce lists."}
+              {" "}
+              Clearing the date does not reverse an exit or delete history.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="dateOfLeaving">Exit date</Label>
+              <Input
+                id="dateOfLeaving"
+                type="date"
+                max={maxDateToday}
+                disabled={isPending}
+                {...form.register("dateOfLeaving")}
+              />
+              {form.formState.errors.dateOfLeaving?.message ? (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.dateOfLeaving.message}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Last working day.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <h2 className="text-base font-semibold">Address</h2>

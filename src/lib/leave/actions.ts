@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { revalidateCeoDashboardHome } from "@/lib/ceo/revalidate-ceo-dashboard";
+import { revalidateOpenPayrollPaths } from "@/lib/payroll/revalidate-open-payroll";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
@@ -87,6 +88,7 @@ function revalidateLeaveSelfServicePaths(leaveRequestId?: string) {
   }
   // CEO home KPIs: pending leave approvals + today's on-leave / attendance %.
   revalidateCeoDashboardHome();
+  revalidateOpenPayrollPaths();
 }
 
 export async function createLeaveRequestAction(

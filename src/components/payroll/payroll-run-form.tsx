@@ -29,11 +29,13 @@ import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/se
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { fetchPayrollDetailAction } from "@/lib/payroll/actions";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
+import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
 import {
   formatCurrency,
   formatPayrollMonth,
   mapPayrollDisplayAmounts,
   roundCurrency,
+  sumDisplayedPayrollRowTotals,
 } from "@/lib/payroll/services/payroll-utils";
 import type {
   HrPayrollAdjustments,
@@ -109,11 +111,16 @@ function formatOptionalPayrollAmount(value: number): string {
   return value > 0 ? formatCurrency(value) : "—";
 }
 
-/** Open current-month banner — Team Payroll uses the full month, so no as-of cutoff. */
+/** Open current-month banner. Closed and future months have no as-of cutoff. */
 function resolveOpenPayrollAsOfLabel(month: number, year: number): string | null {
-  void month;
-  void year;
-  return null;
+  const period = resolvePayrollApplicablePeriod(month, year);
+  if (period.kind !== "current" || period.isClosed) return null;
+  const [yearPart, monthPart, dayPart] = period.periodEnd.split("-").map(Number);
+  const label = new Date(Date.UTC(yearPart, monthPart - 1, dayPart)).toLocaleDateString(
+    "en-IN",
+    { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" },
+  );
+  return `As of ${label}`;
 }
 
 function attendanceFactsFromBreakdown(breakdown: PayrollBreakdown) {
@@ -392,10 +399,14 @@ export function PayrollRunForm({
     return [];
   }, [panel]);
 
-  const totalFinalPayable = useMemo(
+  const payrollSummary = useMemo(
     () =>
-      roundCurrency(
-        tableRows.reduce((sum, row) => sum + Number(row.finalPayable ?? 0), 0),
+      sumDisplayedPayrollRowTotals(
+        tableRows.map((row) => ({
+          grossEarnings: row.attendanceEarnings,
+          deductions: row.deductions,
+          finalPayable: row.finalPayable,
+        })),
       ),
     [tableRows],
   );
@@ -510,10 +521,10 @@ export function PayrollRunForm({
           </div>
 
           <PayrollTotals
-            employeeCount={panel.data.items?.length ?? panel.data.employeeCount ?? 0}
-            totalGross={panel.data.totalGross}
-            totalDeductions={panel.data.totalDeductions}
-            totalFinalPayable={totalFinalPayable}
+            employeeCount={payrollSummary.employeeCount}
+            totalGross={payrollSummary.totalGross}
+            totalDeductions={payrollSummary.totalDeductions}
+            totalFinalPayable={payrollSummary.totalFinalPayable}
           />
 
           <EmployeePayrollTable
@@ -548,10 +559,10 @@ export function PayrollRunForm({
           </div>
 
           <PayrollTotals
-            employeeCount={panel.data.items?.length ?? 0}
-            totalGross={panel.data.totalGross}
-            totalDeductions={panel.data.totalDeductions}
-            totalFinalPayable={totalFinalPayable}
+            employeeCount={payrollSummary.employeeCount}
+            totalGross={payrollSummary.totalGross}
+            totalDeductions={payrollSummary.totalDeductions}
+            totalFinalPayable={payrollSummary.totalFinalPayable}
           />
 
           <EmployeePayrollTable
@@ -789,12 +800,12 @@ function EmployeePayrollTable({
 
   return (
     <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:border-border dark:bg-card">
-      <table className="w-full min-w-[78rem] bg-white text-sm dark:bg-transparent">
+      <table className="w-full min-w-[64rem] bg-white text-sm dark:bg-transparent">
         <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
             <th
               className={cn(
-                "left-0 z-40 h-11 min-w-[16rem] whitespace-nowrap px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
+                "left-0 z-40 h-11 min-w-[11rem] whitespace-nowrap px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
                 stickyCellClass(true),
               )}
             >
@@ -802,7 +813,7 @@ function EmployeePayrollTable({
             </th>
             <th
               className={cn(
-                "left-[16rem] z-40 h-11 min-w-[10rem] whitespace-nowrap px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
+                "left-[11rem] z-40 h-11 min-w-[7.5rem] whitespace-nowrap px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
                 stickyCellClass(true),
               )}
             >
@@ -856,7 +867,7 @@ function EmployeePayrollTable({
             >
               <td
                 className={cn(
-                  "left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
+                  "left-0 min-w-[11rem] max-w-[14rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
                   stickyCellClass(),
                 )}
               >
@@ -872,11 +883,13 @@ function EmployeePayrollTable({
               </td>
               <td
                 className={cn(
-                  "left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
+                  "left-[11rem] min-w-[7.5rem] max-w-[9rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
                   stickyCellClass(),
                 )}
               >
-                {row.department ?? "—"}
+                <div className="truncate" title={row.department ?? undefined}>
+                  {row.department ?? "—"}
+                </div>
               </td>
               <td
                 className="px-3 py-2.5 text-center align-middle tabular-nums"
@@ -896,19 +909,19 @@ function EmployeePayrollTable({
               <td className="px-3 py-2.5 text-center align-middle tabular-nums">
                 {row.lopDays}
               </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
                 {formatCurrency(row.monthlySalary)}
               </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
                 {formatCurrency(row.attendanceEarnings)}
               </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
                 {formatCurrency(row.deductions)}
               </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
+              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
                 {formatOptionalPayrollAmount(row.reimbursement)}
               </td>
-              <td className="px-3 py-2.5 text-center align-middle font-medium tabular-nums">
+              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle font-medium tabular-nums">
                 {formatCurrency(row.finalPayable)}
               </td>
               <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] table-sticky-card group-hover:bg-zinc-50">

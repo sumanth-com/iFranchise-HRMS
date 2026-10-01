@@ -7,6 +7,9 @@ import {
   DOCUMENT_MAX_BYTES,
   PROFILE_IMAGE_MAX_BYTES,
 } from "@/lib/employees/constants";
+import { canManageEmployeeExit } from "@/lib/employees/exit-date-access";
+import { resolveEmployeeExitSave } from "@/lib/employees/exit-date";
+import { syncEmployeeExitDate } from "@/lib/exit/services/exit-mutations";
 import { assertEligibleHrLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
 import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
@@ -253,9 +256,32 @@ export async function updateEmployee(
   const { data: previous } = await supabase
     .schema("hrms")
     .from("employees")
-    .select("employment_status")
+    .select("employment_status, date_of_leaving, date_of_joining")
     .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
     .maybeSingle();
+
+  if (!previous) {
+    throw new Error("Employee not found");
+  }
+
+  const exitPlan = resolveEmployeeExitSave({
+    canManage: canManageEmployeeExit(profile.permissionCodes),
+    requestedDate: input.dateOfLeaving,
+    dateFieldProvided: input.dateOfLeaving !== undefined && input.dateOfLeaving !== null,
+    storedExitDate: previous.date_of_leaving,
+    storedEmploymentStatus: previous.employment_status,
+    formEmploymentStatus: input.employmentStatus,
+    dateOfJoining: emptyToNull(input.dateOfJoining) ?? previous.date_of_joining,
+  });
+
+  if (exitPlan.denial) throw new Error(exitPlan.denial);
+  if (exitPlan.dateError) throw new Error(exitPlan.dateError);
+
+  const employmentStatus = exitPlan.employmentStatus;
+  const dateOfLeaving = exitPlan.dateOfLeaving;
+  const requestedExitDate = dateOfLeaving ?? "";
 
   let designationId = emptyToNull(input.designationId);
 
@@ -295,9 +321,9 @@ export async function updateEmployee(
       last_name: input.lastName.trim(),
       email: input.email.trim().toLowerCase(),
       phone: emptyToNull(input.phone),
-      employment_status: input.employmentStatus,
+      employment_status: employmentStatus,
       date_of_joining: emptyToNull(input.dateOfJoining),
-      date_of_leaving: emptyToNull(input.dateOfLeaving),
+      date_of_leaving: dateOfLeaving,
       updated_by: userId,
     })
     .eq("id", employeeId)
@@ -305,6 +331,17 @@ export async function updateEmployee(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  let exitApplied = false;
+  if (exitPlan.applyingExit && requestedExitDate) {
+    const exitResult = await syncEmployeeExitDate(
+      supabase,
+      profile,
+      employeeId,
+      requestedExitDate,
+    );
+    exitApplied = exitResult.changed;
   }
 
   const { error: profileError } = await supabase
@@ -373,17 +410,22 @@ export async function updateEmployee(
   emitHrmsWebhook(organizationId, "employee.updated", {
     id: employeeId,
     employeeCode: input.employeeCode.trim(),
-    employmentStatus: input.employmentStatus,
+    employmentStatus,
   });
-  if (previous?.employment_status && previous.employment_status !== input.employmentStatus) {
+  if (previous.employment_status !== employmentStatus) {
     emitHrmsWebhook(organizationId, "employee.status_changed", {
       id: employeeId,
       from: previous.employment_status,
-      to: input.employmentStatus,
+      to: employmentStatus,
     });
   }
 
   await initializeEmployeeLeaveBalances(supabase, profile, employeeId);
+
+  return {
+    exitApplied,
+    exitDatePreserved: exitPlan.exitDatePreserved,
+  };
 }
 
 export async function changeEmployeeEmploymentType(

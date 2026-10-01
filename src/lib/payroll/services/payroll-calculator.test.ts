@@ -702,4 +702,85 @@ describe("payroll calculator", () => {
     );
     assert.ok(normalized.totalDeductions <= normalized.grossSalary);
   });
+
+  it("pays only day-1 facts on the first day of an open month", () => {
+    const result = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-01"),
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(30_000, { id: "struct-oct-1" }),
+      attendance: { ...emptyAttendance, presentDays: 1, holidayDays: 0, weekOffDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    assert.equal(result.breakdown.attendance.workingDays, 30);
+    assert.equal(result.breakdown.attendance.paidDays, 1);
+    assert.equal(result.breakdown.attendance.dailyRate, 1_000);
+    assert.equal(result.grossSalary, 1_000);
+  });
+
+  it("pays present, holiday, CL, and EL through mid-month and excludes future days", () => {
+    const result = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-15"),
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(30_000, { id: "struct-oct-15" }),
+      attendance: {
+        ...emptyAttendance,
+        presentDays: 8,
+        holidayDays: 2,
+      },
+      leaveSummary: { lopDays: 1, paidLeaveDays: 2, clDays: 1, elDays: 1 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    assert.equal(result.breakdown.attendance.paidDays, 12);
+    assert.equal(result.grossSalary, 12_000);
+    assert.equal(result.breakdown.attendance.lopDays, 1);
+    const lop = result.breakdown.deductions.find((line) => line.code === "lop");
+    assert.equal(lop?.amount, 1_000);
+    assert.equal(result.totalDeductions, 200);
+    assert.equal(result.netSalary, 11_800);
+  });
+
+  it("does not pay invented attendance for a future month", () => {
+    const result = calculateEmployeePayroll({
+      month: 11,
+      year: 2026,
+      asOfDate: new Date("2026-10-15"),
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(30_000, { id: "struct-nov" }),
+      attendance: { ...emptyAttendance, presentDays: 20, holidayDays: 4 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 2 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    assert.equal(result.breakdown.attendance.paidDays, 0);
+    assert.equal(result.grossSalary, 0);
+  });
+
+  it("turns three late entries into half-day LOP at the daily rate", () => {
+    const result = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-15"),
+      salaryStructure: structure(30_000, { id: "struct-late" }),
+      attendance: { ...emptyAttendance, presentDays: 8, lateDays: 3 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    assert.equal(result.breakdown.attendance.lopDays, 0.5);
+    assert.equal(
+      result.breakdown.deductions.find((line) => line.code === "lop")?.amount,
+      500,
+    );
+  });
 });

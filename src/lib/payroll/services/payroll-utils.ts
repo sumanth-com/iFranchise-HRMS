@@ -124,6 +124,36 @@ export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Team Payroll summary cards from the amounts shown on each employee row.
+ * Gross, deductions, and final payable stay aligned with those columns.
+ */
+export function sumDisplayedPayrollRowTotals(
+  rows: Array<{
+    grossEarnings: number;
+    deductions: number;
+    finalPayable: number;
+  }>,
+): {
+  employeeCount: number;
+  totalGross: number;
+  totalDeductions: number;
+  totalFinalPayable: number;
+} {
+  return {
+    employeeCount: rows.length,
+    totalGross: roundCurrency(
+      rows.reduce((sum, row) => sum + Number(row.grossEarnings ?? 0), 0),
+    ),
+    totalDeductions: roundCurrency(
+      rows.reduce((sum, row) => sum + Number(row.deductions ?? 0), 0),
+    ),
+    totalFinalPayable: roundCurrency(
+      rows.reduce((sum, row) => sum + Number(row.finalPayable ?? 0), 0),
+    ),
+  };
+}
+
 /** Team Payroll summary cards — always derive from the same employee payroll rows. */
 export function sumPayrollEmployeeRowTotals(
   items: Array<{

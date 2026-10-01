@@ -10,6 +10,7 @@ import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
 import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
+import { canManageEmployeeExit } from "@/lib/employees/exit-date-access";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,11 @@ export default async function EmployeeEditPage({ params }: EmployeeEditPageProps
           </Link>
         </div>
 
-        <EmployeeEditForm employee={employee} lookups={lookups} />
+        <EmployeeEditForm
+          employee={employee}
+          lookups={lookups}
+          canManageExit={canManageEmployeeExit(profile.permissionCodes)}
+        />
       </div>
     </PageScroll>
   );
