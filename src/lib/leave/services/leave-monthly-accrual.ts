@@ -197,32 +197,20 @@ type EmployeeAccrualProfile = {
   isFullTime: boolean | null;
 };
 
-const EMPLOYEE_ACCRUAL_SELECT_WITH_CONVERSION =
-  "employment_status, date_of_joining, full_time_effective_date, employment_types:employment_type_id (code, is_full_time)";
 const EMPLOYEE_ACCRUAL_SELECT =
-  "employment_status, date_of_joining, employment_types:employment_type_id (code, is_full_time)";
+  "employment_status, date_of_joining, full_time_effective_date, employment_types:employment_type_id (code, is_full_time)";
 
 async function loadEmployeeAccrualProfile(
   supabase: AuthSupabaseClient,
   employeeId: string,
 ): Promise<{ profile: EmployeeAccrualProfile | null; error: string | null }> {
-  let result = await supabase
+  const result = await supabase
     .schema("hrms")
     .from("employees")
-    .select(EMPLOYEE_ACCRUAL_SELECT_WITH_CONVERSION)
+    .select(EMPLOYEE_ACCRUAL_SELECT)
     .eq("id", employeeId)
     .is("deleted_at", null)
     .maybeSingle();
-
-  if (result.error && /full_time_effective_date/.test(result.error.message)) {
-    result = await supabase
-      .schema("hrms")
-      .from("employees")
-      .select(EMPLOYEE_ACCRUAL_SELECT)
-      .eq("id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle();
-  }
 
   if (result.error) {
     return { profile: null, error: result.error.message };

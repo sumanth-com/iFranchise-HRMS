@@ -41,6 +41,7 @@ import {
   MONTHLY_ACCRUAL_DAYS_PER_MONTH,
   resolveExpectedEarnedLeaveCarryForward,
   resolveExpectedMonthlyAccrualAllocatedDays,
+  resolveLeaveAccrualStartDate,
 } from "@/lib/leave/services/leave-monthly-accrual";
 import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
 import { DEFAULT_LEAVE_PROBATION_RULES, allocateLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
@@ -1064,13 +1065,14 @@ export async function getEmployeeLeaveBalanceSnapshot(
   let leaveEligibilityBand: import("@/lib/leave/leave-eligibility").LeaveEligibilityBand =
     "full_time_confirmed";
   let employeeJoiningDate: string | null = null;
+  let fullTimeEffectiveDate: string | null = null;
   let employeeEmploymentStatus = "active";
   {
     const { data: employeeRow, error: employeeError } = await supabase
       .schema("hrms")
       .from("employees")
       .select(
-        "organization_id, employment_status, date_of_joining, employment_types:employment_type_id (code, is_full_time)",
+        "organization_id, employment_status, date_of_joining, full_time_effective_date, employment_types:employment_type_id (code, is_full_time)",
       )
       .eq("id", employeeId)
       .is("deleted_at", null)
@@ -1080,6 +1082,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
       organizationId = employeeRow?.organization_id as string | undefined;
     }
     employeeJoiningDate = (employeeRow?.date_of_joining as string | null) ?? null;
+    fullTimeEffectiveDate = (employeeRow?.full_time_effective_date as string | null) ?? null;
     employeeEmploymentStatus = String(employeeRow?.employment_status ?? "active");
     const typeRaw = employeeRow?.employment_types as
       | { code?: string | null; is_full_time?: boolean | null }
@@ -1292,6 +1295,11 @@ export async function getEmployeeLeaveBalanceSnapshot(
 
   const asOfDate =
     month === todayMonth && calendarYear === todayYear ? todayIst : monthRange.end;
+  const accrualStartDate = resolveLeaveAccrualStartDate({
+    joiningDate: employeeJoiningDate,
+    fullTimeEffectiveDate,
+    leaveEligibilityBand,
+  });
 
   // EL carry-forward: policy-earned prior-year remaining (capped; never seeded CL).
   let earnedLeaveCarryDays = 0;
@@ -1338,7 +1346,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
     }
 
     earnedLeaveCarryDays = resolveExpectedEarnedLeaveCarryForward({
-      joiningDate: employeeJoiningDate,
+      joiningDate: accrualStartDate,
       balanceYear,
       daysPerYear: 12,
       previousYearLedgerBalance,
@@ -1366,7 +1374,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
       } else {
         const expectedAllocated = resolveExpectedMonthlyAccrualAllocatedDays({
           leaveTypeCode: code,
-          joiningDate: employeeJoiningDate,
+          joiningDate: accrualStartDate,
           balanceYear,
           asOfDate,
           daysPerYear: daysPerYear || 12,
