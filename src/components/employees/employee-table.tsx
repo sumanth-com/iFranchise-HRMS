@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { toast } from "sonner";
 
 import { Input } from "@/components/common/input";
+import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
   Select,
   SelectContent,
@@ -46,6 +47,8 @@ type EmployeeTableProps = {
   canDelete: boolean;
   /** Serializable portal base (e.g. `/dashboard/system/employees`). Never pass route builders from RSC. */
   routesBasePath?: string;
+  /** Replace the text search with an employee name (code) dropdown. */
+  employeePicker?: boolean;
 };
 
 type TabCacheEntry = {
@@ -83,6 +86,7 @@ export function EmployeeTable({
   canEdit,
   canDelete,
   routesBasePath,
+  employeePicker = false,
 }: EmployeeTableProps) {
   const routes = resolveEmployeeModuleRoutes(routesBasePath);
   const [isPending, startTransition] = useTransition();
@@ -105,6 +109,7 @@ export function EmployeeTable({
     employmentCategory: initialEmploymentCategory,
   });
   const [searchInput, setSearchInput] = useState(initialSearch ?? "");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
   const tabCacheRef = useRef(new Map<string, TabCacheEntry>());
 
   useEffect(() => {
@@ -192,6 +197,7 @@ export function EmployeeTable({
   );
 
   useEffect(() => {
+    if (employeePicker) return;
     const trimmed = searchInput.trim();
     const current = (filters.search ?? "").trim();
     if (trimmed === current) return;
@@ -204,9 +210,40 @@ export function EmployeeTable({
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [searchInput, filters.search, updateParams]);
+  }, [employeePicker, searchInput, filters.search, updateParams]);
 
   const { employees } = tableState;
+
+  const employeeItems = useMemo(() => {
+    const options = [...employees]
+      .sort((left, right) =>
+        left.fullName.localeCompare(right.fullName, undefined, { sensitivity: "base" }),
+      )
+      .map((employee) => ({
+        value: employee.id,
+        label: employee.employeeCode
+          ? `${employee.fullName} (${employee.employeeCode})`
+          : employee.fullName,
+      }));
+    return [{ value: "all", label: "All employees" }, ...options];
+  }, [employees]);
+
+  const visibleEmployees = useMemo(() => {
+    if (!employeePicker || selectedEmployeeId === "all") return employees;
+    return employees.filter((employee) => employee.id === selectedEmployeeId);
+  }, [employeePicker, employees, selectedEmployeeId]);
+
+  const peopleCount =
+    employeePicker && selectedEmployeeId !== "all"
+      ? visibleEmployees.length
+      : tableState.total;
+
+  useEffect(() => {
+    if (!employeePicker || selectedEmployeeId === "all") return;
+    if (!employees.some((employee) => employee.id === selectedEmployeeId)) {
+      setSelectedEmployeeId("all");
+    }
+  }, [employeePicker, employees, selectedEmployeeId]);
   const { department, employmentCategory = DEFAULT_EMPLOYMENT_CATEGORY_FILTER } = filters;
 
   const refreshEmployees = useCallback(async () => {
@@ -263,40 +300,54 @@ export function EmployeeTable({
       <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3">
         <EmploymentCategoryFilters
           value={employmentCategory ?? DEFAULT_EMPLOYMENT_CATEGORY_FILTER}
-          onChange={(value) =>
+          onChange={(value) => {
+            setSelectedEmployeeId("all");
             updateParams({
               employmentCategory: value === "all" ? undefined : value,
               page: "1",
-            })
-          }
+            });
+          }}
         />
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 lg:flex-row lg:items-center">
-          <Input
-            placeholder="Search by name, email, or code..."
-            value={searchInput}
-            className="h-10 min-w-[14rem] flex-1 border-border/80 bg-white font-semibold sm:max-w-sm dark:bg-input"
-            onChange={(event) => setSearchInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                updateParams({
-                  search: event.currentTarget.value.trim() || undefined,
-                  page: "1",
-                });
-              }
-            }}
-          />
+          {employeePicker ? (
+            <LabeledSelect
+              items={employeeItems}
+              value={selectedEmployeeId}
+              onValueChange={(value) => setSelectedEmployeeId(value || "all")}
+              placeholder="All employees"
+              nowrapItems
+              triggerClassName="h-10 w-[18rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
+              contentClassName="w-max min-w-[18rem] max-w-[28rem]"
+            />
+          ) : (
+            <Input
+              placeholder="Search by name, email, or code..."
+              value={searchInput}
+              className="h-10 min-w-[14rem] flex-1 border-border/80 bg-white font-semibold sm:max-w-sm dark:bg-input"
+              onChange={(event) => setSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  updateParams({
+                    search: event.currentTarget.value.trim() || undefined,
+                    page: "1",
+                  });
+                }
+              }}
+            />
+          )}
           <Select
             items={departmentItems}
             value={department ?? ""}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              setSelectedEmployeeId("all");
               updateParams({
                 department: value || undefined,
                 departmentId: undefined,
                 branchId: undefined,
                 page: "1",
-              })
-            }
+              });
+            }}
           >
             <SelectTrigger className="h-10 w-[13.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input">
               <SelectValue placeholder="All departments" />
@@ -313,14 +364,14 @@ export function EmployeeTable({
             </SelectContent>
           </Select>
           <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border/80 bg-white px-3 text-sm font-semibold dark:bg-input">
-            {tableState.total} people
+            {peopleCount} {peopleCount === 1 ? "person" : "people"}
           </span>
         </div>
       </div>
 
       <div className={cn(isPending && "pointer-events-none opacity-70")}>
         <EmployeeCardsGrid
-          employees={employees}
+          employees={visibleEmployees}
           canEdit={canEdit}
           canDelete={canDelete}
           onDelete={setDeleteTarget}

@@ -1,6 +1,7 @@
-import { parseISO } from "date-fns";
-
 import type { LeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
+import { resolveEmploymentServiceMonth } from "@/lib/leave/leave-service-month";
+
+export { resolveEmploymentServiceMonth } from "@/lib/leave/leave-service-month";
 import {
   CASUAL_LEAVE_CODE,
   DEFAULT_LEAVE_PROBATION_RULES,
@@ -9,23 +10,6 @@ import {
 } from "@/lib/leave/services/leave-policy-engine";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
-
-/** Calendar month of service (1 = joining month, 2 = second month, …). */
-export function resolveEmploymentServiceMonth(
-  joiningDate: string | null | undefined,
-  asOfDate: string,
-): number | null {
-  if (!joiningDate) return null;
-  const join = parseISO(joiningDate.slice(0, 10));
-  const asOf = parseISO(asOfDate.slice(0, 10));
-  if (Number.isNaN(join.getTime()) || Number.isNaN(asOf.getTime())) return null;
-  if (asOf < join) return null;
-  const months =
-    (asOf.getFullYear() - join.getFullYear()) * 12 +
-    (asOf.getMonth() - join.getMonth()) +
-    1;
-  return Math.max(1, months);
-}
 
 export type InternProbationClEntitlement = {
   /** CL credit for the current calendar month (0 in first month unless policy allows). */
@@ -38,8 +22,7 @@ export type InternProbationClEntitlement = {
 /**
  * Intern / probation Casual Leave rules from the configured leave policy:
  * - No CL in the first employment month (unless org settings allow it)
- * - One CL per calendar month from month 2 onward (expires monthly — not cumulative)
- * - Probation window may cap total CL across months 2–3
+ * - One fresh CL per calendar month from month 2 onward (unused expires that month)
  */
 export function resolveInternProbationClEntitlement(input: {
   joiningDate: string | null | undefined;
@@ -100,29 +83,43 @@ export function resolvePolicyAdjustedClBalance(input: {
   const entitlement = resolveInternProbationClEntitlement(input);
   if (!entitlement) return null;
 
-  const rules = input.probation ?? DEFAULT_LEAVE_PROBATION_RULES;
   const monthUsed = roundLeaveDays(Math.max(0, input.monthUsedDays));
   const monthPending = roundLeaveDays(Math.max(0, input.monthPendingDays));
-  let monthlyAvailable = roundLeaveDays(
+  const monthlyAvailable = roundLeaveDays(
     Math.max(0, entitlement.monthlyEntitlement - monthUsed - monthPending),
   );
-
-  if (
-    entitlement.onProbationWindow &&
-    entitlement.probationMonth != null &&
-    entitlement.probationMonth >= 2
-  ) {
-    const probationRemaining = roundLeaveDays(
-      Math.max(0, rules.casualLeaveCap - input.probationUsedAndPendingCl),
-    );
-    monthlyAvailable = roundLeaveDays(Math.min(monthlyAvailable, probationRemaining));
-  }
 
   return {
     allocatedDays: entitlement.monthlyEntitlement,
     balanceDays: monthlyAvailable,
     monthTotalDays: entitlement.monthlyEntitlement,
   };
+}
+
+/**
+ * Intern/probation CL stored on leave_balances.
+ * Year-to-date used/pending stay on the row. Available balance is only this month's
+ * fresh credit minus this month's use, so unused CL does not accumulate.
+ */
+export function resolveInternClStoredBalance(input: {
+  monthlyEntitlement: number;
+  yearUsedDays: number;
+  yearPendingDays: number;
+  monthUsedDays: number;
+  monthPendingDays: number;
+}): { allocatedDays: number; balanceDays: number } {
+  const screen = {
+    monthlyEntitlement: Math.max(0, input.monthlyEntitlement),
+    monthUsed: Math.max(0, input.monthUsedDays),
+    monthPending: Math.max(0, input.monthPendingDays),
+  };
+  const balanceDays = roundLeaveDays(
+    Math.max(0, screen.monthlyEntitlement - screen.monthUsed - screen.monthPending),
+  );
+  const allocatedDays = roundLeaveDays(
+    balanceDays + Math.max(0, input.yearUsedDays) + Math.max(0, input.yearPendingDays),
+  );
+  return { allocatedDays, balanceDays };
 }
 
 export function applyLeavePolicyToBalanceSnapshot(
@@ -199,29 +196,7 @@ export function resolvePolicyAvailableLeaveBalance(input: {
   }
 
   if (input.ledgerBalance == null) return null;
-
-  let available = roundLeaveDays(Math.max(0, input.ledgerBalance));
-  const probation = getProbationSnapshot(
-    {
-      joiningDate: input.joiningDate ?? null,
-      employmentStatus: input.employmentStatus,
-    },
-    input.asOfDate,
-    input.probation ?? DEFAULT_LEAVE_PROBATION_RULES,
-  );
-
-  if (probation.onProbation && probation.month != null && probation.month >= 2) {
-    const rules = input.probation ?? DEFAULT_LEAVE_PROBATION_RULES;
-    const probationRemaining = roundLeaveDays(
-      Math.max(
-        0,
-        rules.casualLeaveCap - (input.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0),
-      ),
-    );
-    available = roundLeaveDays(Math.min(available, probationRemaining));
-  }
-
-  return available;
+  return roundLeaveDays(Math.max(0, input.ledgerBalance));
 }
 
 export function shouldBlockInternProbationFirstMonthLeave(input: {

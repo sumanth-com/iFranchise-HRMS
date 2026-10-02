@@ -5,8 +5,10 @@ import {
   canRewritePayrollHeader,
   dedupePayrollEmployees,
   evaluatePayrollIntegrity,
+  isActiveWorkforcePayrollEmployee,
   isPayrollEligibleEmployee,
   mergePayrollIntegrityNotes,
+  payrollRunIncludesOnlyActiveWorkforce,
 } from "@/lib/payroll/payroll-integrity";
 import { calculateEmployeePayroll } from "@/lib/payroll/services/payroll-calculator";
 
@@ -68,6 +70,118 @@ describe("payroll integrity eligibility", () => {
       false,
     );
     assert.equal(isPayrollEligibleEmployee(visible, "2026-09-30"), true);
+  });
+
+  it("uses active workforce status for current payroll runs", () => {
+    const today = new Date("2026-10-02T12:00:00+05:30");
+    for (const employment_status of ["active", "probation", "on_leave"] as const) {
+      assert.equal(
+        isActiveWorkforcePayrollEmployee({ ...visible, employment_status }, "2026-10-31"),
+        true,
+      );
+    }
+    for (const employment_status of ["resigned", "terminated"] as const) {
+      assert.equal(
+        isActiveWorkforcePayrollEmployee({ ...visible, employment_status }, "2026-10-31"),
+        false,
+      );
+    }
+
+    assert.equal(
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: "draft",
+        isLocked: false,
+        payrollMonth: "2026-10-01",
+        today,
+      }),
+      true,
+    );
+    assert.equal(
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: "draft",
+        isLocked: false,
+        payrollMonth: "2026-11-01",
+        today,
+      }),
+      true,
+    );
+    assert.equal(
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: "processed",
+        isLocked: false,
+        payrollMonth: "2026-09-01",
+        today,
+      }),
+      false,
+    );
+    assert.equal(
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: "approved",
+        isLocked: false,
+        payrollMonth: "2026-10-01",
+        today,
+      }),
+      false,
+    );
+    assert.equal(
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: "paid",
+        isLocked: true,
+        payrollMonth: "2026-08-01",
+        today,
+      }),
+      false,
+    );
+  });
+
+  it("drops former employees from current-run totals and keeps them on historical runs", () => {
+    const former = {
+      ...visible,
+      id: "former",
+      employee_code: "IF-FORMER-01",
+      email: "former.employee@ifranchise.in",
+      employment_status: "resigned",
+    };
+    const active = { ...visible, employment_status: "active" };
+    const items = [
+      {
+        employeeId: "e1",
+        grossSalary: 25000,
+        totalDeductions: 200,
+        netSalary: 24800,
+        employee: active,
+      },
+      {
+        employeeId: "former",
+        grossSalary: 50000,
+        totalDeductions: 200,
+        netSalary: 49800,
+        employee: former,
+      },
+    ];
+
+    const current = evaluatePayrollIntegrity({
+      periodEnd: "2026-10-31",
+      headerGross: 25000,
+      headerDeductions: 200,
+      headerNet: 24800,
+      requireActiveEmployment: true,
+      items,
+    });
+    assert.equal(current.eligibleItems.length, 1);
+    assert.equal(current.eligibleItems[0]?.employeeId, "e1");
+    assert.equal(current.totals.totalGross, 25000);
+    assert.equal(current.totals.totalNet, 24800);
+
+    const historical = evaluatePayrollIntegrity({
+      periodEnd: "2026-09-30",
+      headerGross: 75000,
+      headerDeductions: 400,
+      headerNet: 74600,
+      items,
+    });
+    assert.equal(historical.eligibleItems.length, 2);
+    assert.equal(historical.ok, true);
   });
 
   it("dedupes the same email so a person is counted once", () => {

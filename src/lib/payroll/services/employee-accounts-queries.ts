@@ -2,6 +2,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { isExcludedFromTeamPayslips } from "@/lib/employee/directory-listing";
 import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { resolveEmployeeBankName } from "@/lib/payroll/services/ifsc-bank-names";
+import { resolveMissingBankBranch } from "@/lib/payroll/services/ifsc-branch-lookup";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountListItem,
@@ -46,6 +47,23 @@ type BankRow = {
   ifsc_code: string | null;
   branch_name: string | null;
 };
+
+async function resolveStoredBankRow(bank: BankRow): Promise<BankRow> {
+  const resolved = await resolveMissingBankBranch(
+    {
+      bankName: bank.bank_name,
+      ifscCode: bank.ifsc_code,
+      branchName: bank.branch_name,
+    },
+    { bankAccountId: bank.id },
+  );
+  return {
+    ...bank,
+    bank_name: resolved.bankName?.trim() || bank.bank_name,
+    ifsc_code: bank.ifsc_code ? bank.ifsc_code.trim().toUpperCase() : bank.ifsc_code,
+    branch_name: resolved.branchName ?? bank.branch_name,
+  };
+}
 
 function mapEmployeeAccountRow(
   row: EmployeeRow,
@@ -172,7 +190,10 @@ export async function listEmployeeAccounts(
       .is("deleted_at", null);
 
     if (bankError) throw new Error(bankError.message);
-    for (const bank of (bankRows ?? []) as BankRow[]) {
+    const resolvedBanks = await Promise.all(
+      ((bankRows ?? []) as BankRow[]).map((bank) => resolveStoredBankRow(bank)),
+    );
+    for (const bank of resolvedBanks) {
       bankByEmployee.set(bank.employee_id, bank);
     }
   }
@@ -235,5 +256,9 @@ export async function getEmployeeAccountByEmployeeId(
     .is("deleted_at", null)
     .maybeSingle();
 
-  return mapEmployeeAccountRow(data as EmployeeRow, (bank as BankRow | null) ?? null);
+  const stored = (bank as BankRow | null) ?? null;
+  return mapEmployeeAccountRow(
+    data as EmployeeRow,
+    stored ? await resolveStoredBankRow(stored) : null,
+  );
 }

@@ -1,7 +1,11 @@
 import { format, parseISO } from "date-fns";
 
 import { siteConfig } from "@/config/site";
-import { formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
+import {
+  formatPayrollMonthLabel,
+  officialPayslipNumber,
+  resolveDisplayedPayslipNumber,
+} from "@/lib/payroll/services/payroll-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
@@ -36,9 +40,7 @@ export async function verifyPayslipByReference(
   const normalizedRef = decodeURIComponent(payslipRef).trim();
   if (!normalizedRef) return { valid: false };
 
-  const { data, error } = await fromHrms(admin, "payslips")
-    .select(
-      `
+  const payslipSelect = `
         id,
         payslip_number,
         status,
@@ -56,13 +58,39 @@ export async function verifyPayslipByReference(
           payroll_status,
           organizations:organization_id (name)
         )
-      `,
-    )
+      `;
+
+  const direct = await fromHrms(admin, "payslips")
+    .select(payslipSelect)
     .eq("payslip_number", normalizedRef)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (error || !data) return { valid: false };
+  let data = direct.data;
+  if (direct.error || !data) {
+    const parsed = normalizedRef.toUpperCase().match(/^PS-(\d{6})-([A-Z0-9]+)$/);
+    const month = parsed ? Number.parseInt(parsed[1].slice(4, 6), 10) : 0;
+    if (!parsed || month < 1 || month > 12) return { valid: false };
+    const payrollMonth = `${parsed[1].slice(0, 4)}-${parsed[1].slice(4, 6)}-01`;
+    const { data: employees } = await fromHrms(admin, "employees")
+      .select("id, employee_code")
+      .ilike("employee_code", parsed[2])
+      .is("deleted_at", null);
+    const employee = (employees ?? []).find(
+      (row: { id: string; employee_code: string | null }) =>
+        officialPayslipNumber(row.employee_code, payrollMonth) === `PS-${parsed[1]}-${parsed[2]}`,
+    );
+    if (!employee) return { valid: false };
+    const byPeriod = await fromHrms(admin, "payslips")
+      .select(payslipSelect)
+      .eq("employee_id", employee.id)
+      .eq("payrolls.payroll_month", payrollMonth)
+      .is("deleted_at", null)
+      .order("is_current", { ascending: false })
+      .limit(1);
+    data = byPeriod.data?.[0] ?? null;
+    if (byPeriod.error || !data) return { valid: false };
+  }
 
   if (data.archived_at) return { valid: false };
 
@@ -91,7 +119,11 @@ export async function verifyPayslipByReference(
     valid: true,
     employeeName: `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim(),
     employeeCode: employee.employee_code ?? "—",
-    payslipNumber: data.payslip_number,
+    payslipNumber: resolveDisplayedPayslipNumber({
+      storedNumber: data.payslip_number,
+      employeeCode: employee.employee_code,
+      payrollMonth,
+    }),
     payrollMonth,
     payrollMonthLabel: payrollMonth
       ? formatPayrollMonthLabel(payrollMonth)

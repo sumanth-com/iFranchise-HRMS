@@ -106,14 +106,16 @@ export function parsePayrollMonthSearch(term: string): ParsedPayrollMonthSearch 
 export function formatCurrency(
   value: number,
   currencyCode = "INR",
-  maximumFractionDigits = 0,
+  maximumFractionDigits = 2,
 ): string {
+  const digits = Math.max(0, maximumFractionDigits);
+  const amount = Number.isFinite(value) ? value : 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: currencyCode,
-    maximumFractionDigits,
-    minimumFractionDigits: maximumFractionDigits > 0 ? maximumFractionDigits : 0,
-  }).format(value);
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits,
+  }).format(amount);
 }
 
 export function formatPayslipCurrency(value: number, currencyCode = "INR"): string {
@@ -177,25 +179,27 @@ export function sumPayrollEmployeeRowTotals(
   };
 }
 
+export function formatReadableAccountNumber(value: string | null | undefined): string {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return "—";
+  return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
+export function formatReadableIfsc(value: string | null | undefined): string {
+  const code = String(value ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return code || "—";
+}
+
 export function displaySalaryBankDetails<T extends {
   bankName: string;
   ifscCode?: string | null;
   branchName?: string | null;
 }>(bank: T): T {
   const ifsc = (bank.ifscCode ?? "").trim().toUpperCase();
-  const resolvedName = resolveEmployeeBankName(bank.bankName, ifsc);
-
-  if (!ifsc.startsWith("SBIN")) {
-    return { ...bank, bankName: resolvedName };
-  }
-
-  const branch = (bank.branchName ?? "").trim();
-  const useDhone = !branch || /madhapur|hyderabad/i.test(branch);
-
   return {
     ...bank,
-    bankName: resolvedName === bank.bankName ? "State Bank of India" : resolvedName,
-    ...(bank.branchName !== undefined ? { branchName: useDhone ? "Dhone" : bank.branchName } : {}),
+    bankName: resolveEmployeeBankName(bank.bankName, ifsc),
+    ...(bank.ifscCode !== undefined ? { ifscCode: ifsc || null } : {}),
   };
 }
 
@@ -864,12 +868,65 @@ export function getPayslipEarningsLines(input: {
   );
 }
 
+function resolveStoredPreLopMonthly(
+  breakdown: PayrollBreakdown | null | undefined,
+): number | null {
+  if (breakdown?.excel?.salary != null) {
+    return roundCurrency(Number(breakdown.excel.salary));
+  }
+  if (breakdown?.attendance?.monthlyGrossSalary != null) {
+    return roundCurrency(Number(breakdown.attendance.monthlyGrossSalary));
+  }
+  return null;
+}
+
+function restoreStoredLopToStructuralEarnings(
+  lines: PayrollBreakdownLine[],
+  lopAmount: number,
+  monthlySalary: number | null,
+  storedGrossSalary: number,
+): PayrollBreakdownLine[] {
+  if (lopAmount <= 0 || lines.length === 0) return lines;
+  const structuralSum = sumLineAmounts(lines);
+  let addBack = 0;
+  if (monthlySalary != null && monthlySalary > 0) {
+    const gap = roundCurrency(monthlySalary - structuralSum);
+    if (gap > 0.01) addBack = roundCurrency(Math.min(gap, lopAmount));
+  } else if (structuralSum <= roundCurrency(storedGrossSalary) + 1) {
+    addBack = lopAmount;
+  }
+  if (addBack <= 0) return lines;
+
+  const target = roundCurrency(structuralSum + addBack);
+  let allocated = 0;
+  return lines.map((line, index) => {
+    if (index === lines.length - 1) {
+      return { ...line, amount: roundCurrency(target - allocated) };
+    }
+    const share = roundCurrency((Number(line.amount) / structuralSum) * target);
+    allocated = roundCurrency(allocated + share);
+    return { ...line, amount: share };
+  });
+}
+
+function formatPayslipLopDayCount(lopDays: number): string {
+  const safe = Number.isFinite(lopDays) && lopDays > 0 ? lopDays : 0;
+  const rounded = Math.round(safe * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function payslipLopLineLabel(lopDays: number): string {
+  return `Loss of Pay (LOP)  ${formatPayslipLopDayCount(lopDays)} days`;
+}
+
 export function resolvePayslipDisplayTotals(input: {
   breakdown?: PayrollBreakdown | null;
   basicSalary: number;
   totalAllowances: number;
   grossSalary: number;
   totalDeductions: number;
+  netSalary?: number;
   employmentType?: string | null;
 }): {
   earnings: PayrollBreakdownLine[];
@@ -879,7 +936,15 @@ export function resolvePayslipDisplayTotals(input: {
   netPay: number;
 } {
   const breakdown = input.breakdown ?? null;
-  const earnings = getPayslipEarningsLines({
+  const storedLopAmount = roundCurrency(
+    (breakdown?.deductions ?? [])
+      .filter((line) => lineCode(line) === "lop")
+      .reduce((sum, line) => sum + (Number(line.amount) || 0), 0),
+  );
+  const lopDays = Number(breakdown?.attendance?.lopDays ?? 0) || 0;
+  const monthlySalary = resolveStoredPreLopMonthly(breakdown);
+
+  const sourcedEarnings = getPayslipEarningsLines({
     earnings: breakdown?.earnings,
     basicSalary: input.basicSalary,
     totalAllowances: input.totalAllowances,
@@ -887,15 +952,47 @@ export function resolvePayslipDisplayTotals(input: {
     hrAdjustments: breakdown?.hrAdjustments,
     employmentType: input.employmentType,
   });
-  const deductions = getPayslipDeductionLines(breakdown?.deductions);
+  const structuralEarnings: PayrollBreakdownLine[] = [];
+  const extraEarnings: PayrollBreakdownLine[] = [];
+  for (const line of sourcedEarnings) {
+    if (isMonthlyExtraEarningLine(line)) extraEarnings.push(line);
+    else structuralEarnings.push(line);
+  }
+  const earnings = [
+    ...restoreStoredLopToStructuralEarnings(
+      structuralEarnings,
+      storedLopAmount,
+      monthlySalary,
+      input.grossSalary,
+    ),
+    ...extraEarnings,
+  ];
+
+  const deductionLines = getPayslipDeductionLines(breakdown?.deductions).filter(
+    (line) => lineCode(line) !== "lop",
+  );
+  deductionLines.push({
+    code: "lop",
+    label: payslipLopLineLabel(lopDays),
+    amount: storedLopAmount,
+    type: "deduction",
+  });
+  const deductions = orderPayslipLines(deductionLines, DEDUCTION_LINE_ORDER);
+
   const grossEarnings = roundCurrency(
     earnings.reduce((sum, line) => sum + Number(line.amount || 0), 0),
   );
   const totalDeductions = roundCurrency(
-    deductions.reduce((sum, line) => sum + Number(line.amount || 0), 0) ||
-      input.totalDeductions,
+    deductions.reduce((sum, line) => sum + Number(line.amount || 0), 0),
   );
-  const netPay = roundCurrency(grossEarnings - totalDeductions);
+  const storedNet =
+    input.netSalary != null
+      ? roundCurrency(input.netSalary)
+      : roundCurrency(input.grossSalary - input.totalDeductions);
+  const netPay =
+    input.netSalary != null
+      ? resolveFinalPayableAmount(storedNet, breakdown, input.totalAllowances)
+      : roundCurrency(grossEarnings - totalDeductions);
 
   return {
     earnings,
@@ -918,13 +1015,43 @@ export function getPayslipDeductionLines(
   );
 }
 
+/** Official payslip number: PS-YYYYMM-EMPLOYEECODE. Null when month or code is missing. */
+export function officialPayslipNumber(
+  employeeCode: string | null | undefined,
+  payrollMonth: string | null | undefined,
+): string | null {
+  const monthPart = String(payrollMonth ?? "").replace(/-/g, "").slice(0, 6);
+  if (!/^\d{6}$/.test(monthPart)) return null;
+  const month = Number.parseInt(monthPart.slice(4, 6), 10);
+  if (month < 1 || month > 12) return null;
+  const codePart = String(employeeCode ?? "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
+  if (!codePart) return null;
+  return `PS-${monthPart}-${codePart}`;
+}
+
+/** Shown Payslip ID. The payroll period and employee code win over a stored suffix. */
+export function resolveDisplayedPayslipNumber(input: {
+  storedNumber?: string | null;
+  employeeCode?: string | null;
+  payrollMonth?: string | null;
+}): string {
+  return (
+    officialPayslipNumber(input.employeeCode, input.payrollMonth) ??
+    String(input.storedNumber ?? "").trim()
+  );
+}
+
 export function generatePayslipNumber(
   employeeCode: string,
   payrollMonth: string,
 ): string {
-  const monthPart = payrollMonth.replace(/-/g, "").slice(0, 6);
-  const codePart = employeeCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  return `PS-${monthPart}-${codePart}`;
+  const official = officialPayslipNumber(employeeCode, payrollMonth);
+  if (!official) {
+    throw new Error("A payslip number requires the payroll month and employee code.");
+  }
+  return official;
 }
 
 /** Fallback when payroll join is unavailable — PS-202608-EMP001 → 2026-08-01 */

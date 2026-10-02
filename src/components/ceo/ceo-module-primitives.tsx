@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { BarRow } from "@/components/reports/report-chart-cards";
-import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
 import type { CeoChartItem } from "@/types/ceo-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -273,7 +272,13 @@ export function CeoBackToDashboard() {
 }
 
 export function formatCeoCurrency(value: number) {
-  return formatCurrencyInr(value);
+  const amount = Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 export function formatCeoPercent(value: number) {

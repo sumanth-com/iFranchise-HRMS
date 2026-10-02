@@ -1,6 +1,10 @@
 import { format, lastDayOfMonth, parseISO } from "date-fns";
 
-import { displaySalaryBankDetails } from "@/lib/payroll/services/payroll-utils";
+import {
+  displaySalaryBankDetails,
+  formatReadableAccountNumber,
+  formatReadableIfsc,
+} from "@/lib/payroll/services/payroll-utils";
 import { PAYSLIP_DESIGN } from "@/lib/payroll/services/payslip-design";
 import type { PayrollBreakdown, PayrollBreakdownLine, PayslipDetail } from "@/types/payroll";
 
@@ -212,6 +216,7 @@ export function getPayslipPaymentDetails(payslip: PayslipDetail): PayslipInfoCel
     ? displaySalaryBankDetails({
         bankName: payslip.bankAccount.bankName,
         ifscCode: payslip.bankAccount.ifscCode,
+        branchName: payslip.bankAccount.branchName,
       })
     : null;
 
@@ -226,7 +231,15 @@ export function getPayslipPaymentDetails(payslip: PayslipDetail): PayslipInfoCel
     },
     {
       label: "Account Number",
-      value: fmtPayslipValue(payslip.bankAccount?.accountNumberMasked),
+      value: formatReadableAccountNumber(payslip.bankAccount?.accountNumberMasked),
+    },
+    {
+      label: "IFSC Code",
+      value: formatReadableIfsc(bank?.ifscCode),
+    },
+    {
+      label: "Bank Branch",
+      value: fmtPayslipValue(bank?.branchName),
     },
   ];
 }

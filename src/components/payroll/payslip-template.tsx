@@ -106,6 +106,7 @@ export function PayslipTemplate({
       totalAllowances: payslip.totalAllowances,
       grossSalary: payslip.grossSalary,
       totalDeductions: payslip.totalDeductions,
+      netSalary: payslip.netSalary,
       employmentType: payslip.employee.employmentType,
     });
 

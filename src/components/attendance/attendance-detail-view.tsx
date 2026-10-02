@@ -12,6 +12,7 @@ import {
   type AttendanceLocationPointKind,
 } from "@/lib/attendance/services/attendance-location";
 import { formatAttendanceTime, toDisplayAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceDetail } from "@/types/attendance";
 import { cn } from "@/lib/utils";
 
@@ -156,7 +157,7 @@ export function AttendanceDetailView({
             />
             <DetailRow
               label="Working Hours"
-              value={`${attendance.workHours.toFixed(2)} hours`}
+              value={formatHoursLabel(attendance.workHours)}
             />
             <DetailRow
               label="Late Minutes"
@@ -168,7 +169,7 @@ export function AttendanceDetailView({
             />
             <DetailRow
               label="Overtime"
-              value={`${attendance.overtimeHours.toFixed(2)} hours`}
+              value={formatHoursLabel(attendance.overtimeHours)}
             />
             <DetailRow
               label="Remarks"

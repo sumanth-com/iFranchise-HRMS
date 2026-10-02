@@ -19,7 +19,7 @@ import {
   buildStandardEarningsLines,
   resolveSalaryBreakdownFromStructure,
 } from "@/lib/payroll/salary-structure-breakdown";
-import { roundCurrency } from "@/lib/payroll/services/payroll-utils";
+import { formatCurrency, roundCurrency } from "@/lib/payroll/services/payroll-utils";
 
 export type SalaryStructureRow = {
   id: string;
@@ -54,6 +54,10 @@ export type LeaveMonthSummary = {
   clDays?: number;
   /** Display split of paid leave (EL); included in paidLeaveDays for the formula. */
   elDays?: number;
+  /** Display-only CL dates. Not used by the salary formula. */
+  clDates?: string[];
+  /** Display-only EL dates. Not used by the salary formula. */
+  elDates?: string[];
   sandwichDates?: string[];
 };
 
@@ -415,8 +419,8 @@ function prorateEarningsLines(
 }
 
 /**
- * Unpaid days for LOP display (leave LOP + unpaid Absent + half-day / late / sandwich).
- * CL/EL never count as unpaid. Gross uses paid days × daily rate, not monthly − LOP.
+ * Unpaid days for LOP display and salary deduction (leave LOP + unpaid Absent + half-day / late / sandwich).
+ * CL/EL never count as unpaid. Gross is full monthly salary minus these unpaid days.
  */
 export function resolveLopDays(input: {
   attendance: AttendanceSummary;
@@ -472,6 +476,8 @@ function emptyAttendanceBreakdown(
     paidLeaveDays: leave.paidLeaveDays,
     clDays: leave.clDays ?? 0,
     elDays: leave.elDays ?? 0,
+    clDates: leave.clDates ?? [],
+    elDates: leave.elDates ?? [],
     holidayCount: attendance.holidayDays,
     weekOffDays: attendance.weekOffDays,
     dailyRate: options?.dailyRate,
@@ -533,7 +539,6 @@ export function calculateEmployeePayroll(
     settings: input.settings,
     lopDaysOverride: adjustments.lopDaysOverride,
   });
-  const payableDays = computePresentPaidDays(attendance, leave, period);
   const workingDaysForRate = resolveDailyRateWorkingDays(
     month,
     year,
@@ -635,14 +640,17 @@ export function calculateEmployeePayroll(
     statutory?.incomeTax === false ? 0 : (components.incomeTax ?? 0);
   const structureOtherDeduction = components.other ?? 0;
 
-  // Excel source of truth:
-  // Total Working Days = Present + Holiday + CL + EL
-  // Per Day = Monthly Salary / 30
-  // Working Day Salary = Per Day × Total Working Days
+  // Daily rate is always monthly salary / 30.
+  // Gross starts from the full monthly salary. Only unpaid LOP days that have
+  // already occurred reduce it. Elapsed calendar days do not.
   const rawPerDay = workingDaysForRate > 0 ? salaryGross / workingDaysForRate : 0;
   const perDay = roundCurrency(rawPerDay);
-  const payableGross = roundCurrency(rawPerDay * payableDays);
-  const lopDeduction = roundCurrency(rawPerDay * lopDays);
+  const salaryWindowClosed =
+    period.kind === "future" || period.periodStart > period.periodEnd;
+  const lopDeduction = salaryWindowClosed ? 0 : roundCurrency(rawPerDay * lopDays);
+  const payableGross = salaryWindowClosed
+    ? 0
+    : roundCurrency(Math.max(0, salaryGross - rawPerDay * lopDays));
   const prorateFactor = salaryGross > 0 ? payableGross / salaryGross : 0;
   const proratedBasic = proratePayrollComponentAmount(basic, prorateFactor);
   const proratedHra = proratePayrollComponentAmount(hra, prorateFactor);
@@ -802,9 +810,9 @@ export function calculateEmployeePayroll(
       reimbursementBreakdown:
         reimbursementBreakdown.length > 0 ? reimbursementBreakdown : undefined,
       notes: [
-        `Daily rate ₹${roundCurrency(perDay).toLocaleString("en-IN")} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}) × ${payableDays} paid day(s) [P+H+CL+EL].`,
+        `Daily rate ${formatCurrency(roundCurrency(perDay))} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}). Gross is full monthly salary minus ${lopDays} unpaid day(s).`,
         lopDays > 0
-          ? `LOP/Absent excluded from paid days (₹${roundCurrency(lopDeduction).toLocaleString("en-IN")} at daily rate for ${lopDays} day(s)).`
+          ? `LOP/Absent excluded from paid days (${formatCurrency(roundCurrency(lopDeduction))} at daily rate for ${lopDays} day(s)).`
           : null,
       ].filter(Boolean) as string[],
     },

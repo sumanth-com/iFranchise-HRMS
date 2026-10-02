@@ -11,7 +11,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { CheckCircle2, Eye, Loader2, Paperclip, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Loader2, Paperclip, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { z } from "zod";
 
@@ -45,6 +45,7 @@ import {
   deleteReimbursementAction,
   getReimbursementAttachmentUrlAction,
   rejectReimbursementAction,
+  updateOrgPendingReimbursementAction,
   uploadReimbursementAttachmentAction,
 } from "@/lib/payroll/actions";
 import {
@@ -100,9 +101,20 @@ const EMPTY_REIMBURSEMENT_VALUES: z.input<typeof reimbursementFormSchema> = {
   receiptPaths: [],
 };
 
+export type ReimbursementClaimDraft = {
+  id: string;
+  employeeId: string;
+  category: z.input<typeof reimbursementFormSchema>["category"];
+  amount: number;
+  expenseDate: string;
+  description: string;
+  receiptPaths: string[];
+};
+
 type ReimbursementFormProps = {
   employees: LookupOption[];
   variant?: "page" | "dialog";
+  claim?: ReimbursementClaimDraft;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -110,17 +122,32 @@ type ReimbursementFormProps = {
 export function ReimbursementForm({
   employees,
   variant = "page",
+  claim,
   onSuccess,
   onCancel,
 }: ReimbursementFormProps) {
   const isDialog = variant === "dialog";
   const [isPending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
-  const [attachments, setAttachments] = useState<Array<{ path: string; name: string }>>([]);
+  const [attachments, setAttachments] = useState<Array<{ path: string; name: string }>>(() =>
+    (claim?.receiptPaths ?? []).map((path) => ({
+      path,
+      name: path.split("/").pop() ?? path,
+    })),
+  );
 
   const form = useForm<z.input<typeof reimbursementFormSchema>>({
     resolver: zodResolver(reimbursementFormSchema),
-    defaultValues: EMPTY_REIMBURSEMENT_VALUES,
+    defaultValues: claim
+      ? {
+          employeeId: claim.employeeId,
+          category: claim.category,
+          amount: claim.amount,
+          expenseDate: claim.expenseDate.slice(0, 10),
+          description: claim.description,
+          receiptPaths: claim.receiptPaths,
+        }
+      : EMPTY_REIMBURSEMENT_VALUES,
   });
 
   const gridClass = isDialog ? "grid gap-3 md:grid-cols-2" : "grid gap-4 md:grid-cols-2";
@@ -188,18 +215,26 @@ export function ReimbursementForm({
 
   function handleSubmit(values: z.input<typeof reimbursementFormSchema>) {
     startTransition(async () => {
-      const result = await createReimbursementAction({
+      const payload = {
         ...values,
         receiptPaths: attachments.map((item) => item.path),
-      });
+      };
+      const result = claim
+        ? await updateOrgPendingReimbursementAction({
+            ...payload,
+            reimbursementId: claim.id,
+          })
+        : await createReimbursementAction(payload);
       if (!result.success) {
-        toast.error(result.message || "Submit failed");
+        toast.error(result.message || (claim ? "Update failed" : "Submit failed"));
         return;
       }
 
-      toast.success("Claim submitted");
-      form.reset(EMPTY_REIMBURSEMENT_VALUES);
-      setAttachments([]);
+      toast.success(claim ? "Claim updated" : "Claim submitted");
+      if (!claim) {
+        form.reset(EMPTY_REIMBURSEMENT_VALUES);
+        setAttachments([]);
+      }
       onSuccess?.();
     });
   }
@@ -226,7 +261,7 @@ export function ReimbursementForm({
               setAttachments([]);
               form.setValue("receiptPaths", [], { shouldValidate: true });
             }}
-            disabled={isPending || uploading}
+            disabled={isPending || uploading || Boolean(claim)}
           />
         </Field>
         <Field label="Category">
@@ -331,13 +366,13 @@ export function ReimbursementForm({
           </Button>
           <Button type="submit" disabled={isPending || uploading} className="gap-1.5">
             {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Submit claim
+            {claim ? "Save changes" : "Submit claim"}
           </Button>
         </div>
       ) : (
         <Button type="submit" disabled={isPending || uploading} className="gap-1.5">
           {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Submit claim
+          {claim ? "Save changes" : "Submit claim"}
         </Button>
       )}
     </form>
@@ -369,6 +404,7 @@ export function ReimbursementTable({
   const searchParams = useSearchParams();
   const { setHeaderActions } = useTeamPayrollHeaderActions();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingClaim, setEditingClaim] = useState<ReimbursementClaimDraft | null>(null);
   const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState(records);
   const [decisionRow, setDecisionRow] = useState<ReimbursementItem | null>(null);
@@ -429,6 +465,20 @@ export function ReimbursementTable({
   );
 
   const openCreateDialog = useCallback(() => {
+    setEditingClaim(null);
+    setDialogOpen(true);
+  }, []);
+
+  const openEditDialog = useCallback((row: ReimbursementItem) => {
+    setEditingClaim({
+      id: row.id,
+      employeeId: row.employeeId,
+      category: row.category,
+      amount: row.amount,
+      expenseDate: row.expenseDate,
+      description: row.description?.trim() || "",
+      receiptPaths: attachmentPathsFor(row),
+    });
     setDialogOpen(true);
   }, []);
 
@@ -611,6 +661,19 @@ export function ReimbursementTable({
                 <Eye className="size-3.5" />
                 View
               </Button>
+              {canCreate && pending ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 px-2.5"
+                  disabled={isPending || Boolean(deletingId)}
+                  onClick={() => openEditDialog(row.original)}
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </Button>
+              ) : null}
               {canApprove && pending ? (
                 <>
                   <Button
@@ -659,7 +722,7 @@ export function ReimbursementTable({
         },
       },
     ],
-    [canApprove, canDelete, deletingId, isPending, openDecision],
+    [canApprove, canCreate, canDelete, deletingId, isPending, openDecision, openEditDialog],
   );
 
   const table = useReactTable({ data: filteredRecords, columns, getCoreRowModel: getCoreRowModel() });
@@ -679,27 +742,29 @@ export function ReimbursementTable({
           items={[{ value: "all", label: "All months" }, ...MONTH_OPTIONS]}
           value={monthFilter}
           onValueChange={setMonthFilter}
-          triggerClassName="w-[140px]"
+          triggerClassName="h-10 w-[9.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
         />
         <LabeledSelect
           items={[{ value: "all", label: "All years" }, ...YEAR_OPTIONS]}
           value={yearFilter}
           onValueChange={setYearFilter}
-          triggerClassName="w-[100px]"
+          triggerClassName="h-10 w-[7.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
         />
         <LabeledSelect
           items={employeeItems}
           value={employeeFilter}
           onValueChange={(value) => setEmployeeFilter(value || "all")}
-          placeholder="Employee"
-          triggerClassName="w-[220px]"
+          placeholder="All employees"
+          nowrapItems
+          triggerClassName="h-10 w-[18rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
+          contentClassName="w-max min-w-[18rem] max-w-[28rem]"
         />
         <LabeledSelect
           items={statusItems}
           value={statusFilter}
           onValueChange={(value) => setStatusFilter(value || "all")}
-          placeholder="Status"
-          triggerClassName="w-[150px]"
+          placeholder="All statuses"
+          triggerClassName="h-10 w-[10.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
         />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -973,8 +1038,12 @@ export function ReimbursementTable({
       {canCreate ? (
         <ReimbursementDialog
           open={dialogOpen}
-          onOpenChange={setDialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setEditingClaim(null);
+          }}
           employees={employees}
+          claim={editingClaim ?? undefined}
           onSaved={() => router.refresh()}
         />
       ) : null}

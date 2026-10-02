@@ -25,9 +25,11 @@ import {
 import {
   resolveSalaryBreakdownFromStructure,
 } from "@/lib/payroll/salary-structure-breakdown";
+import { ensureOfficialPayslipNumbers } from "@/lib/payroll/services/payslip-number-backfill";
 import {
   getMonthDateRange,
   getPayrollMonthDate,
+  resolveDisplayedPayslipNumber,
 } from "@/lib/payroll/services/payroll-utils";
 import {
   listHrReimbursementApplicantEmployeeIds,
@@ -35,6 +37,7 @@ import {
 } from "@/lib/payroll/reimbursement-approval-routing";
 import {
   evaluatePayrollIntegrity,
+  payrollRunIncludesOnlyActiveWorkforce,
   type PayrollIntegrityEmployee,
 } from "@/lib/payroll/payroll-integrity";
 import {
@@ -84,6 +87,7 @@ function payrollIntegrityEmployeeFromJoin(
         date_of_joining?: string | null;
         app_hidden_at?: string | null;
         deleted_at?: string | null;
+        employment_status?: string | null;
         designations?: { title: string } | { title: string }[] | null;
       }
     | {
@@ -95,6 +99,7 @@ function payrollIntegrityEmployeeFromJoin(
         date_of_joining?: string | null;
         app_hidden_at?: string | null;
         deleted_at?: string | null;
+        employment_status?: string | null;
         designations?: { title: string } | { title: string }[] | null;
       }[]
     | null,
@@ -111,6 +116,7 @@ function payrollIntegrityEmployeeFromJoin(
     date_of_joining: row.date_of_joining,
     app_hidden_at: row.app_hidden_at,
     deleted_at: row.deleted_at,
+    employment_status: row.employment_status ?? null,
     designationTitle: designation?.title ?? null,
   };
 }
@@ -130,6 +136,7 @@ const PAYROLL_ITEM_INTEGRITY_SELECT = `
     date_of_joining,
     app_hidden_at,
     deleted_at,
+    employment_status,
     designations:designation_id (title)
   )
 `;
@@ -420,6 +427,11 @@ export async function listPayrollRuns(
         headerDeductions: Number(row.total_deductions),
         headerNet: Number(row.total_net),
         periodEnd,
+        requireActiveEmployment: payrollRunIncludesOnlyActiveWorkforce({
+          payrollStatus: row.payroll_status,
+          isLocked: row.is_locked,
+          payrollMonth: String(row.payroll_month),
+        }),
       });
       totalsByPayroll[row.id] = {
         totalGross: report.totals.totalGross,
@@ -465,7 +477,7 @@ export async function getPayrollSummary(
   const { data: currentPayroll } = await supabase
     .schema("hrms")
     .from("payrolls")
-    .select("id, payroll_status, total_gross, total_deductions, total_net")
+    .select("id, payroll_status, is_locked, total_gross, total_deductions, total_net")
     .eq("organization_id", organizationId)
     .eq("payroll_month", payrollMonth)
     .is("deleted_at", null)
@@ -522,9 +534,14 @@ export async function getPayrollSummary(
       })),
       headerGross: Number(currentPayroll.total_gross),
       headerDeductions: Number(currentPayroll.total_deductions),
-      headerNet: Number(currentPayroll.total_net),
-      periodEnd,
-    });
+        headerNet: Number(currentPayroll.total_net),
+        periodEnd,
+        requireActiveEmployment: payrollRunIncludesOnlyActiveWorkforce({
+          payrollStatus: currentPayroll.payroll_status,
+          isLocked: currentPayroll.is_locked,
+          payrollMonth,
+        }),
+      });
     employeesProcessed = report.eligibleItems.length;
     grossPayroll = report.totals.totalGross;
     totalDeductions = report.totals.totalDeductions;
@@ -570,6 +587,7 @@ export async function listPayslips(
   profile: UserProfile,
   params: PayrollListParams,
 ): Promise<PayslipListResult> {
+  await ensureOfficialPayslipNumbers(profile.employee.organizationId);
   const parsed = payslipListParamsSchema.parse(params);
   const { page, pageSize, search, month, year, employeeId } = parsed;
   const from = (page - 1) * pageSize;
@@ -647,7 +665,11 @@ export async function listPayslips(
       );
       return {
         id: row.id,
-        payslipNumber: row.payslip_number,
+        payslipNumber: resolveDisplayedPayslipNumber({
+          storedNumber: row.payslip_number,
+          employeeCode: employee?.employee_code,
+          payrollMonth: payroll?.payroll_month,
+        }),
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
         employeeName: employee

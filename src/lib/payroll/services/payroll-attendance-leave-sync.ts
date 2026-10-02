@@ -3,8 +3,10 @@
  * Attendance notes are preferred over leave-request breakdown when both exist.
  */
 import { isLopAttendanceNotes } from "@/lib/attendance/manual-status";
-import { isLateEntryAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
-import { isEarlyLogoutFullAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
+import {
+  isEarlyLogoutFullAttendanceNotes,
+  isUnapprovedQualifyingLateEntry,
+} from "@/lib/attendance/services/attendance-utils";
 import {
   leaveTypeCodeFromAttendanceNotes,
   mergeAttendanceAndRequestLeaveUsage,
@@ -18,6 +20,8 @@ export type PayrollAttendanceDayRow = {
   attendance_status?: string | null;
   notes?: string | null;
   overtime_hours?: number | string | null;
+  /** yyyy-MM-dd when the row came from attendance already loaded for payroll. */
+  attendance_date?: string | null;
 };
 
 export type AttendanceLeaveMarkerCounts = {
@@ -27,7 +31,16 @@ export type AttendanceLeaveMarkerCounts = {
   lopDays: number;
   /** on_leave rows without an explicit src:CL/EL/PL marker (treated as CL). */
   unmarkedOnLeaveDays: number;
+  /** Display-only dates for the same CL rows counted above. */
+  clDates: string[];
+  /** Display-only dates for the same EL rows counted above. */
+  elDates: string[];
 };
+
+function attendanceLeaveDate(value: string | null | undefined): string | null {
+  const iso = String(value ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
 
 /** Count sheet leave markers from attendance status + notes. */
 export function tallyAttendanceLeaveMarkers(
@@ -39,19 +52,24 @@ export function tallyAttendanceLeaveMarkers(
     plDays: 0,
     lopDays: 0,
     unmarkedOnLeaveDays: 0,
+    clDates: [],
+    elDates: [],
   };
 
   for (const row of rows) {
     const status = String(row.attendance_status ?? "");
     const notes = row.notes;
     const code = leaveTypeCodeFromAttendanceNotes(notes);
+    const date = attendanceLeaveDate(row.attendance_date);
 
     if (code === "CL") {
       counts.clDays += 1;
+      if (date) counts.clDates.push(date);
       continue;
     }
     if (code === "EL") {
       counts.elDays += 1;
+      if (date) counts.elDates.push(date);
       continue;
     }
     if (code === "PL") {
@@ -65,6 +83,7 @@ export function tallyAttendanceLeaveMarkers(
     if (status === "on_leave") {
       // Sheet/UI default: on_leave without type code displays as Casual Leave.
       counts.unmarkedOnLeaveDays += 1;
+      if (date) counts.clDates.push(date);
     }
   }
 
@@ -97,11 +116,7 @@ export function applyPayrollAttendanceDay(
     if (isEarlyLogoutFullAttendanceNotes(notes) || !lopMarker) {
       summary.absentDays += 1;
     }
-    // Early-checkout Absent must not count toward the 3-lates/month penalty.
-    if (
-      isLateEntryAttendanceNotes(notes) &&
-      !isEarlyLogoutFullAttendanceNotes(notes)
-    ) {
+    if (isUnapprovedQualifyingLateEntry(normalized, notes)) {
       summary.lateDays += 1;
     }
     return;
@@ -113,12 +128,13 @@ export function applyPayrollAttendanceDay(
       break;
     case "late":
       summary.presentDays += 1;
-      summary.lateDays += 1;
+      if (isUnapprovedQualifyingLateEntry(normalized, notes)) {
+        summary.lateDays += 1;
+      }
       break;
     case "half_day":
       summary.halfDays += 1;
-      // Late check-in + early half-day logout still counts as one late entry.
-      if (isLateEntryAttendanceNotes(notes)) {
+      if (isUnapprovedQualifyingLateEntry(normalized, notes)) {
         summary.lateDays += 1;
       }
       break;
@@ -187,6 +203,8 @@ export function mergePayrollLeaveSummary(input: {
     paidLeaveDays: Math.max(paidLeaveDays, clDays + elDays + attendancePl),
     clDays: hasAttendanceTypeSplit ? clDays : requestCl > 0 ? requestCl : clDays,
     elDays: hasAttendanceTypeSplit ? elDays : requestEl > 0 ? requestEl : elDays,
+    clDates: hasAttendanceTypeSplit ? markers.clDates : (request.clDates ?? []),
+    elDates: hasAttendanceTypeSplit ? markers.elDates : (request.elDates ?? []),
     sandwichDates: request.sandwichDates ?? [],
   };
 }

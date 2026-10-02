@@ -16,12 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { TeamMonthlyAttendanceRow } from "@/types/manager-attendance";
-
-function formatHours(hours: number) {
-  if (hours <= 0) return "—";
-  return `${hours.toFixed(1)}h`;
-}
 
 type ManagerAttendanceMonthlyTableProps = {
   rows: TeamMonthlyAttendanceRow[];
@@ -66,7 +62,7 @@ export function ManagerAttendanceMonthlyTable({ rows }: ManagerAttendanceMonthly
       {
         accessorKey: "averageWorkingHours",
         header: "Avg Working Hours",
-        cell: ({ row }) => formatHours(row.original.averageWorkingHours),
+        cell: ({ row }) => formatHoursLabel(row.original.averageWorkingHours),
       },
     ],
     [],

@@ -276,27 +276,29 @@ export function SalaryStructureTable({
           items={MONTH_OPTIONS}
           value={monthFilter}
           onValueChange={setMonthFilter}
-          triggerClassName="w-[140px]"
+          triggerClassName="h-10 w-[9.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
         />
         <LabeledSelect
           items={YEAR_OPTIONS}
           value={yearFilter}
           onValueChange={setYearFilter}
-          triggerClassName="w-[100px]"
+          triggerClassName="h-10 w-[7.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
         />
         <LabeledSelect
           items={employeeItems}
           value={employeeFilter}
           onValueChange={(value) => setEmployeeFilter(value || "all")}
-          placeholder="Employee"
-          triggerClassName="w-[220px]"
+          placeholder="All employees"
+          nowrapItems
+          triggerClassName="h-10 w-[18rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
+          contentClassName="w-max min-w-[18rem] max-w-[28rem]"
         />
         <LabeledSelect
           items={[...STATUS_FILTER_ITEMS]}
           value={statusFilter}
           onValueChange={(value) => setStatusFilter(value || "all")}
-          placeholder="Status"
-          triggerClassName="w-[150px]"
+          placeholder="All statuses"
+          triggerClassName="h-10 w-[10.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
         />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">

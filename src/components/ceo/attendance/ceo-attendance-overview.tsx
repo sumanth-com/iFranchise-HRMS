@@ -4,6 +4,7 @@ import { Building2, Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { CeoAttendanceTrendChart } from "@/components/ceo/attendance/ceo-attendance-trend-chart";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button } from "@/components/common/button";
@@ -256,7 +257,7 @@ function CompanyInsightPanel({
         />
         <StatPill
           label="Avg Hours"
-          value={`${overview.averageWorkingHours.toFixed(1)} hrs`}
+          value={formatHoursLabel(overview.averageWorkingHours)}
         />
         <StatPill
           label="Overall"
@@ -269,7 +270,7 @@ function CompanyInsightPanel({
         {" · "}
         Monthly rate {formatCeoPercent(overview.monthlyAttendancePercent)}
         {" · "}
-        Avg {overview.averageWorkingHours.toFixed(1)} hrs/day
+        Avg {formatHoursLabel(overview.averageWorkingHours)}/day
       </div>
 
       <div className="min-h-0 flex-1">
@@ -343,7 +344,7 @@ function EmployeeInsightPanel({
         />
         <StatPill
           label="Avg Hours"
-          value={`${summary.averageHours.toFixed(1)} hrs`}
+          value={formatHoursLabel(summary.averageHours)}
         />
         <StatPill label="Present" value={String(summary.presentDays)} />
         <StatPill label="Absent" value={String(summary.absentDays)} />

@@ -13,7 +13,8 @@ import {
   sanitizeAadhaar,
   sanitizePan,
 } from "@/lib/onboarding/identity-field-utils";
-import { resolveBankNameFromIfsc, resolveEmployeeBankName } from "@/lib/payroll/services/ifsc-bank-names";
+import { resolveBankNameFromIfsc, resolveEmployeeBankName, isStoredBankBranch } from "@/lib/payroll/services/ifsc-bank-names";
+import { lookupIfscInstitution, resolveMissingBankBranch } from "@/lib/payroll/services/ifsc-branch-lookup";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeAccountFormInput, PayslipBankAccountSnapshot } from "@/types/employee-accounts";
 import type { PayrollBreakdown } from "@/types/payroll";
@@ -129,7 +130,7 @@ export async function upsertEmployeeAccount(
     : "";
   const ifscCode = input.ifscCode?.trim() ? sanitizeIfsc(input.ifscCode) : "";
   const accountHolderName = (input.accountHolderName?.trim() || fullName).trim();
-  const branchName = input.branchName?.trim() || null;
+  let branchName = input.branchName?.trim() || null;
   const accountType = input.accountType ?? "salary";
   const bankName =
     resolveEmployeeBankName(input.bankName, ifscCode) ||
@@ -141,11 +142,19 @@ export async function upsertEmployeeAccount(
     const { data: existingBank } = await supabase
       .schema("hrms")
       .from("bank_accounts")
-      .select("id")
+      .select("id, branch_name")
       .eq("employee_id", employee.id)
       .eq("is_primary", true)
       .is("deleted_at", null)
       .maybeSingle();
+
+    const savedBranch = existingBank?.branch_name ?? null;
+    if (!branchName && isStoredBankBranch(savedBranch)) {
+      branchName = savedBranch;
+    }
+    if (!branchName) {
+      branchName = (await lookupIfscInstitution(ifscCode))?.branchName ?? null;
+    }
 
     const bankPayload = {
       bank_name: bankName,
@@ -213,7 +222,7 @@ export async function loadPrimaryBankSnapshot(
   const { data: bankAccount, error } = await supabase
     .schema("hrms")
     .from("bank_accounts")
-    .select("bank_name, account_number, ifsc_code, account_holder_name, branch_name")
+    .select("id, bank_name, account_number, ifsc_code, account_holder_name, branch_name")
     .eq("employee_id", employeeId)
     .eq("is_primary", true)
     .is("deleted_at", null)
@@ -222,12 +231,21 @@ export async function loadPrimaryBankSnapshot(
   if (error) throw new Error(error.message);
   if (!bankAccount?.account_number) return null;
 
+  const resolved = await resolveMissingBankBranch(
+    {
+      bankName: bankAccount.bank_name,
+      ifscCode: bankAccount.ifsc_code,
+      branchName: bankAccount.branch_name,
+    },
+    { bankAccountId: bankAccount.id },
+  );
+
   return {
-    bankName: resolveEmployeeBankName(bankAccount.bank_name, bankAccount.ifsc_code),
+    bankName: resolved.bankName || resolveEmployeeBankName(bankAccount.bank_name, bankAccount.ifsc_code),
     accountHolderName: bankAccount.account_holder_name ?? "",
     accountNumber: bankAccount.account_number,
-    ifscCode: bankAccount.ifsc_code ?? null,
-    branchName: bankAccount.branch_name ?? null,
+    ifscCode: bankAccount.ifsc_code ? bankAccount.ifsc_code.trim().toUpperCase() : null,
+    branchName: resolved.branchName ?? null,
   };
 }
 

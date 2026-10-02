@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button } from "@/components/common/button";
 import {
@@ -96,9 +97,7 @@ export function CeoAttendanceEmployeesTable({
         accessorKey: "workingHours",
         header: "Working Hours",
         cell: ({ row }) =>
-          row.original.workingHours > 0
-            ? `${row.original.workingHours.toFixed(1)} hrs`
-            : "—",
+          formatHoursLabel(row.original.workingHours),
       },
       {
         accessorKey: "lateMinutes",

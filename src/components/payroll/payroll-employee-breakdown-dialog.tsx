@@ -36,32 +36,36 @@ function StatTile({ label, value }: { label: string; value: string }) {
 function LineItemsSection({
   title,
   lines,
+  emptyLabel,
 }: {
   title: string;
   lines: PayrollBreakdown["earnings"];
+  emptyLabel: string;
 }) {
-  if (lines.length === 0) {
-    return null;
-  }
-
   return (
     <section className="min-w-0">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h3>
-      <ul className="mt-2 divide-y rounded-lg border bg-card">
-        {lines.map((line) => (
-          <li
-            key={`${line.code}-${line.label}`}
-            className="flex items-center justify-between gap-4 px-3 py-2.5 text-sm"
-          >
-            <span className="min-w-0 truncate text-foreground">{line.label}</span>
-            <span className="shrink-0 tabular-nums font-medium">
-              {formatCurrency(line.amount)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {lines.length === 0 ? (
+        <p className="mt-2 rounded-lg border bg-card px-3 py-2.5 text-sm text-muted-foreground">
+          {emptyLabel}
+        </p>
+      ) : (
+        <ul className="mt-2 divide-y rounded-lg border bg-card">
+          {lines.map((line) => (
+            <li
+              key={`${line.code}-${line.label}`}
+              className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+            >
+              <span className="min-w-0 truncate text-foreground">{line.label}</span>
+              <span className="shrink-0 font-medium tabular-nums">
+                {formatCurrency(line.amount)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -70,8 +74,104 @@ function isHrAdjustmentLine(code: string) {
   return code.startsWith("hr_");
 }
 
-function formatOptionalAmount(value: number): string {
-  return value > 0 ? formatCurrency(value) : formatCurrency(0);
+function isLopDeductionLine(line: { code: string; label: string }) {
+  const code = line.code.toLowerCase();
+  const label = line.label.toLowerCase();
+  return code === "lop" || label.includes("loss of pay") || label.includes("(lop)");
+}
+
+function PayrollNetLine({
+  monthlySalary,
+  attendanceEarnings,
+  deductions,
+  netSalary,
+  lopAmount,
+}: {
+  monthlySalary: number;
+  attendanceEarnings: number;
+  deductions: number;
+  netSalary: number;
+  lopAmount: number;
+}) {
+  const includeLop =
+    lopAmount > 0 &&
+    Math.abs(Math.round(monthlySalary - lopAmount - deductions) - Math.round(netSalary)) <= 1;
+  const startAmount = includeLop ? monthlySalary : attendanceEarnings;
+
+  return (
+    <p className="flex items-baseline justify-center gap-x-1.5 whitespace-nowrap text-sm tabular-nums">
+      <span className="text-muted-foreground">Gross Earning</span>
+      <span className="font-medium">{formatCurrency(startAmount)}</span>
+      {includeLop ? (
+        <>
+          <span className="text-muted-foreground">−</span>
+          <span className="text-muted-foreground">LOP</span>
+          <span className="font-medium">{formatCurrency(lopAmount)}</span>
+        </>
+      ) : null}
+      <span className="text-muted-foreground">−</span>
+      <span className="text-muted-foreground">Deductions</span>
+      <span className="font-medium">{formatCurrency(deductions)}</span>
+      <span className="text-muted-foreground">=</span>
+      <span className="font-semibold text-primary">Net salary</span>
+      <span className="font-semibold text-primary">{formatCurrency(netSalary)}</span>
+    </p>
+  );
+}
+
+function formatLeaveUsageDate(isoDate: string): string {
+  const [year, month, day] = isoDate.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return isoDate;
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatLeaveDayCount(days: number): string {
+  const rounded = Math.round((Number(days) || 0) * 100) / 100;
+  const label = Number.isInteger(rounded) ? String(rounded) : String(rounded);
+  return `${label} ${rounded === 1 ? "day" : "days"}`;
+}
+
+function LeaveUsageBlock({
+  title,
+  days,
+  dates,
+  emptyLabel,
+}: {
+  title: string;
+  days: number;
+  dates: string[];
+  emptyLabel: string;
+}) {
+  const used = Number(days) || 0;
+  const sortedDates = [...dates].filter(Boolean).sort();
+
+  return (
+    <div className="min-w-0 rounded-lg border bg-card px-3 py-2.5">
+      <p className="text-sm font-semibold">
+        {title}
+        {used > 0 ? (
+          <span className="font-medium text-muted-foreground"> — {formatLeaveDayCount(used)}</span>
+        ) : null}
+      </p>
+      {used <= 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {sortedDates.map((date) => (
+            <li key={date} className="flex items-center gap-2 text-sm text-foreground">
+              <span className="size-1 shrink-0 rounded-full bg-foreground/45" aria-hidden />
+              {formatLeaveUsageDate(date)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function PayrollEmployeeBreakdownDialog({
@@ -143,16 +243,34 @@ export function PayrollEmployeeBreakdownDialog({
                 </div>
               </section>
 
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Leave Usage
+                </h3>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <LeaveUsageBlock
+                    title="CL"
+                    days={attendance?.clDays ?? 0}
+                    dates={attendance?.clDates ?? []}
+                    emptyLabel="No CL taken this month"
+                  />
+                  <LeaveUsageBlock
+                    title="EL"
+                    days={attendance?.elDays ?? 0}
+                    dates={attendance?.elDates ?? []}
+                    emptyLabel="No EL taken this month"
+                  />
+                </div>
+              </section>
+
               {attendance ? (
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Attendance summary
                   </h3>
-                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
                     <StatTile label="Present" value={String(attendance.presentDays)} />
                     <StatTile label="Holiday" value={String(attendance.holidayCount ?? 0)} />
-                    <StatTile label="CL" value={String(attendance.clDays ?? 0)} />
-                    <StatTile label="EL" value={String(attendance.elDays ?? 0)} />
                     <StatTile label="LOP" value={String(attendance.lopDays)} />
                     <StatTile
                       label="Paid days"
@@ -168,39 +286,32 @@ export function PayrollEmployeeBreakdownDialog({
                 </section>
               ) : null}
 
-              <div className="space-y-4">
-                <LineItemsSection title="Earnings" lines={systemEarnings} />
-                <LineItemsSection title="Deductions" lines={systemDeductions} />
+              <div className="grid items-start gap-4 sm:grid-cols-2">
+                <LineItemsSection
+                  title="Earnings"
+                  lines={systemEarnings}
+                  emptyLabel="No earnings"
+                />
+                <LineItemsSection
+                  title="Deductions"
+                  lines={systemDeductions}
+                  emptyLabel="No deductions"
+                />
               </div>
 
-              <section className="mt-auto rounded-lg border bg-muted/20 px-4 py-3">
-                <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-medium tabular-nums">
-                  <span className="text-muted-foreground">Monthly Salary</span>
-                  <span>{formatCurrency(amounts.monthlySalary)}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Gross Earning</span>
-                  <span>{formatCurrency(amounts.attendanceEarnings)}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Deductions</span>
-                  <span>{formatCurrency(amounts.deductions)}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Net Salary</span>
-                  <span>{formatCurrency(amounts.netSalary)}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Bonus</span>
-                  <span>{formatOptionalAmount(amounts.bonus)}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Incentive</span>
-                  <span>{formatOptionalAmount(amounts.incentive)}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className="text-muted-foreground">Reimbursement</span>
-                  <span>{formatOptionalAmount(amounts.reimbursement)}</span>
-                  <span className="text-muted-foreground">=</span>
-                  <span className="font-semibold text-primary">Final Payable</span>
-                  <span className="font-semibold text-primary">
-                    {formatCurrency(amounts.finalPayable)}
-                  </span>
-                </div>
+              <section className="mt-auto rounded-lg border bg-muted/20 px-3 py-2.5">
+                <PayrollNetLine
+                  monthlySalary={amounts.monthlySalary}
+                  attendanceEarnings={amounts.attendanceEarnings}
+                  deductions={amounts.deductions}
+                  netSalary={amounts.netSalary}
+                  lopAmount={
+                    systemDeductions
+                      .filter(isLopDeductionLine)
+                      .reduce((sum, line) => sum + Number(line.amount || 0), 0) ||
+                    Number(attendance?.lopDeductionAmount || 0)
+                  }
+                />
               </section>
             </>
           )}

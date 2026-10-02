@@ -12,6 +12,8 @@ import { resolveEmployeeExitSave } from "@/lib/employees/exit-date";
 import { syncEmployeeExitDate } from "@/lib/exit/services/exit-mutations";
 import { assertEligibleHrLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
 
 export { createSignedStorageUrl } from "@/lib/storage/signed-url";
@@ -108,6 +110,24 @@ export async function createEmployeeFromWizard(
     });
   }
 
+  let fullTimeEffectiveDate: string | null = null;
+  if (employment.employmentTypeId && employment.employmentStatus !== "probation") {
+    const { data: typeRow } = await supabase
+      .schema("hrms")
+      .from("employment_types")
+      .select("code, is_full_time")
+      .eq("id", employment.employmentTypeId)
+      .maybeSingle();
+    const band = resolveLeaveEligibilityBand({
+      employmentStatus: employment.employmentStatus,
+      employmentTypeCode: typeRow?.code ?? null,
+      isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
+    });
+    if (band === "full_time_confirmed") {
+      fullTimeEffectiveDate = emptyToNull(employment.dateOfJoining);
+    }
+  }
+
   const { data: employee, error: employeeError } = await supabase
     .schema("hrms")
     .from("employees")
@@ -126,6 +146,7 @@ export async function createEmployeeFromWizard(
       phone: emptyToNull(basic.phone),
       employment_status: employment.employmentStatus,
       date_of_joining: emptyToNull(employment.dateOfJoining),
+      full_time_effective_date: fullTimeEffectiveDate,
       date_of_leaving: emptyToNull(employment.dateOfLeaving),
       status: "active",
       created_by: userId,
@@ -256,7 +277,7 @@ export async function updateEmployee(
   const { data: previous } = await supabase
     .schema("hrms")
     .from("employees")
-    .select("employment_status, date_of_leaving, date_of_joining")
+    .select("employment_status, date_of_leaving, date_of_joining, employment_type_id, full_time_effective_date")
     .eq("id", employeeId)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -306,6 +327,29 @@ export async function updateEmployee(
     );
   }
 
+  let fullTimeEffectiveDate: string | undefined;
+  const nextTypeId = emptyToNull(input.employmentTypeId);
+  if (
+    nextTypeId &&
+    nextTypeId !== previous.employment_type_id &&
+    !previous.full_time_effective_date
+  ) {
+    const { data: typeRow } = await supabase
+      .schema("hrms")
+      .from("employment_types")
+      .select("code, is_full_time")
+      .eq("id", nextTypeId)
+      .maybeSingle();
+    const band = resolveLeaveEligibilityBand({
+      employmentStatus,
+      employmentTypeCode: typeRow?.code ?? null,
+      isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
+    });
+    if (band === "full_time_confirmed") {
+      fullTimeEffectiveDate = getTodayDateString();
+    }
+  }
+
   const { error } = await supabase
     .schema("hrms")
     .from("employees")
@@ -323,6 +367,7 @@ export async function updateEmployee(
       phone: emptyToNull(input.phone),
       employment_status: employmentStatus,
       date_of_joining: emptyToNull(input.dateOfJoining),
+      ...(fullTimeEffectiveDate ? { full_time_effective_date: fullTimeEffectiveDate } : {}),
       date_of_leaving: dateOfLeaving,
       updated_by: userId,
     })
@@ -441,7 +486,9 @@ export async function changeEmployeeEmploymentType(
     supabase
       .schema("hrms")
       .from("employees")
-      .select("employment_status, employment_type_id, employee_code, first_name, last_name")
+      .select(
+        "employment_status, employment_type_id, full_time_effective_date, employee_code, first_name, last_name",
+      )
       .eq("id", employeeId)
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
@@ -482,12 +529,23 @@ export async function changeEmployeeEmploymentType(
     nextStatus = "probation";
   }
 
+  const nextBand = resolveLeaveEligibilityBand({
+    employmentStatus: nextStatus,
+    employmentTypeCode: typeCode,
+    isFullTime: typeof nextType.is_full_time === "boolean" ? nextType.is_full_time : null,
+  });
+  const fullTimeEffectiveDate =
+    nextBand === "full_time_confirmed" && !employee.full_time_effective_date
+      ? getTodayDateString()
+      : null;
+
   const { error } = await supabase
     .schema("hrms")
     .from("employees")
     .update({
       employment_type_id: employmentTypeId,
       employment_status: nextStatus,
+      ...(fullTimeEffectiveDate ? { full_time_effective_date: fullTimeEffectiveDate } : {}),
       updated_by: userId,
     })
     .eq("id", employeeId)

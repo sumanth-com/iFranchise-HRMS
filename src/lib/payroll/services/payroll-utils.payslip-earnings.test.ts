@@ -249,6 +249,240 @@ describe("getPayslipEarningsLines display mapping", () => {
     assert.equal(totals.netPay, 12_800);
   });
 
+  it("matches Team Payroll final payable for Ekta September 2026 with stored LOP", () => {
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 11_666.67, type: "earning" },
+          { code: "hra", label: "HRA", amount: 5_833.33, type: "earning" },
+          { code: "transport", label: "LTA", amount: 2_333.33, type: "earning" },
+          { code: "special_allowance", label: "Special", amount: 3_500, type: "earning" },
+        ],
+        deductions: [
+          { code: "pt", label: "Professional Tax", amount: 200, type: "deduction" },
+          { code: "lop", label: "Loss of Pay (LOP)", amount: 1_666.67, type: "deduction" },
+        ],
+        attendance: {
+          workingDays: 30,
+          presentDays: 20,
+          absentDays: 0,
+          lopDays: 2,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+          monthlyGrossSalary: 25_000,
+        },
+      },
+      basicSalary: 11_666.67,
+      totalAllowances: 0,
+      grossSalary: 23_333.33,
+      totalDeductions: 200,
+      netSalary: 23_133.33,
+    });
+
+    assert.equal(totals.grossEarnings, 25_000);
+    const lop = totals.deductions.find((line) => line.code === "lop");
+    const pt = totals.deductions.find((line) => line.code === "pt");
+    assert.equal(lop?.amount, 1_666.67);
+    assert.match(lop?.label ?? "", /2 days/);
+    assert.equal(pt?.amount, 200);
+    assert.equal(totals.totalDeductions, 1_866.67);
+    assert.equal(totals.netPay, 23_133.33);
+  });
+
+  it("shows zero LOP without reducing a full monthly salary", () => {
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 12_500, type: "earning" },
+          { code: "hra", label: "HRA", amount: 6_250, type: "earning" },
+          { code: "transport", label: "LTA", amount: 2_500, type: "earning" },
+          { code: "special_allowance", label: "Special", amount: 3_750, type: "earning" },
+        ],
+        deductions: [
+          { code: "pt", label: "Professional Tax", amount: 200, type: "deduction" },
+        ],
+        attendance: {
+          workingDays: 30,
+          presentDays: 22,
+          absentDays: 0,
+          lopDays: 0,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+          paidLeaveDays: 2,
+          monthlyGrossSalary: 25_000,
+        },
+      },
+      basicSalary: 12_500,
+      totalAllowances: 0,
+      grossSalary: 25_000,
+      totalDeductions: 200,
+      netSalary: 24_800,
+    });
+
+    const lop = totals.deductions.find((line) => line.code === "lop");
+    assert.equal(lop?.amount, 0);
+    assert.match(lop?.label ?? "", /0 days/);
+    assert.equal(totals.grossEarnings, 25_000);
+    assert.equal(totals.totalDeductions, 200);
+    assert.equal(totals.netPay, 24_800);
+  });
+
+  it("keeps a half-day LOP and reimbursement on the persisted final payable", () => {
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 12_291.67, type: "earning" },
+          { code: "hra", label: "HRA", amount: 6_145.83, type: "earning" },
+          { code: "transport", label: "LTA", amount: 2_458.33, type: "earning" },
+          { code: "special_allowance", label: "Special", amount: 3_687.5, type: "earning" },
+          { code: "hr_reimbursement", label: "Reimbursement", amount: 500, type: "earning" },
+        ],
+        deductions: [
+          { code: "pt", label: "Professional Tax", amount: 200, type: "deduction" },
+          { code: "lop", label: "Loss of Pay (LOP)", amount: 416.67, type: "deduction" },
+        ],
+        attendance: {
+          workingDays: 30,
+          presentDays: 10,
+          absentDays: 0,
+          lopDays: 0.5,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+          monthlyGrossSalary: 25_000,
+        },
+        hrAdjustments: { bonus: 0, incentive: 0, reimbursements: 500 },
+      },
+      basicSalary: 12_291.67,
+      totalAllowances: 500,
+      grossSalary: 24_583.33,
+      totalDeductions: 200,
+      netSalary: 24_383.33,
+    });
+
+    const lop = totals.deductions.find((line) => line.code === "lop");
+    assert.equal(lop?.amount, 416.67);
+    assert.match(lop?.label ?? "", /0\.5 days/);
+    assert.equal(totals.grossEarnings, 25_500);
+    assert.equal(totals.totalDeductions, 616.67);
+    assert.equal(totals.netPay, 24_883.33);
+  });
+
+  it("adds one stored full-day LOP back into gross and keeps net on the payroll item", () => {
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 12_083.33, type: "earning" },
+          { code: "hra", label: "HRA", amount: 6_041.67, type: "earning" },
+          { code: "transport", label: "LTA", amount: 2_416.67, type: "earning" },
+          { code: "special_allowance", label: "Special", amount: 3_625, type: "earning" },
+        ],
+        deductions: [
+          { code: "pt", label: "Professional Tax", amount: 200, type: "deduction" },
+          { code: "lop", label: "Loss of Pay (LOP)", amount: 833.33, type: "deduction" },
+        ],
+        attendance: {
+          workingDays: 30,
+          presentDays: 21,
+          absentDays: 0,
+          lopDays: 1,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+          paidLeaveDays: 1,
+          monthlyGrossSalary: 25_000,
+        },
+      },
+      basicSalary: 12_083.33,
+      totalAllowances: 0,
+      grossSalary: 24_166.67,
+      totalDeductions: 200,
+      netSalary: 23_966.67,
+    });
+
+    const lop = totals.deductions.find((line) => line.code === "lop");
+    assert.equal(lop?.amount, 833.33);
+    assert.match(lop?.label ?? "", /1 days/);
+    assert.equal(totals.grossEarnings, 25_000);
+    assert.equal(totals.totalDeductions, 1_033.33);
+    assert.equal(totals.netPay, 23_966.67);
+    assert.equal(
+      Math.round((totals.grossEarnings - totals.totalDeductions) * 100) / 100,
+      totals.netPay,
+    );
+  });
+
+  it("does not add LOP a second time when earnings are already the full monthly salary", () => {
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 12_500, type: "earning" },
+          { code: "hra", label: "HRA", amount: 6_250, type: "earning" },
+          { code: "transport", label: "LTA", amount: 2_500, type: "earning" },
+          { code: "special_allowance", label: "Special", amount: 3_750, type: "earning" },
+        ],
+        deductions: [
+          { code: "pt", label: "Professional Tax", amount: 200, type: "deduction" },
+          { code: "lop", label: "Loss of Pay (LOP)", amount: 1_666.67, type: "deduction" },
+        ],
+        attendance: {
+          workingDays: 30,
+          presentDays: 20,
+          absentDays: 0,
+          lopDays: 2,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+          monthlyGrossSalary: 25_000,
+        },
+      },
+      basicSalary: 12_500,
+      totalAllowances: 0,
+      grossSalary: 23_333.33,
+      totalDeductions: 200,
+      netSalary: 23_133.33,
+    });
+
+    assert.equal(totals.grossEarnings, 25_000);
+    assert.equal(totals.totalDeductions, 1_866.67);
+    assert.equal(totals.netPay, 23_133.33);
+  });
+
+  it("keeps bonus and incentive inside the persisted final payable", () => {
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 12_500, type: "earning" },
+          { code: "hra", label: "HRA", amount: 6_250, type: "earning" },
+          { code: "transport", label: "LTA", amount: 2_500, type: "earning" },
+          { code: "special_allowance", label: "Special", amount: 3_750, type: "earning" },
+          { code: "hr_bonus", label: "Bonus", amount: 1_000, type: "earning" },
+          { code: "hr_incentive", label: "Incentive", amount: 500, type: "earning" },
+        ],
+        deductions: [
+          { code: "pt", label: "Professional Tax", amount: 200, type: "deduction" },
+        ],
+        attendance: {
+          workingDays: 30,
+          presentDays: 22,
+          absentDays: 0,
+          lopDays: 0,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+          monthlyGrossSalary: 25_000,
+        },
+        hrAdjustments: { bonus: 1_000, incentive: 500, reimbursements: 0 },
+      },
+      basicSalary: 12_500,
+      totalAllowances: 0,
+      grossSalary: 25_000,
+      totalDeductions: 200,
+      netSalary: 24_800,
+    });
+
+    assert.equal(totals.grossEarnings, 26_500);
+    assert.equal(totals.deductions.find((line) => line.code === "lop")?.amount, 0);
+    assert.equal(totals.totalDeductions, 200);
+    assert.equal(totals.netPay, 26_300);
+  });
+
   for (const gross of [12_000, 25_000, 50_000]) {
     it(`derives components that sum to ₹${gross.toLocaleString("en-IN")}`, () => {
       const earnings = getPayslipEarningsLines({

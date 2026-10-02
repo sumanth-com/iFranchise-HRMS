@@ -25,7 +25,10 @@ import { EmployeeAccountDialog } from "@/components/payroll/employee-account-dia
 import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { fetchEmployeeAccountsAction } from "@/lib/payroll/actions";
-import { maskAccountNumber } from "@/lib/payroll/services/payroll-utils";
+import {
+  formatReadableAccountNumber,
+  formatReadableIfsc,
+} from "@/lib/payroll/services/payroll-utils";
 import {
   PAYROLL_TABLE_SCROLL_CLASS,
   TABLE_HEADER_ROW_CLASS,
@@ -209,9 +212,7 @@ export function EmployeeAccountsTable({
         header: "Account Number",
         cell: ({ row }) => (
           <span className="whitespace-nowrap tabular-nums">
-            {row.original.accountNumber
-              ? maskAccountNumber(row.original.accountNumber, { reveal: true })
-              : "—"}
+            {formatReadableAccountNumber(row.original.accountNumber)}
           </span>
         ),
       },
@@ -219,7 +220,9 @@ export function EmployeeAccountsTable({
         accessorKey: "ifscCode",
         header: "IFSC",
         cell: ({ row }) => (
-          <span className="whitespace-nowrap">{row.original.ifscCode ?? "—"}</span>
+          <span className="whitespace-nowrap font-medium tracking-wide">
+            {formatReadableIfsc(row.original.ifscCode)}
+          </span>
         ),
       },
       {

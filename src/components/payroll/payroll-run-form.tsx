@@ -8,16 +8,16 @@ import {
   Eye,
   Info,
   Pencil,
-  Search,
 } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { TeamPayrollDataSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
-import {
-  TABLE_HEADER_CELL_CLASS,
-} from "@/components/common/table-header-classes";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/common/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   PayrollEmployeeBreakdownDialog,
   type PayrollEmployeeBreakdownData,
@@ -135,11 +135,10 @@ function attendanceFactsFromBreakdown(breakdown: PayrollBreakdown) {
   };
 }
 
-function stickyCellClass(isHeader = false) {
-  return cn(
-    isHeader ? "bg-blue-600" : "bg-white table-sticky-card",
-    "sticky z-20",
-  );
+function formatPayrollDayCount(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
 
@@ -222,7 +221,7 @@ export function PayrollRunForm({
     useState<PayrollEmployeeBreakdownData | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EmployeeTableRow | null>(null);
-  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const loadSeq = useRef(0);
   const panel = panelOverride ?? initialPanel;
@@ -232,7 +231,7 @@ export function PayrollRunForm({
     setYear(String(defaultYear));
     setPanelOverride(null);
     setDepartmentFilter("");
-    setEmployeeSearch("");
+    setEmployeeFilter("");
   }, [defaultMonth, defaultYear, initialPanel]);
 
   const hasPeriod = month.length > 0 && year.length > 0;
@@ -442,6 +441,31 @@ export function PayrollRunForm({
     ];
   }, [tableRows]);
 
+  const employeeItems = useMemo(() => {
+    const department = departmentFilter.trim();
+    const options = new Map<string, string>();
+    for (const row of tableRows) {
+      const departmentLabel =
+        directoryDepartmentLabel(row.department) ?? row.department ?? "";
+      if (department && departmentLabel !== department) continue;
+      const label = row.code.trim() ? `${row.name} (${row.code})` : row.name;
+      options.set(row.id, label);
+    }
+    return [
+      { value: "all", label: "All employees" },
+      ...[...options.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [departmentFilter, tableRows]);
+
+  useEffect(() => {
+    if (!employeeFilter) return;
+    if (!employeeItems.some((item) => item.value === employeeFilter)) {
+      setEmployeeFilter("");
+    }
+  }, [employeeFilter, employeeItems]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 lg:flex-row lg:items-center">
@@ -474,16 +498,15 @@ export function PayrollRunForm({
           triggerClassName="h-10 w-[13.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
           onValueChange={(value) => setDepartmentFilter(value ?? "")}
         />
-        <div className="relative min-w-[14rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={employeeSearch}
-            onChange={(event) => setEmployeeSearch(event.target.value)}
-            placeholder="Search by name, email, or code..."
-            className="h-10 w-full border-border/80 bg-white pl-9 font-semibold dark:bg-input"
-            aria-label="Search employee"
-          />
-        </div>
+        <LabeledSelect
+          items={employeeItems}
+          value={employeeFilter || "all"}
+          placeholder="All employees"
+          nowrapItems
+          triggerClassName="h-10 w-[18rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
+          contentClassName="w-max min-w-[18rem] max-w-[28rem]"
+          onValueChange={(value) => setEmployeeFilter(!value || value === "all" ? "" : value)}
+        />
         {tableRows.length > 0 ? (
           <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border/80 bg-white px-3 text-sm font-semibold dark:bg-input">
             {tableRows.length} employees
@@ -515,7 +538,7 @@ export function PayrollRunForm({
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {openMonthAsOfLabel
-                ? "Open month: attendance, Sundays, and holidays count only through today. Future dates are not included yet."
+                ? "Open month: salary starts from the full month. Only LOP already recorded reduces it. Future dates are not marked absent."
                 : "Amounts below are calculated from salary structure, attendance, and leave for this period."}
             </p>
           </div>
@@ -529,7 +552,7 @@ export function PayrollRunForm({
 
           <EmployeePayrollTable
             rows={tableRows}
-            employeeSearch={employeeSearch}
+            employeeId={employeeFilter}
             departmentFilter={departmentFilter}
             onView={openBreakdown}
             canMutate={false}
@@ -552,7 +575,7 @@ export function PayrollRunForm({
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {openMonthAsOfLabel
-                  ? "Open month: attendance, Sundays, and holidays count only through today. Future dates are not included yet."
+                  ? "Open month: salary starts from the full month. Only LOP already recorded reduces it. Future dates are not marked absent."
                   : "Amounts are calculated from salary structure, attendance, and leave for this period."}
               </p>
             </div>
@@ -567,7 +590,7 @@ export function PayrollRunForm({
 
           <EmployeePayrollTable
             rows={tableRows}
-            employeeSearch={employeeSearch}
+            employeeId={employeeFilter}
             departmentFilter={departmentFilter}
             onView={openBreakdown}
             canMutate={canRun && !panel.data.isLocked}
@@ -759,21 +782,21 @@ function PayrollTotals({
 
 function EmployeePayrollTable({
   rows,
-  employeeSearch = "",
+  employeeId = "",
   departmentFilter = "",
   onView,
   canMutate = false,
   onEdit,
 }: {
   rows: EmployeeTableRow[];
-  employeeSearch?: string;
+  employeeId?: string;
   departmentFilter?: string;
   onView: (row: EmployeeTableRow) => void;
   canMutate?: boolean;
   onEdit?: (row: EmployeeTableRow) => void;
 }) {
   const filteredRows = useMemo(() => {
-    const term = employeeSearch.trim().toLowerCase();
+    const selectedEmployeeId = employeeId.trim();
     const department = departmentFilter.trim();
     return rows.filter((row) => {
       const departmentLabel =
@@ -781,12 +804,12 @@ function EmployeePayrollTable({
       if (department && departmentLabel !== department) {
         return false;
       }
-      if (!term) return true;
-      const haystack =
-        `${row.name} ${row.code} ${row.email ?? ""} ${departmentLabel}`.toLowerCase();
-      return haystack.includes(term);
+      if (selectedEmployeeId && row.id !== selectedEmployeeId) {
+        return false;
+      }
+      return true;
     });
-  }, [departmentFilter, employeeSearch, rows]);
+  }, [departmentFilter, employeeId, rows]);
 
   if (filteredRows.length === 0) {
     return (
@@ -798,155 +821,112 @@ function EmployeePayrollTable({
     );
   }
 
+  const headCell =
+    "h-11 min-w-0 bg-transparent px-2 py-2 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-white";
+  const moneyCell =
+    "min-w-0 whitespace-nowrap px-1.5 py-2.5 text-center align-middle text-[13px] tabular-nums";
+
   return (
-    <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:border-border dark:bg-card">
-      <table className="w-full min-w-[64rem] bg-white text-sm dark:bg-transparent">
+    <div className="max-h-[min(32rem,calc(100dvh-18rem))] min-w-0 overflow-x-hidden overflow-y-auto rounded-lg border border-input bg-white dark:border-border dark:bg-card">
+      <table className="w-full table-fixed bg-white text-sm dark:bg-transparent">
+        <colgroup>
+          <col className="w-[14%]" />
+          <col className="w-[11%]" />
+          <col className="w-[8%]" />
+          <col className="w-[6%]" />
+          <col className="w-[11%]" />
+          <col className="w-[11%]" />
+          <col className="w-[12%]" />
+          <col className="w-[9%]" />
+          <col className="w-[10%]" />
+          <col className="w-[8%]" />
+        </colgroup>
         <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
-            <th
-              className={cn(
-                "left-0 z-40 h-11 min-w-[11rem] whitespace-nowrap px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
-                stickyCellClass(true),
-              )}
-            >
-              Employee
-            </th>
-            <th
-              className={cn(
-                "left-[11rem] z-40 h-11 min-w-[7.5rem] whitespace-nowrap px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-white",
-                stickyCellClass(true),
-              )}
-            >
-              Department
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              Present / Paid
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              Holiday
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              CL
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              EL
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              LOP
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              Monthly salary
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              Gross Earning
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              PT / Deductions
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              Reimbursement
-            </th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
-              Final payable
-            </th>
-            <th
-              className={cn(
-                TABLE_HEADER_CELL_CLASS,
-                "sticky right-0 z-40 bg-blue-600 text-center",
-              )}
-            >
-              Actions
-            </th>
+            <th className={cn(headCell, "text-left")}>Employee</th>
+            <th className={cn(headCell, "text-left")}>Department</th>
+            <th className={cn(headCell, "text-center")}>Present / Paid</th>
+            <th className={cn(headCell, "text-center")}>LOP</th>
+            <th className={cn(headCell, "text-center")}>Monthly Salary</th>
+            <th className={cn(headCell, "text-center")}>Gross Earnings</th>
+            <th className={cn(headCell, "text-center")}>PT / Deductions</th>
+            <th className={cn(headCell, "text-center")}>Reimbursement</th>
+            <th className={cn(headCell, "text-center")}>Final Payable</th>
+            <th className={cn(headCell, "text-center")}>Actions</th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-transparent">
           {filteredRows.map((row) => (
             <tr
               key={row.payrollItemId ?? row.id}
-              className="group border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:border-border/60 dark:bg-transparent dark:hover:bg-white/[0.04]"
+              className="group cursor-pointer border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:border-border/60 dark:bg-transparent dark:hover:bg-white/[0.04]"
+              onClick={() => onView(row)}
             >
-              <td
-                className={cn(
-                  "left-0 min-w-[11rem] max-w-[14rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
-                  stickyCellClass(),
-                )}
-              >
-                <div className="truncate whitespace-nowrap font-medium" title={row.name}>
-                  {row.name}
-                </div>
-                <div
-                  className="truncate whitespace-nowrap text-xs text-muted-foreground"
-                  title={row.code}
+              <td className="min-w-0 px-2 py-2.5 text-left align-middle">
+                <button
+                  type="button"
+                  className="block min-w-0 max-w-full text-left font-medium break-words"
+                  onClick={() => onView(row)}
                 >
-                  {row.code}
-                </div>
+                  {row.name}
+                </button>
+                <div className="break-all text-xs text-muted-foreground">{row.code}</div>
+              </td>
+              <td className="min-w-0 px-2 py-2.5 text-left align-middle">
+                <div className="break-words">{row.department ?? "—"}</div>
               </td>
               <td
-                className={cn(
-                  "left-[11rem] min-w-[7.5rem] max-w-[9rem] border-r border-input/40 px-3 py-2.5 text-left align-middle dark:border-border/60 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50",
-                  stickyCellClass(),
-                )}
+                className="px-1.5 py-2.5 text-center align-middle tabular-nums"
+                title="Paid days include present, paid holidays, and approved CL/EL"
               >
-                <div className="truncate" title={row.department ?? undefined}>
-                  {row.department ?? "—"}
-                </div>
+                {formatPayrollDayCount(row.paidDays)}
               </td>
+              <td className="px-1.5 py-2.5 text-center align-middle tabular-nums">
+                {formatPayrollDayCount(row.lopDays)}
+              </td>
+              <td className={moneyCell}>{formatCurrency(row.monthlySalary)}</td>
+              <td className={moneyCell}>{formatCurrency(row.attendanceEarnings)}</td>
+              <td className={moneyCell}>{formatCurrency(row.deductions)}</td>
+              <td className={moneyCell}>{formatOptionalPayrollAmount(row.reimbursement)}</td>
+              <td className={cn(moneyCell, "font-medium")}>{formatCurrency(row.finalPayable)}</td>
               <td
-                className="px-3 py-2.5 text-center align-middle tabular-nums"
-                title={`Paid working days: ${row.paidDays}`}
+                className="px-1 py-2.5 text-center align-middle"
+                onClick={(event) => event.stopPropagation()}
               >
-                {row.presentDays}
-              </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
-                {row.holidayDays}
-              </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
-                {row.clDays}
-              </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
-                {row.elDays}
-              </td>
-              <td className="px-3 py-2.5 text-center align-middle tabular-nums">
-                {row.lopDays}
-              </td>
-              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
-                {formatCurrency(row.monthlySalary)}
-              </td>
-              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
-                {formatCurrency(row.attendanceEarnings)}
-              </td>
-              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
-                {formatCurrency(row.deductions)}
-              </td>
-              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle tabular-nums">
-                {formatOptionalPayrollAmount(row.reimbursement)}
-              </td>
-              <td className="whitespace-nowrap px-2 py-2.5 text-center align-middle font-medium tabular-nums">
-                {formatCurrency(row.finalPayable)}
-              </td>
-              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-center align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] table-sticky-card group-hover:bg-zinc-50">
-                <div className="inline-flex justify-center gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 px-2.5"
-                    onClick={() => onView(row)}
-                  >
-                    <Eye className="size-3.5" />
-                    View
-                  </Button>
+                <div className="inline-flex items-center justify-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-sm"
+                          aria-label="View payroll"
+                          onClick={() => onView(row)}
+                        >
+                          <Eye className="size-3.5" />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>View</TooltipContent>
+                  </Tooltip>
                   {canMutate && row.payrollItemId ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 px-2.5"
-                      onClick={() => onEdit?.(row)}
-                    >
-                      <Pencil className="size-3.5" />
-                      Edit
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label="Edit payroll"
+                            onClick={() => onEdit?.(row)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>Edit</TooltipContent>
+                    </Tooltip>
                   ) : null}
                 </div>
               </td>

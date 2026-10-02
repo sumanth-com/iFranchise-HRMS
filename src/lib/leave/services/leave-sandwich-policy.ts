@@ -64,9 +64,7 @@ export function previousScheduleWorkingDate(
 
 /**
  * Working days the employee selected as leave within the requested date range.
- * Public holidays count only when explicitly selected as the first or last date
- * of the request (boundary selection). Interior public holidays become sandwich
- * days when sandwiched between other leave days.
+ * Declared public holidays are never leave days and never sandwich days.
  */
 export function absenceLeaveDatesForRange(
   requestedDates: string[],
@@ -74,8 +72,6 @@ export function absenceLeaveDatesForRange(
 ): Set<string> {
   if (requestedDates.length === 0) return new Set();
 
-  const first = requestedDates[0]!;
-  const last = requestedDates[requestedDates.length - 1]!;
   const dates = new Set<string>();
 
   for (const date of requestedDates) {
@@ -83,9 +79,6 @@ export function absenceLeaveDatesForRange(
     if (!isScheduleWorkingClass(schedule)) continue;
 
     if (isPublicHolidayDate(date, calendar)) {
-      if (date === first || date === last) {
-        dates.add(date.slice(0, 10));
-      }
       continue;
     }
 
@@ -100,7 +93,7 @@ export function isSandwichInterveningDay(
   calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,
 ): boolean {
   if (isPublicHolidayDate(date, calendar)) {
-    return calendar.sandwich.enabled;
+    return false;
   }
   return (
     calendar.sandwich.enabled &&
@@ -110,15 +103,11 @@ export function isSandwichInterveningDay(
 }
 
 /**
- * Weekly-off sandwich: a weekly off becomes sandwich leave/LOP when approved leave
- * exists on the schedule-working day immediately before OR after it.
- * Examples with Sunday weekly off:
- * - Leave on Saturday → following Sunday is sandwich
- * - Leave on Monday → preceding Sunday is sandwich
- * - Leave on Saturday and Monday → Sunday is sandwich
+ * Weekly-off sandwich: a weekly off after an actual absence is included.
+ * Leave on Saturday → the following Sunday counts.
+ * Leave that starts on Monday does not charge the previous Sunday.
  *
- * Public holidays keep the strict both-adjacent-working-days rule and are never
- * converted to LOP solely by one-sided leave.
+ * Declared public holidays are never sandwich leave or sandwich LOP.
  */
 export function sandwichedInterveningDates(
   absenceLeaveDates: Set<string>,
@@ -152,27 +141,13 @@ export function sandwichedInterveningDates(
 
     const schedule = classifyScheduleDay(iso, calendar);
     const isWeeklyOff = schedule === "weekly_off" && calendar.sandwich.includeWeekends;
-    const isHoliday = isPublicHolidayDate(iso, calendar) && calendar.sandwich.includeHolidays;
+
+    if (isPublicHolidayDate(iso, calendar)) continue;
 
     if (isWeeklyOff) {
       const before = previousScheduleWorkingDate(iso, calendar);
-      const after = nextScheduleWorkingDate(iso, calendar);
       const beforeHit = Boolean(before && absenceLeaveDates.has(before));
-      const afterHit = Boolean(after && absenceLeaveDates.has(after));
-      if (beforeHit || afterHit) {
-        sandwiched.add(iso);
-      }
-      continue;
-    }
-
-    if (isHoliday) {
-      let before = previousScheduleWorkingDate(iso, calendar);
-      let after = nextScheduleWorkingDate(iso, calendar);
-      if (before && !absenceLeaveDates.has(before)) before = null;
-      if (after && !absenceLeaveDates.has(after)) after = null;
-      if (before && after) {
-        sandwiched.add(iso);
-      }
+      if (beforeHit) sandwiched.add(iso);
     }
   }
 
@@ -211,6 +186,7 @@ export function unpaidAbsenceWeeklyOffDates(
     end: parseISO(scanEnd),
   })) {
     const iso = format(day, "yyyy-MM-dd");
+    if (isPublicHolidayDate(iso, calendar)) continue;
     if (classifyScheduleDay(iso, calendar) !== "weekly_off") continue;
 
     const previousWorking = previousScheduleWorkingDate(iso, calendar);

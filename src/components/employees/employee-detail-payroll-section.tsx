@@ -13,7 +13,11 @@ import { FilterSelect } from "@/components/common/filter-select";
 import { SECTION_HEADING_ROW_CLASS } from "@/components/common/table-header-classes";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
-import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import {
+  formatCurrency,
+  formatReadableAccountNumber,
+  formatReadableIfsc,
+} from "@/lib/payroll/services/payroll-utils";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import type { PayrollStatus, PayslipListItem } from "@/types/payroll";
 import { cn } from "@/lib/utils";
@@ -282,8 +286,12 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
           <div className="grid gap-4 p-4 md:grid-cols-2">
             <InfoTile label="Bank" value={data.bank.bankName} />
             <InfoTile label="Account holder" value={data.bank.accountHolderName} />
-            <InfoTile label="Account number" value={data.bank.accountNumberMasked} />
-            <InfoTile label="IFSC" value={data.bank.ifscCode ?? "—"} />
+            <InfoTile
+              label="Account number"
+              value={formatReadableAccountNumber(data.bank.accountNumberMasked)}
+            />
+            <InfoTile label="IFSC" value={formatReadableIfsc(data.bank.ifscCode)} />
+            <InfoTile label="Bank branch" value={data.bank.branchName ?? "—"} />
           </div>
         </section>
       ) : null}

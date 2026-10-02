@@ -242,6 +242,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
       totalAllowances: payslip.totalAllowances,
       grossSalary: payslip.grossSalary,
       totalDeductions: payslip.totalDeductions,
+      netSalary: payslip.netSalary,
       employmentType: payslip.employee.employmentType,
     });
 
@@ -561,7 +562,9 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   y -= Math.max(14, wordsHeight) + 12;
 
   // ── Payment details ─────────────────────────────────────────────────
-  const payH = 46;
+  const payColumns = 3;
+  const payRows = Math.max(1, Math.ceil(paymentDetails.length / payColumns));
+  const payH = 16 + payRows * 32;
   ctx.page.drawRectangle({
     x: MARGIN,
     y: y - payH,
@@ -571,16 +574,19 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     borderColor: BORDER,
     borderWidth: 1,
   });
-  const payColW = CONTENT_WIDTH / 3;
+  const payColW = CONTENT_WIDTH / payColumns;
   paymentDetails.forEach((detail, index) => {
-    const x = MARGIN + payColW * index + 10;
-    drawText(ctx, detail.label.toUpperCase(), x, y - 14, {
+    const column = index % payColumns;
+    const row = Math.floor(index / payColumns);
+    const x = MARGIN + payColW * column + 10;
+    const rowTop = y - row * 32;
+    drawText(ctx, detail.label.toUpperCase(), x, rowTop - 14, {
       size: 7,
       bold: true,
       color: MUTED,
     });
-    drawWrapped(ctx, detail.value, x, y - 30, payColW - 18, {
-      size: 9,
+    drawWrapped(ctx, detail.value, x, rowTop - 28, payColW - 18, {
+      size: 8.5,
       bold: true,
       lineHeight: 11,
     });

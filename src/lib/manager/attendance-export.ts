@@ -4,6 +4,7 @@ import {
   reportToPdfBytes,
 } from "@/lib/reports/services/reports-utils";
 import type { ReportExportFormat } from "@/types/reports";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { TeamMonthlyAttendanceRow } from "@/types/manager-attendance";
 
 const MONTHLY_COLUMNS = [
@@ -33,8 +34,7 @@ function buildMonthlyReportResult(rows: TeamMonthlyAttendanceRow[], monthLabel: 
       absentDays: row.absentDays,
       wfhDays: row.wfhDays,
       lateDays: row.lateDays,
-      averageWorkingHours:
-        row.averageWorkingHours > 0 ? row.averageWorkingHours.toFixed(1) : "—",
+      averageWorkingHours: formatHoursLabel(row.averageWorkingHours),
     })),
     total: rows.length,
   };

@@ -31,7 +31,12 @@ import {
   BONUS_STATUS_LABELS,
   BONUS_TYPE_LABELS,
 } from "@/lib/payroll/constants";
-import { formatCurrency, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
+import {
+  formatCurrency,
+  formatPayrollMonthLabel,
+  formatReadableAccountNumber,
+  formatReadableIfsc,
+} from "@/lib/payroll/services/payroll-utils";
 import { useModuleSoftData } from "@/lib/perf/use-module-soft-data";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import type {
@@ -404,16 +409,19 @@ export function EmployeePayrollView({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{data.bank.bankName}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {data.bank.accountNumberMasked} · {data.bank.accountType}
+                    {formatReadableAccountNumber(data.bank.accountNumberMasked)} · {data.bank.accountType}
                   </p>
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
                 <Detail label="Bank Name" value={data.bank.bankName} />
                 <Detail label="Account Holder Name" value={data.bank.accountHolderName} />
-                <Detail label="Account Number" value={data.bank.accountNumberMasked} />
-                <Detail label="IFSC Code" value={data.bank.ifscCode} />
-                <Detail label="Branch" value={data.bank.branchName} />
+                <Detail
+                  label="Account Number"
+                  value={formatReadableAccountNumber(data.bank.accountNumberMasked)}
+                />
+                <Detail label="IFSC Code" value={formatReadableIfsc(data.bank.ifscCode)} />
+                <Detail label="Bank Branch" value={data.bank.branchName} />
               </dl>
               <p className="pt-1 text-[11px] text-muted-foreground">
                 To update bank details, please contact HR.

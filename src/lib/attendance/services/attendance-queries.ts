@@ -8,6 +8,7 @@ import type {
   AttendanceDisplayStatus,
   AttendanceSummary,
 } from "@/types/attendance";
+import { attendanceRecordSlots } from "@/lib/attendance/attendance-pagination";
 import { attendanceListParamsSchema } from "@/lib/validations/attendance";
 import {
   getTodayDateString,
@@ -102,33 +103,19 @@ function matchesAttendanceStatusFilter(
   return matchesAttendanceUiStatusFilter(status, notes, filter);
 }
 
-async function loadAttendanceRosterUncached(
+async function fetchAttendanceEmployees(
   supabase: AuthSupabaseClient,
   params: {
     organizationId: string;
-    rangeFrom: string;
-    rangeTo: string;
     employeeId?: string;
     departmentId?: string;
     branchId?: string;
     search?: string;
     scopedIds: string[] | null;
-    includeCorrections: boolean;
+    onlyEmployeeIds?: string[];
   },
-): Promise<AttendanceListResult["data"]> {
-  const {
-    organizationId,
-    rangeFrom,
-    rangeTo,
-    employeeId,
-    departmentId,
-    branchId,
-    search,
-    scopedIds,
-    includeCorrections,
-  } = params;
-  const isSingleDay = rangeFrom === rangeTo;
-  const rosterDates = isSingleDay ? [rangeFrom] : eachInclusiveDate(rangeFrom, rangeTo);
+): Promise<LooseRow[]> {
+  if (params.onlyEmployeeIds && params.onlyEmployeeIds.length === 0) return [];
 
   let empQuery = excludeItSystemAccountFromEmployeeQuery(
     supabase
@@ -149,7 +136,7 @@ async function loadAttendanceRosterUncached(
           designations:designation_id (title, code)
         `,
       )
-      .eq("organization_id", organizationId)
+      .eq("organization_id", params.organizationId)
       .is("deleted_at", null)
       .in("employment_status", activeEmploymentStatusFilter()),
   );
@@ -159,23 +146,107 @@ async function loadAttendanceRosterUncached(
     empQuery = empQuery.not("employee_code", "in", `(${hiddenCodes.join(",")})`);
   }
 
-  if (scopedIds) {
-    empQuery = empQuery.in("id", scopedIds);
-  } else if (employeeId) {
-    empQuery = empQuery.eq("id", employeeId);
+  if (params.onlyEmployeeIds) {
+    empQuery = empQuery.in("id", params.onlyEmployeeIds);
+  } else if (params.scopedIds) {
+    empQuery = empQuery.in("id", params.scopedIds);
+  } else if (params.employeeId) {
+    empQuery = empQuery.eq("id", params.employeeId);
   }
-  if (departmentId) {
-    empQuery = empQuery.eq("department_id", departmentId);
+  if (params.departmentId) {
+    empQuery = empQuery.eq("department_id", params.departmentId);
   }
-  if (branchId) {
-    empQuery = empQuery.eq("branch_id", branchId);
+  if (params.branchId) {
+    empQuery = empQuery.eq("branch_id", params.branchId);
   }
-  if (search) {
-    const term = `%${search}%`;
+  if (params.search) {
+    const term = `%${params.search}%`;
     empQuery = empQuery.or(
       `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`,
     );
   }
+
+  const empRes = await empQuery;
+  if (empRes.error) {
+    console.error("Failed to load employees for attendance:", empRes.error);
+    throw new Error("Unable to load attendance records. Please try again.");
+  }
+
+  return ((empRes.data ?? []) as LooseRow[]).filter((row) => !isHiddenAttendancePerson(row));
+}
+
+function sortAttendanceEmployees(
+  employees: LooseRow[],
+  mode: "name" | "code",
+): LooseRow[] {
+  return [...employees].sort((a, b) => {
+    if (mode === "code") {
+      return String(a.employee_code ?? "").localeCompare(String(b.employee_code ?? ""));
+    }
+    return formatCleanEmployeeName(a.first_name, a.last_name).localeCompare(
+      formatCleanEmployeeName(b.first_name, b.last_name),
+    );
+  });
+}
+
+function countAttendanceHistory(records: AttendanceListResult["data"]) {
+  let presentDays = 0;
+  let absentDays = 0;
+  for (const row of records) {
+    if (
+      row.attendanceStatus === "present" ||
+      row.attendanceStatus === "late" ||
+      row.attendanceStatus === "half_day"
+    ) {
+      presentDays += 1;
+    } else if (row.attendanceStatus === "absent") {
+      absentDays += 1;
+    }
+  }
+  return { presentDays, absentDays };
+}
+
+async function loadAttendanceRosterUncached(
+  supabase: AuthSupabaseClient,
+  params: {
+    organizationId: string;
+    rangeFrom: string;
+    rangeTo: string;
+    employeeId?: string;
+    departmentId?: string;
+    branchId?: string;
+    search?: string;
+    scopedIds: string[] | null;
+    includeCorrections: boolean;
+    /** When set, only these employee-day pairs are loaded and returned in this order. */
+    slots?: Array<{ employeeId: string; rosterDate: string }>;
+  },
+): Promise<AttendanceListResult["data"]> {
+  const {
+    organizationId,
+    rangeFrom,
+    rangeTo,
+    employeeId,
+    departmentId,
+    branchId,
+    search,
+    scopedIds,
+    includeCorrections,
+    slots,
+  } = params;
+  const isSingleDay = rangeFrom === rangeTo;
+  const rosterDates = slots
+    ? [...new Set(slots.map((slot) => slot.rosterDate))]
+    : isSingleDay
+      ? [rangeFrom]
+      : eachInclusiveDate(rangeFrom, rangeTo);
+  const slotEmployeeIds = slots
+    ? [...new Set(slots.map((slot) => slot.employeeId))]
+    : undefined;
+  if (slots && slots.length === 0) return [];
+
+  const attendanceFrom = rosterDates[0] ?? rangeFrom;
+  const attendanceTo = rosterDates[rosterDates.length - 1] ?? rangeTo;
 
   let attQuery = supabase
     .schema("hrms")
@@ -200,19 +271,29 @@ async function loadAttendanceRosterUncached(
           `,
     )
     .eq("organization_id", organizationId)
-    .gte("attendance_date", rangeFrom)
-    .lte("attendance_date", rangeTo)
+    .gte("attendance_date", slots ? attendanceFrom : rangeFrom)
+    .lte("attendance_date", slots ? attendanceTo : rangeTo)
     .is("deleted_at", null)
-    .limit(10000);
+    .limit(slots ? Math.max(slotEmployeeIds?.length ?? 1, 1) * Math.max(rosterDates.length, 1) : 10000);
 
-  if (scopedIds) {
+  if (slotEmployeeIds) {
+    attQuery = attQuery.in("employee_id", slotEmployeeIds);
+  } else if (scopedIds) {
     attQuery = attQuery.in("employee_id", scopedIds);
   } else if (employeeId) {
     attQuery = attQuery.eq("employee_id", employeeId);
   }
 
-  const [empRes, attRes, leavesRes, rules] = await Promise.all([
-    empQuery,
+  const [employees, attRes, leavesRes, rules] = await Promise.all([
+    fetchAttendanceEmployees(supabase, {
+      organizationId,
+      employeeId,
+      departmentId,
+      branchId,
+      search,
+      scopedIds,
+      onlyEmployeeIds: slotEmployeeIds,
+    }),
     attQuery,
     (async () => {
       try {
@@ -237,18 +318,11 @@ async function loadAttendanceRosterUncached(
     getOrganizationAttendanceRules(supabase, organizationId),
   ]);
 
-  if (empRes.error) {
-    console.error("Failed to load employees for attendance:", empRes.error);
-    throw new Error("Unable to load attendance records. Please try again.");
-  }
   if (attRes.error) {
     console.error("Failed to load attendance records:", attRes.error);
     throw new Error("Unable to load attendance records. Please try again.");
   }
 
-  const employees = ((empRes.data ?? []) as LooseRow[]).filter(
-    (row) => !isHiddenAttendancePerson(row),
-  );
   const attendanceMap = new Map<string, LooseRow>();
   for (const a of attRes.data ?? []) {
     attendanceMap.set(`${a.employee_id}:${toDateKey(a.attendance_date)}`, a);
@@ -293,92 +367,105 @@ async function loadAttendanceRosterUncached(
   const todayStr = getTodayDateString();
   const isAfter7Pm = isAfterOfficeCheckoutTime();
   const records: AttendanceListResult["data"] = [];
+  const employeesById = new Map(employees.map((emp) => [String(emp.id), emp]));
 
-  for (const emp of employees) {
+  const rowFor = (emp: LooseRow, rosterDate: string) => {
     const branch = unwrapRelation(emp.branches);
     const department = unwrapRelation(emp.departments);
     const designation = unwrapRelation(emp.designations);
-
-    for (const rosterDate of rosterDates) {
-      const att = attendanceMap.get(`${emp.id}:${rosterDate}`);
-      const hasApprovedLeave = leaveCoversDate(approvedLeaves, emp.id, rosterDate);
-      const checkInAt = att?.check_in_at ?? null;
-      const checkOutAt = att?.check_out_at ?? null;
-      const punchedWorkHours =
-        checkInAt && checkOutAt
-          ? completedWorkHoursFromPunches(checkInAt, checkOutAt, {
+    const att = attendanceMap.get(`${emp.id}:${rosterDate}`);
+    const hasApprovedLeave = leaveCoversDate(approvedLeaves, emp.id, rosterDate);
+    const checkInAt = att?.check_in_at ?? null;
+    const checkOutAt = att?.check_out_at ?? null;
+    const punchedWorkHours =
+      checkInAt && checkOutAt
+        ? completedWorkHoursFromPunches(checkInAt, checkOutAt, {
+            storedWorkHours: Number(att?.work_hours ?? 0),
+            priorWorkSeconds: Number(att?.prior_work_seconds ?? 0),
+          })
+        : checkInAt
+          ? completedWorkHoursFromPunches(checkInAt, null, {
               storedWorkHours: Number(att?.work_hours ?? 0),
               priorWorkSeconds: Number(att?.prior_work_seconds ?? 0),
             })
-          : checkInAt
-            ? completedWorkHoursFromPunches(checkInAt, null, {
-                storedWorkHours: Number(att?.work_hours ?? 0),
-                priorWorkSeconds: Number(att?.prior_work_seconds ?? 0),
-              })
-            : 0;
+          : 0;
 
-      // Prefer stored status for HR manual sheet overrides.
-      // Punch rows are reconciled from punches so early checkout never stays Late.
-      let status: AttendanceDisplayStatus;
-      if (att?.check_in_at) {
-        status = resolveEffectivePunchAttendanceStatus({
-          storedStatus: att.attendance_status,
-          checkInAt: checkInAt,
-          checkOutAt: checkOutAt,
-          attendanceDate: rosterDate,
-          notes: att.notes,
-          rules,
-          today: todayStr,
-        }) as AttendanceStatus;
-      } else if (att?.attendance_status) {
-        status = att.attendance_status as AttendanceStatus;
-      } else if (hasApprovedLeave) {
-        status = "on_leave";
-      } else if (!isSingleDay) {
-        status = "upcoming";
-      } else if (rosterDate === todayStr) {
-        status = isAfter7Pm ? "absent" : "upcoming";
-      } else if (rosterDate > todayStr) {
-        status = "upcoming";
-      } else {
-        status = "absent";
-      }
-
-      const correction = att ? correctionByAttendance.get(att.id) : undefined;
-      const rowNotes = att?.notes ?? null;
-      const locationFlags = resolveAttendanceLocationFlags({
-        checkInLatitude: att?.check_in_latitude,
-        checkInLongitude: att?.check_in_longitude,
-        checkOutLatitude: att?.check_out_latitude,
-        checkOutLongitude: att?.check_out_longitude,
-        notes: rowNotes,
-      });
-
-      records.push({
-        id: att?.id ?? `virtual-${emp.id}-${rosterDate}`,
-        employeeId: emp.id,
-        employeeCode: emp.employee_code ?? "",
-        employeeName: formatCleanEmployeeName(emp.first_name, emp.last_name),
-        departmentId: emp.department_id ?? null,
-        departmentName: department?.name ?? null,
-        designationId: emp.designation_id ?? null,
-        designationTitle: designation?.title ?? null,
-        branchId: att?.branch_id ?? emp.branch_id ?? "",
-        branchName: branch?.name ?? null,
+    // Prefer stored status for HR manual sheet overrides.
+    // Punch rows are reconciled from punches so early checkout never stays Late.
+    let status: AttendanceDisplayStatus;
+    if (att?.check_in_at) {
+      status = resolveEffectivePunchAttendanceStatus({
+        storedStatus: att.attendance_status,
+        checkInAt: checkInAt,
+        checkOutAt: checkOutAt,
         attendanceDate: rosterDate,
-        checkInAt,
-        checkOutAt,
-        workHours: punchedWorkHours,
-        overtimeHours: Number(att?.overtime_hours ?? 0),
-        attendanceStatus: status,
-        notes: rowNotes,
-        correctionId: correction?.id ?? null,
-        correctionStatus:
-          (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??
-          null,
-        hasCheckInLocation: locationFlags.hasCheckInLocation,
-        hasCheckOutLocation: locationFlags.hasCheckOutLocation,
-      });
+        notes: att.notes,
+        rules,
+        today: todayStr,
+      }) as AttendanceStatus;
+    } else if (att?.attendance_status) {
+      status = att.attendance_status as AttendanceStatus;
+    } else if (hasApprovedLeave) {
+      status = "on_leave";
+    } else if (!isSingleDay) {
+      status = "upcoming";
+    } else if (rosterDate === todayStr) {
+      status = isAfter7Pm ? "absent" : "upcoming";
+    } else if (rosterDate > todayStr) {
+      status = "upcoming";
+    } else {
+      status = "absent";
+    }
+
+    const correction = att ? correctionByAttendance.get(att.id) : undefined;
+    const rowNotes = att?.notes ?? null;
+    const locationFlags = resolveAttendanceLocationFlags({
+      checkInLatitude: att?.check_in_latitude,
+      checkInLongitude: att?.check_in_longitude,
+      checkOutLatitude: att?.check_out_latitude,
+      checkOutLongitude: att?.check_out_longitude,
+      notes: rowNotes,
+    });
+
+    return {
+      id: att?.id ?? `virtual-${emp.id}-${rosterDate}`,
+      employeeId: emp.id,
+      employeeCode: emp.employee_code ?? "",
+      employeeName: formatCleanEmployeeName(emp.first_name, emp.last_name),
+      departmentId: emp.department_id ?? null,
+      departmentName: department?.name ?? null,
+      designationId: emp.designation_id ?? null,
+      designationTitle: designation?.title ?? null,
+      branchId: att?.branch_id ?? emp.branch_id ?? "",
+      branchName: branch?.name ?? null,
+      attendanceDate: rosterDate,
+      checkInAt,
+      checkOutAt,
+      workHours: punchedWorkHours,
+      overtimeHours: Number(att?.overtime_hours ?? 0),
+      attendanceStatus: status,
+      notes: rowNotes,
+      correctionId: correction?.id ?? null,
+      correctionStatus:
+        (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??
+        null,
+      hasCheckInLocation: locationFlags.hasCheckInLocation,
+      hasCheckOutLocation: locationFlags.hasCheckOutLocation,
+    };
+  };
+
+  if (slots) {
+    for (const slot of slots) {
+      const emp = employeesById.get(slot.employeeId);
+      if (!emp) continue;
+      records.push(rowFor(emp, slot.rosterDate));
+    }
+    return records;
+  }
+
+  for (const emp of employees) {
+    for (const rosterDate of rosterDates) {
+      records.push(rowFor(emp, rosterDate));
     }
   }
 
@@ -401,6 +488,7 @@ const loadAttendanceRosterMemo = cache(
       search?: string;
       scopedIds: string[] | null;
       includeCorrections: boolean;
+      slots?: Array<{ employeeId: string; rosterDate: string }>;
     };
     const supabase = await createClient();
     return loadAttendanceRosterUncached(supabase, params);
@@ -419,6 +507,7 @@ async function loadAttendanceRoster(
     search?: string;
     scopedIds: string[] | null;
     includeCorrections: boolean;
+    slots?: Array<{ employeeId: string; rosterDate: string }>;
   },
 ): Promise<AttendanceListResult["data"]> {
   const cacheKey = JSON.stringify({
@@ -431,6 +520,7 @@ async function loadAttendanceRoster(
     search: params.search?.trim() ? params.search.trim() : null,
     scopedIds: params.scopedIds ? [...params.scopedIds].sort() : null,
     includeCorrections: params.includeCorrections,
+    slots: params.slots ?? null,
   });
   return loadAttendanceRosterMemo(cacheKey);
 }
@@ -475,7 +565,7 @@ export async function listAttendance(
   const rangeTo = dateTo ?? rangeFrom;
   const isSingleDay = rangeFrom === rangeTo;
 
-  const allRecords = await loadAttendanceRoster(supabase, {
+  const rosterParams = {
     organizationId,
     rangeFrom,
     rangeTo,
@@ -485,7 +575,55 @@ export async function listAttendance(
     search,
     scopedIds,
     includeCorrections: true,
-  });
+  };
+
+  const canPageQuery =
+    !attendanceStatus &&
+    !(isSingleDay && (sortBy === "check_in_at" || sortBy === "employee_code"));
+
+  if (canPageQuery) {
+    const workforce = sortAttendanceEmployees(
+      await fetchAttendanceEmployees(supabase, {
+        organizationId,
+        employeeId,
+        departmentId,
+        branchId,
+        search,
+        scopedIds,
+      }),
+      isSingleDay && sortBy === "employee_code" ? "code" : "name",
+    );
+    const rosterDates = isSingleDay ? [rangeFrom] : eachInclusiveDate(rangeFrom, rangeTo);
+    const total = workforce.length * rosterDates.length;
+    const slots = attendanceRecordSlots({
+      employeeCount: workforce.length,
+      dateCount: rosterDates.length,
+      page: effectivePage,
+      pageSize: effectivePageSize,
+      order: isSingleDay ? "employee" : "date-then-employee",
+    }).flatMap((slot) => {
+      const person = workforce[slot.employeeIndex];
+      const rosterDate = rosterDates[slot.dateIndex];
+      if (!person || !rosterDate) return [];
+      return [{ employeeId: String(person.id), rosterDate }];
+    });
+    const pageData = await loadAttendanceRoster(supabase, {
+      ...rosterParams,
+      slots,
+    });
+    const historySource = employeeId
+      ? await loadAttendanceRoster(supabase, rosterParams)
+      : [];
+    return {
+      data: pageData,
+      total,
+      page: effectivePage,
+      pageSize: effectivePageSize,
+      historyCounts: countAttendanceHistory(historySource),
+    };
+  }
+
+  const allRecords = await loadAttendanceRoster(supabase, rosterParams);
 
   const filteredRecords = allRecords.filter((record) =>
     matchesAttendanceStatusFilter(
@@ -521,26 +659,12 @@ export async function listAttendance(
   const total = filteredRecords.length;
   const pageData = filteredRecords.slice(from, from + effectivePageSize);
 
-  let presentDays = 0;
-  let absentDays = 0;
-  for (const row of allRecords) {
-    if (
-      row.attendanceStatus === "present" ||
-      row.attendanceStatus === "late" ||
-      row.attendanceStatus === "half_day"
-    ) {
-      presentDays += 1;
-    } else if (row.attendanceStatus === "absent") {
-      absentDays += 1;
-    }
-  }
-
   return {
     data: pageData,
     total,
     page: effectivePage,
     pageSize: effectivePageSize,
-    historyCounts: { presentDays, absentDays },
+    historyCounts: countAttendanceHistory(allRecords),
   };
 }
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchCeoOrgEmployeeDetailAction } from "@/lib/ceo/actions/ceo-organization-actions";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { CeoOrgEmployeeDetail } from "@/types/ceo-organization";
 
 type CeoOrganizationDrawerProps = {
@@ -182,7 +183,7 @@ export function CeoOrganizationDrawer({
                 <div>
                   <p className="text-xs text-muted-foreground">Work Hours</p>
                   <p className="font-semibold tabular-nums">
-                    {detail.attendanceSummary.totalWorkHours}
+                    {formatHoursLabel(detail.attendanceSummary.totalWorkHours)}
                   </p>
                 </div>
               </div>

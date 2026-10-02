@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { Button } from "@/components/common/button";
 import {
   Table,
@@ -70,7 +71,7 @@ export function CeoAttendanceDepartmentsTable({
       {
         accessorKey: "averageWorkingHours",
         header: "Average Working Hours",
-        cell: ({ row }) => `${row.original.averageWorkingHours.toFixed(1)} hrs`,
+        cell: ({ row }) => formatHoursLabel(row.original.averageWorkingHours),
       },
       {
         accessorKey: "attendanceScore",

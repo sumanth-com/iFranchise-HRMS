@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 
 import { CEO_ROUTES } from "@/lib/ceo/constants";
-import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
+import { formatCeoCurrency } from "@/components/ceo/ceo-module-primitives";
 import type {
   CeoAttendanceOverview,
   CeoChartItem,
@@ -300,7 +300,7 @@ export function PrioritiesPanel({
         <PriorityTile
           label="Payroll Status"
           value={payroll.status}
-          detail={formatCurrencyInr(payroll.salaryCost)}
+          detail={formatCeoCurrency(payroll.salaryCost)}
           href={CEO_ROUTES.payrollRun}
           icon={<Wallet className="size-3.5" />}
           tone={payroll.pending ? "text-amber-700 dark:text-amber-400" : undefined}

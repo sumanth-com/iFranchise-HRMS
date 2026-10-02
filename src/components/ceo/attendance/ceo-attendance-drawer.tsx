@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { EmployeeAvatar } from "@/components/employees/employee-avatar";
 import {
@@ -159,7 +160,7 @@ export function CeoAttendanceDrawer({
                 <div>
                   <p className="text-xs text-muted-foreground">Avg Hours</p>
                   <p className="font-semibold tabular-nums">
-                    {detail.attendanceSummary.averageHours.toFixed(1)}
+                    {formatHoursLabel(detail.attendanceSummary.averageHours)}
                   </p>
                 </div>
               </div>
@@ -176,7 +177,7 @@ export function CeoAttendanceDrawer({
               />
               <Field
                 label="Overtime"
-                value={`${detail.overtimeHours.toFixed(1)} hrs`}
+                value={formatHoursLabel(detail.overtimeHours)}
               />
               <Field
                 label="Leave Summary"
@@ -233,7 +234,7 @@ export function CeoAttendanceDrawer({
                           {formatAttendanceTime(item.checkInAt)} –{" "}
                           {formatAttendanceTime(item.checkOutAt)}
                           {item.workHours > 0
-                            ? ` · ${item.workHours.toFixed(1)} hrs`
+                            ? ` · ${formatHoursLabel(item.workHours)}`
                             : ""}
                         </p>
                       </div>

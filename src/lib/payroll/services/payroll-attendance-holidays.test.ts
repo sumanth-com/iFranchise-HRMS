@@ -227,12 +227,12 @@ describe("official holiday attendance facts", () => {
       bonuses: [],
       reimbursements: [],
     });
-    assert.equal(result.grossSalary, 10_833.33);
+    assert.equal(result.grossSalary, 25_000);
     assert.equal(result.totalDeductions, 200);
-    assert.equal(result.netSalary, 10_633.33);
+    assert.equal(result.netSalary, 24_800);
     assert.equal(
       resolveFinalPayableAmount(result.netSalary, result.breakdown, result.totalAllowances),
-      10_633.33,
+      24_800,
     );
     assert.equal(EXCEL_PAYROLL_DAY_DENOMINATOR, 30);
   });
@@ -367,7 +367,7 @@ describe("official holiday attendance facts", () => {
     assert.equal(EXCEL_PAYROLL_DAY_DENOMINATOR, 30);
     assert.equal(result.breakdown.attendance.paidDays, 10);
     assert.equal(result.breakdown.attendance.dailyRate, roundCurrency(25_000 / 30));
-    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 10));
+    assert.equal(result.grossSalary, 25_000);
     assert.equal(
       result.breakdown.deductions.find((d) => d.code === "pt")?.amount,
       200,

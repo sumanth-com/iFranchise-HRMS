@@ -37,17 +37,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
-import { formatLateByLabel } from "@/lib/employee/attendance-format";
+import { formatHoursLabel, formatLateByLabel } from "@/lib/employee/attendance-format";
 import type { CorrectionStatus, TeamAttendanceListItem } from "@/types/manager-attendance";
 import { cn } from "@/lib/utils";
-
-function formatHours(hours: number) {
-  if (hours <= 0) return "—";
-  const wholeHours = Math.floor(hours);
-  const minutes = Math.round((hours - wholeHours) * 60);
-  if (minutes <= 0) return `${wholeHours}h`;
-  return `${wholeHours}h ${minutes}m`;
-}
 
 function CorrectionStatusBadge({ status }: { status: CorrectionStatus | null }) {
   if (!status) return null;
@@ -208,10 +200,10 @@ export function ManagerAttendanceTable({
         header: "Hours",
         cell: ({ row }) => (
           <div className="text-sm">
-            <p className="font-medium tabular-nums">{formatHours(row.original.workHours)}</p>
+            <p className="font-medium tabular-nums">{formatHoursLabel(row.original.workHours)}</p>
             {row.original.overtimeHours > 0 ? (
               <p className="text-xs text-muted-foreground tabular-nums">
-                +{formatHours(row.original.overtimeHours)} OT
+                +{formatHoursLabel(row.original.overtimeHours)} OT
               </p>
             ) : null}
           </div>

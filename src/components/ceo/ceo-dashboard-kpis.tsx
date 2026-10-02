@@ -12,7 +12,7 @@ import { useCallback, type MouseEvent } from "react";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { DASHBOARD_KPI_GRID } from "@/components/dashboard/dashboard-surface-classes";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
-import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
+import { formatCeoCurrency } from "@/components/ceo/ceo-module-primitives";
 import type { CeoKpis } from "@/types/ceo-dashboard";
 
 function asNumber(value: number | null | undefined) {
@@ -91,7 +91,7 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
       />
       <EmployeeStatCard
         label="Payroll Cost"
-        value={formatCurrencyInr(asNumber(kpis.payrollCost))}
+        value={formatCeoCurrency(asNumber(kpis.payrollCost))}
         hint="Monthly"
         icon={Wallet}
         accent="text-amber-700 dark:text-amber-400"

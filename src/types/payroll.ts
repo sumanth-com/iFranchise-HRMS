@@ -84,6 +84,10 @@ export type PayrollBreakdown = {
     clDays?: number;
     /** Earned leave days in the as-of window (display; part of paidLeaveDays). */
     elDays?: number;
+    /** CL dates already classified for this payroll month (display only). */
+    clDates?: string[];
+    /** EL dates already classified for this payroll month (display only). */
+    elDates?: string[];
     weekOffDays?: number;
     /** Daily rate = monthly structure gross ÷ payroll working days. */
     dailyRate?: number;
@@ -412,6 +416,7 @@ export type PayslipDetail = {
     accountNumberMasked: string;
     ifscCode: string | null;
     accountHolderName: string | null;
+    branchName?: string | null;
   } | null;
   /** Casual / Earned leave used in payroll month and current balances (no Sick Leave). */
   leaveBalances: {

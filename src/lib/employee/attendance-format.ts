@@ -1,34 +1,39 @@
 import { differenceInSeconds, parseISO } from "date-fns";
 
-/** Decimal hours (e.g. 7.5) -> "7h 30m". Client-safe (no server imports). */
+/**
+ * Decimal hours (e.g. 8.6) -> "8h 36m".
+ * The fraction is a portion of an hour, not clock minutes, so 8.60 is 8h 36m.
+ * Minutes are always two digits. Client-safe (no server imports).
+ */
 export function formatHoursLabel(hours: number) {
-  const safe = Math.max(0, hours);
-  const wholeHours = Math.floor(safe);
-  const minutes = Math.round((safe - wholeHours) * 60);
-  return `${wholeHours}h ${minutes}m`;
+  if (!Number.isFinite(hours) || hours <= 0) return "0h 00m";
+  const totalMinutes = Math.round(hours * 60);
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${wholeHours}h ${String(minutes).padStart(2, "0")}m`;
 }
 
-/** Seconds -> "0h 0m" / "7h 5m". */
+/** Seconds -> "0h 00m" / "7h 05m". */
 export function formatWorkingDuration(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds));
+  const safe = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
-  return `${hours}h ${minutes}m`;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
 }
 
 /**
  * Live open-session label. Shows seconds under 1 hour so the counter
- * visibly advances every second / minute instead of sitting on "0h 0m".
+ * visibly advances every second / minute instead of sitting on "0h 00m".
  */
 export function formatLiveWorkingDuration(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds));
+  const safe = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
   const secs = safe % 60;
   if (hours === 0) {
     return `${minutes}m ${String(secs).padStart(2, "0")}s`;
   }
-  return `${hours}h ${minutes}m`;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
 }
 
 /** Minutes late -> "45m", "1 Hour", "1 hr 1m", "3 hr 7m", etc. */

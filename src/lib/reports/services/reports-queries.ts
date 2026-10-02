@@ -4,6 +4,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { getAssetsReports, getAssetActivityFeed, getAssetsSummary } from "@/lib/assets/services/asset-queries";
 import { ASSET_ACTIVITY_FILTER_ITEMS } from "@/lib/assets/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
@@ -595,7 +596,7 @@ async function runAttendanceReport(
         status: statusMap[row.attendance_status] ?? row.attendance_status,
         checkIn: formatAttendanceTime(row.check_in_at),
         checkOut: formatAttendanceTime(row.check_out_at),
-        overtimeHours: Number(row.overtime_hours ?? 0) > 0 ? `${Number(row.overtime_hours).toFixed(1)} hrs` : "—",
+        overtimeHours: formatHoursLabel(Number(row.overtime_hours ?? 0)),
       };
     });
 

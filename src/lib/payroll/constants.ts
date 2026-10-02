@@ -334,7 +334,12 @@ const PAYROLL_DOWNLOAD = [
   "payslips.download",
 ];
 const SALARY_VIEW = ["salary.view", "salary_structure.view"];
-const SALARY_EDIT = ["salary.edit", "salary_structure.edit", "salary_structure.create"];
+const SALARY_EDIT = [
+  "salary.edit",
+  "salary_structure.edit",
+  "salary_structure.create",
+  PORTAL_PERMISSIONS.ceo,
+];
 const BONUS_VIEW = ["bonus.view", "payroll.view", "payroll.view_all"];
 const BONUS_CREATE = ["bonus.create"];
 const BONUS_APPROVE = ["bonus.approve"];

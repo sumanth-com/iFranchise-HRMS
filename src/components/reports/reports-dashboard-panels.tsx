@@ -3,7 +3,7 @@ import {
   ChartCard,
   MetricCard,
 } from "@/components/reports/report-chart-cards";
-import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
+import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { ChartSeriesItem, ExecutiveDashboard } from "@/types/reports";
 
 function seriesMax(items: ChartSeriesItem[]) {
@@ -36,7 +36,7 @@ export function ReportsDashboardPanels({
           <MetricCard label="Total Employees" value={String(cards.totalEmployees)} />
           <MetricCard label="New Hires" value={String(cards.newHires)} />
           <MetricCard label="Attendance Today" value={String(cards.attendanceToday)} />
-          <MetricCard label="Payroll Cost" value={formatCurrencyInr(cards.payrollCost)} />
+          <MetricCard label="Payroll Cost" value={formatCurrency(cards.payrollCost)} />
           <MetricCard label="Open Recruitments" value={String(cards.openRecruitments)} />
           <MetricCard
             label="Avg Performance"
@@ -140,7 +140,7 @@ export function ReportsDashboardPanels({
                   <BarRow key={`leave-${item.label}`} label={`Leave ${item.label}`} value={item.value} max={seriesMax(leaveTrend)} color="bg-violet-500" />
                 ))}
                 {payrollCostTrend.slice(-1).map((item) => (
-                  <BarRow key={`payroll-${item.label}`} label={`Payroll ${item.label}`} value={item.value} max={seriesMax(payrollCostTrend)} color="bg-amber-500" formatValue={formatCurrencyInr} />
+                  <BarRow key={`payroll-${item.label}`} label={`Payroll ${item.label}`} value={item.value} max={seriesMax(payrollCostTrend)} color="bg-amber-500" formatValue={formatCurrency} />
                 ))}
               </div>
             </div>

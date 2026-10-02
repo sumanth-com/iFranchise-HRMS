@@ -9,15 +9,13 @@ export const OFFICE_LATE_AFTER_TIME = "10:05";
 /** Check-in closes automatically at this office time (legacy; self-service punch no longer locks). */
 export const OFFICE_CHECK_IN_LOCK_TIME = "10:07";
 export const OFFICE_CHECK_OUT_TIME = "19:00";
-/**
- * Legacy first-half marker (14:00). Punch status no longer splits early logout
- * at lunch — any checkout before office end is incomplete/absent.
- */
+/** First half ends at 2:00 p.m. Checkout after this and before 7:00 p.m. is a half day. */
 export const OFFICE_FIRST_HALF_END_TIME = "14:00";
 
 export const LATE_ENTRY_NOTE_TAG = "late-entry";
+/** Written when a late arrival was approved and must not count toward the 3-late penalty. */
+export const LATE_APPROVED_NOTE_TAG = "late-approved";
 export const EARLY_LOGOUT_FULL_NOTE_TAG = "early-logout:full";
-/** @deprecated Half-day early logout is no longer applied; kept for note cleanup. */
 export const EARLY_LOGOUT_HALF_NOTE_TAG = "early-logout:half";
 
 export function getTodayDateString(timeZone = OFFICE_TIMEZONE) {
@@ -163,25 +161,53 @@ export function istMinutesFromMidnight(timestamp: string): number | null {
 export type EarlyLogoutKind = "none" | "full_lop" | "half_day";
 
 /**
- * Early logout vs office end (19:00 / 7:00 PM).
- * - Checkout at/after office end → none (day may be Present or Late from check-in)
- * - Any checkout before office end → incomplete / Absent (not Present or Late)
- *
- * `firstHalfEnd` is ignored for status; kept on the options bag for call-site compat.
+ * Early logout vs the shared first-half and office-end times.
+ * - Checkout at/after office end → none
+ * - Checkout at/after first-half end (14:00) and before office end → half day
+ * - Checkout before the first half is complete → full day
  */
 export function resolveEarlyLogoutKind(
   checkOutAt: string | null | undefined,
   options?: { officeEnd?: string; firstHalfEnd?: string },
 ): EarlyLogoutKind {
-  void options?.firstHalfEnd;
   if (!checkOutAt) return "none";
   const outMinutes = istMinutesFromMidnight(checkOutAt);
   const officeEndMinutes = parseHmToMinutes(options?.officeEnd ?? OFFICE_CHECK_OUT_TIME);
+  const firstHalfEndMinutes = parseHmToMinutes(
+    options?.firstHalfEnd ?? OFFICE_FIRST_HALF_END_TIME,
+  );
   if (outMinutes == null || officeEndMinutes == null) {
     return "none";
   }
   if (outMinutes >= officeEndMinutes) return "none";
+  if (firstHalfEndMinutes != null && outMinutes >= firstHalfEndMinutes) return "half_day";
   return "full_lop";
+}
+
+export function isApprovedLateAttendanceNotes(notes: string | null | undefined): boolean {
+  return new RegExp(`\\b${LATE_APPROVED_NOTE_TAG}\\b`, "i").test(String(notes ?? ""));
+}
+
+/**
+ * Late entries that count toward the 3-late half-day LOP.
+ * Approved lates and morning early-checkout absences do not count.
+ */
+export function isUnapprovedQualifyingLateEntry(
+  status: string | null | undefined,
+  notes?: string | null,
+): boolean {
+  if (isApprovedLateAttendanceNotes(notes)) return false;
+  const normalized = String(status ?? "");
+  if (normalized === "late") return true;
+  if (normalized === "half_day" && isLateEntryAttendanceNotes(notes)) return true;
+  if (
+    normalized === "absent" &&
+    isLateEntryAttendanceNotes(notes) &&
+    !isEarlyLogoutFullAttendanceNotes(notes)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export type PunchAttendanceResult = {
@@ -248,11 +274,11 @@ export function mergeAttendancePolicyNotes(
 /**
  * Single source of truth for punch-derived attendance status + policy tags.
  * Priority when checkout exists:
- * 1) checkout < 19:00 → Absent (incomplete) — never Present/Late
- * 2) checkout >= 19:00 + check-in ≤ 10:05 → Present
- * 3) checkout >= 19:00 + check-in > 10:05 → Late
- * Without checkout: in-progress present/late from check-in only (day not finalized).
- * Early-checkout Absent does not count toward the 3-lates/month penalty.
+ * 1) checkout before 14:00 → Absent (morning / incomplete first half)
+ * 2) checkout from 14:00 and before 19:00 → half day
+ * 3) checkout >= 19:00 + check-in ≤ 10:05 → Present
+ * 4) checkout >= 19:00 + check-in > 10:05 → Late
+ * Morning absence does not count toward the 3-late penalty.
  */
 export function resolvePunchAttendanceResult(
   checkInAt: string | null,
@@ -282,24 +308,29 @@ export function resolvePunchAttendanceResult(
 
   // Checkout present: early logout always wins over check-in Late/Present.
   if (finalizeHours && checkOutAt) {
-    if (earlyLogout !== "none") {
+    if (earlyLogout === "full_lop") {
       status = "absent";
+    } else if (earlyLogout === "half_day") {
+      status = "half_day";
     } else if (isLateEntry) {
       status = "late";
     } else {
       status = "present";
     }
   } else if (isLateEntry) {
-    // In-progress only — not a finalized day until checkout (or past day close).
     status = "late";
   } else {
     status = "present";
   }
 
   const policyNoteTags: string[] = [];
-  // Early-checkout Absent never tags late-entry — those days must not feed 3-late penalty.
   if (earlyLogout === "full_lop") {
     policyNoteTags.push(EARLY_LOGOUT_FULL_NOTE_TAG);
+  } else if (earlyLogout === "half_day") {
+    policyNoteTags.push(EARLY_LOGOUT_HALF_NOTE_TAG);
+    if (isLateEntry) policyNoteTags.push(LATE_ENTRY_NOTE_TAG);
+  } else if (isLateEntry) {
+    policyNoteTags.push(LATE_ENTRY_NOTE_TAG);
   }
 
   return { status, isLateEntry, earlyLogout, policyNoteTags };

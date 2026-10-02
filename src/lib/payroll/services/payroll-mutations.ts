@@ -1,12 +1,17 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
+import {
+  activeEmploymentStatusFilter,
+  isActiveEmploymentStatus,
+} from "@/lib/employees/employment-eligibility";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   canRewritePayrollHeader,
   dedupePayrollEmployees,
   evaluatePayrollIntegrity,
+  isActiveWorkforcePayrollEmployee,
   isPayrollEligibleEmployee,
   mergePayrollIntegrityNotes,
+  payrollRunIncludesOnlyActiveWorkforce,
   PayrollIntegrityError,
   type PayrollIntegrityEmployee,
   type PayrollIntegrityItem,
@@ -79,10 +84,12 @@ import {
 import {
   applyPayrollAttendanceDay,
   mergePayrollLeaveSummary,
+  tallyAttendanceLeaveMarkers,
   type PayrollAttendanceDayRow,
 } from "@/lib/payroll/services/payroll-attendance-leave-sync";
 import {
-  generatePayslipNumber,
+  officialPayslipNumber,
+  resolveDisplayedPayslipNumber,
   formatPayrollMonth,
   formatPayrollMonthLabel,
   getMonthDateRange,
@@ -94,6 +101,7 @@ import {
   isReimbursementEarningLine,
   sumPayrollEmployeeRowTotals,
 } from "@/lib/payroll/services/payroll-utils";
+import { persistOfficialPayslipNumber } from "@/lib/payroll/services/payslip-number-backfill";
 import { isRowLevelSecurityError } from "@/lib/errors/user-messages";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
@@ -262,6 +270,7 @@ function payrollEmployeeFromJoin(row: {
   date_of_joining?: string | null;
   app_hidden_at?: string | null;
   deleted_at?: string | null;
+  employment_status?: string | null;
   designations?: { title: string } | { title: string }[] | null;
 } | null): PayrollIntegrityEmployee | null {
   if (!row) return null;
@@ -276,6 +285,7 @@ function payrollEmployeeFromJoin(row: {
     app_hidden_at: row.app_hidden_at,
     deleted_at: row.deleted_at,
     designationTitle: designation?.title ?? null,
+    employment_status: row.employment_status ?? null,
   };
 }
 
@@ -346,6 +356,7 @@ async function loadPayrollIntegrityItems(
           date_of_joining,
           app_hidden_at,
           deleted_at,
+          employment_status,
           designations:designation_id (title)
         )
       `,
@@ -390,12 +401,18 @@ async function persistPayrollHeaderFromValidItems(
     monthDate.getUTCFullYear(),
   ).endDate;
   const items = await loadPayrollIntegrityItems(supabase, payroll.id);
+  const requireActiveEmployment = payrollRunIncludesOnlyActiveWorkforce({
+    payrollStatus: payroll.payroll_status,
+    isLocked: payroll.is_locked,
+    payrollMonth: String(payroll.payroll_month),
+  });
   const report = evaluatePayrollIntegrity({
     items,
     headerGross: Number(payroll.total_gross ?? 0),
     headerDeductions: Number(payroll.total_deductions ?? 0),
     headerNet: Number(payroll.total_net ?? 0),
     periodEnd,
+    requireActiveEmployment,
   });
 
   const mayRewrite = canRewritePayrollHeader({
@@ -454,12 +471,18 @@ async function assertPayrollIntegrityForFinalize(
     monthDate.getUTCFullYear(),
   ).endDate;
   const items = await loadPayrollIntegrityItems(supabase, payrollId);
+  const requireActiveEmployment = payrollRunIncludesOnlyActiveWorkforce({
+    payrollStatus: payroll.payroll_status,
+    isLocked: payroll.is_locked,
+    payrollMonth: String(payroll.payroll_month),
+  });
   const report = evaluatePayrollIntegrity({
     items,
     headerGross: Number(payroll.total_gross ?? 0),
     headerDeductions: Number(payroll.total_deductions ?? 0),
     headerNet: Number(payroll.total_net ?? 0),
     periodEnd,
+    requireActiveEmployment,
   });
 
   if (!report.ok) {
@@ -622,6 +645,7 @@ async function getAttendanceSummary(
       attendance_status: row.attendance_status,
       notes: row.notes,
       overtime_hours: row.overtime_hours,
+      attendance_date: date,
     });
     applyPayrollAttendanceDay(
       summary,
@@ -733,10 +757,34 @@ type LeavePeriodBounds = { periodStart: string; periodEnd: string };
 
 type LeaveSummaryAcc = Required<
   Pick<LeaveMonthSummary, "lopDays" | "paidLeaveDays" | "clDays" | "elDays">
-> & { sandwichDates: string[] };
+> & { sandwichDates: string[]; clDates: string[]; elDates: string[] };
 
 function emptyLeaveSummaryAcc(): LeaveSummaryAcc {
-  return { lopDays: 0, paidLeaveDays: 0, clDays: 0, elDays: 0, sandwichDates: [] };
+  return {
+    lopDays: 0,
+    paidLeaveDays: 0,
+    clDays: 0,
+    elDays: 0,
+    sandwichDates: [],
+    clDates: [],
+    elDates: [],
+  };
+}
+
+/** Dates already visited while splitting paid leave. Does not change day counts. */
+function withLeaveDates(
+  sum: LeaveSummaryAcc,
+  leaveCode: string | undefined,
+  dates: string[],
+): Pick<LeaveSummaryAcc, "clDates" | "elDates"> {
+  const code = String(leaveCode ?? "").trim().toUpperCase();
+  if (code === "CL" && dates.length > 0) {
+    return { clDates: [...sum.clDates, ...dates], elDates: sum.elDates };
+  }
+  if (code === "EL" && dates.length > 0) {
+    return { clDates: sum.clDates, elDates: [...sum.elDates, ...dates] };
+  }
+  return { clDates: sum.clDates, elDates: sum.elDates };
 }
 
 /** Split paid leave into CL/EL for Team Payroll display only (formula still uses paidLeaveDays). */
@@ -778,6 +826,7 @@ function summarizeLeaveRows(
       const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
       const breakdown = row.duration_breakdown;
       const total = Number(row.total_days) || 0;
+      let explicitPaidDates: string[] = [];
       let sandwichDates = [
         ...sum.sandwichDates,
         ...sandwichDatesFromBreakdown(breakdown),
@@ -799,15 +848,19 @@ function summarizeLeaveRows(
       if (period && breakdown?.dayAllocations?.length) {
         let lop = 0;
         let paid = 0;
+        const paidDates: string[] = [];
         for (const day of breakdown.dayAllocations) {
           if (day.date < period.periodStart || day.date > period.periodEnd) continue;
           if (day.counted <= 0) continue;
-          if (day.kind === "paid") paid += day.counted;
-          else if (day.kind === "lop") lop += day.counted;
+          if (day.kind === "paid") {
+            paid += day.counted;
+            paidDates.push(String(day.date).slice(0, 10));
+          } else if (day.kind === "lop") lop += day.counted;
         }
         return {
           lopDays: sum.lopDays + lop,
           ...addPaidLeaveByType(sum, leaveType?.code, paid),
+          ...withLeaveDates(sum, leaveType?.code, paidDates),
           sandwichDates,
         };
       }
@@ -852,15 +905,23 @@ function summarizeLeaveRows(
               paidLeaveDays: sum.paidLeaveDays,
               clDays: sum.clDays,
               elDays: sum.elDays,
+              clDates: sum.clDates,
+              elDates: sum.elDates,
               sandwichDates,
             };
           }
           return {
             lopDays: sum.lopDays + fullLop * scale,
             ...addPaidLeaveByType(sum, leaveType?.code, fullPaid * scale),
+            ...withLeaveDates(
+              sum,
+              leaveType?.code,
+              inPeriodDays.map((day) => String(day.date).slice(0, 10)),
+            ),
             sandwichDates,
           };
         }
+        explicitPaidDates = inPeriodDays.map((day) => String(day.date).slice(0, 10));
       }
 
       if (leaveType?.is_paid === false) {
@@ -869,6 +930,8 @@ function summarizeLeaveRows(
           paidLeaveDays: sum.paidLeaveDays,
           clDays: sum.clDays,
           elDays: sum.elDays,
+          clDates: sum.clDates,
+          elDates: sum.elDates,
           sandwichDates,
         };
       }
@@ -878,6 +941,7 @@ function summarizeLeaveRows(
       return {
         lopDays: sum.lopDays + lop,
         ...addPaidLeaveByType(sum, leaveType?.code, paid),
+        ...withLeaveDates(sum, leaveType?.code, explicitPaidDates),
         sandwichDates,
       };
     },
@@ -1070,6 +1134,7 @@ async function loadPayrollPeriodFacts(
         attendance_status: row.attendance_status,
         notes: row.notes,
         overtime_hours: row.overtime_hours,
+        attendance_date: date,
       };
       attendanceRowsByEmployee.get(row.employee_id)?.push(dayRow);
       applyPayrollAttendanceDay(
@@ -1369,7 +1434,7 @@ async function refreshEmployeePayrollItemForMonth(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, employee_code, first_name, last_name, email, date_of_joining, app_hidden_at, deleted_at, designations:designation_id (title)",
+      "id, employee_code, first_name, last_name, email, date_of_joining, employment_status, app_hidden_at, deleted_at, designations:designation_id (title)",
     )
     .eq("id", employeeId)
     .maybeSingle();
@@ -1398,6 +1463,21 @@ async function refreshEmployeePayrollItemForMonth(
     payrollMonth: payroll.payroll_month,
   });
   if (!mayCreateItems) return;
+
+  if (
+    !isActiveEmploymentStatus(mappedTarget?.employment_status) &&
+    payrollRunIncludesOnlyActiveWorkforce({
+      payrollStatus: payroll.payroll_status,
+      isLocked: payroll.is_locked,
+      payrollMonth: payroll.payroll_month,
+    })
+  ) {
+    const removed = await detachInactiveWorkforceFromPayrollRun(profile, payroll, {
+      employeeId,
+    });
+    if (removed) await persistPayrollHeaderFromValidItems(admin, profile, payroll);
+    return;
+  }
 
   const payrollSettings = await getPayrollSettings(admin, organizationId);
   const calcSettings = calcSettingsFromPayroll(payrollSettings);
@@ -2157,6 +2237,7 @@ export async function processPayrollRun(
     throw new Error("Unauthorized payroll access.");
   }
 
+  await detachInactiveWorkforceFromPayrollRun(profile, payroll);
   await persistPayrollHeaderFromValidItems(supabase, profile, payroll);
   await assertPayrollIntegrityForFinalize(supabase, payrollId);
 
@@ -2377,7 +2458,7 @@ export async function generatePayslips(
   const { data: payroll } = await supabase
     .schema("hrms")
     .from("payrolls")
-    .select("payroll_month")
+    .select("payroll_month, payroll_status, is_locked")
     .eq("id", payrollId)
     .single();
 
@@ -2408,6 +2489,7 @@ export async function generatePayslips(
           date_of_joining,
           app_hidden_at,
           deleted_at,
+          employment_status,
           designations:designation_id (title)
         )
       `,
@@ -2433,7 +2515,17 @@ export async function generatePayslips(
           | null,
       ),
     );
-    if (!isPayrollEligibleEmployee(employee, periodEnd)) continue;
+    if (
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: String(payroll.payroll_status ?? ""),
+        isLocked: payroll.is_locked,
+        payrollMonth: String(payroll.payroll_month),
+      })
+        ? !isActiveWorkforcePayrollEmployee(employee, periodEnd)
+        : !isPayrollEligibleEmployee(employee, periodEnd)
+    ) {
+      continue;
+    }
     if (seenIds.has(item.employee_id)) continue;
     const email = String(employee?.email ?? "").trim().toLowerCase();
     if (email) {
@@ -2442,10 +2534,11 @@ export async function generatePayslips(
     }
     seenIds.add(item.employee_id);
 
-    const payslipNumber = generatePayslipNumber(
-      employee?.employee_code ?? "EMP",
+    const payslipNumber = officialPayslipNumber(
+      employee?.employee_code,
       payroll.payroll_month,
     );
+    if (!payslipNumber) continue;
 
     const { data: existing } = await supabase
       .schema("hrms")
@@ -2454,7 +2547,10 @@ export async function generatePayslips(
       .eq("payroll_item_id", item.id)
       .maybeSingle();
 
-    if (existing) continue;
+    if (existing) {
+      await persistOfficialPayslipNumber(existing.id, payslipNumber);
+      continue;
+    }
 
     const actorId = actorUserId(profile);
     const { error: insertError } = await supabase.schema("hrms").from("payslips").insert({
@@ -3085,10 +3181,13 @@ export async function ensureUnpublishedPayslipForPayrollItem(
   const employee = unwrapRelation(
     item.employees as { employee_code: string } | { employee_code: string }[] | null,
   );
-  const payslipNumber = generatePayslipNumber(
-    employee?.employee_code ?? "EMP",
+  const payslipNumber = officialPayslipNumber(
+    employee?.employee_code,
     payroll.payroll_month,
   );
+  if (!payslipNumber) {
+    throw new Error("Employee code is required to create a payslip.");
+  }
 
   const recovered = await recoverPayslipIdForPayrollItem({
     payrollItemId: item.id,
@@ -3097,7 +3196,10 @@ export async function ensureUnpublishedPayslipForPayrollItem(
     payslipNumber,
     actorId,
   });
-  if (recovered) return recovered;
+  if (recovered) {
+    await persistOfficialPayslipNumber(recovered, payslipNumber);
+    return recovered;
+  }
 
   const nowIso = new Date().toISOString();
   const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
@@ -3141,24 +3243,11 @@ export async function ensureUnpublishedPayslipForPayrollItem(
         payslipNumber,
         actorId,
       });
-      if (again) return again;
-
-      // Number taken by another row we couldn't claim — mint a unique number.
-      const uniqueNumber = `${payslipNumber}-${item.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-      const retry = await attemptInsert(uniqueNumber);
-      if (!retry.error && retry.data?.id) return retry.data.id;
-
-      if (retry.error) {
-        const retryRecovered = await recoverPayslipIdForPayrollItem({
-          payrollItemId: item.id,
-          employeeId: item.employee_id as string,
-          payrollId: payroll.id,
-          payslipNumber: uniqueNumber,
-          actorId,
-        });
-        if (retryRecovered) return retryRecovered;
-        throw new Error(retry.error.message);
+      if (again) {
+        await persistOfficialPayslipNumber(again, payslipNumber);
+        return again;
       }
+      throw new Error(insertError.message);
     } else {
       throw new Error(insertError.message);
     }
@@ -3277,10 +3366,14 @@ export async function releaseEmployeePayslip(
   let payslipNumber = String(existingPayslipRow?.payslip_number ?? "");
 
   if (!payslipId) {
-    payslipNumber = generatePayslipNumber(
-      employee?.employee_code ?? "EMP",
+    const officialNumber = officialPayslipNumber(
+      employee?.employee_code,
       payroll.payroll_month,
     );
+    if (!officialNumber) {
+      throw new Error("Employee code is required to create a payslip.");
+    }
+    payslipNumber = officialNumber;
     const byNumber = await findPayslipIdByNumberForEmployee(
       payslipNumber,
       item.employee_id as string,
@@ -3302,7 +3395,6 @@ export async function releaseEmployeePayslip(
       if (recoveredRow?.email_sent_at) {
         throw new Error("Payslip already sent for this employee and period.");
       }
-      payslipNumber = String(recoveredRow?.payslip_number ?? payslipNumber);
       await admin
         .schema("hrms")
         .from("payslips")
@@ -3365,7 +3457,6 @@ export async function releaseEmployeePayslip(
           if (recoveredRow?.email_sent_at) {
             throw new Error("Payslip already sent for this employee and period.");
           }
-          payslipNumber = String(recoveredRow?.payslip_number ?? payslipNumber);
           await admin
             .schema("hrms")
             .from("payslips")
@@ -3431,6 +3522,10 @@ export async function releaseEmployeePayslip(
 
   if (!payslipId) {
     throw new Error("Payslip could not be created.");
+  }
+
+  if (payslipNumber) {
+    await persistOfficialPayslipNumber(payslipId, payslipNumber);
   }
 
   await archiveDuplicateEmployeePayslipsForMonth(
@@ -3685,7 +3780,7 @@ export async function refreshDraftPayrollItemsForEmployee(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, employee_code, first_name, last_name, email, date_of_joining, app_hidden_at, deleted_at, designations:designation_id (title)",
+      "id, employee_code, first_name, last_name, email, date_of_joining, employment_status, app_hidden_at, deleted_at, designations:designation_id (title)",
     )
     .eq("id", employeeId)
     .maybeSingle();
@@ -3717,6 +3812,20 @@ export async function refreshDraftPayrollItemsForEmployee(
     const month = monthDate.getUTCMonth() + 1;
     const year = monthDate.getUTCFullYear();
     const period = resolvePayrollApplicablePeriod(month, year, { today: asOfDate });
+    if (
+      !isActiveEmploymentStatus(mappedTarget?.employment_status) &&
+      payrollRunIncludesOnlyActiveWorkforce({
+        payrollStatus: payroll.payroll_status,
+        isLocked: payroll.is_locked,
+        payrollMonth: payroll.payroll_month,
+      })
+    ) {
+      const removed = await detachInactiveWorkforceFromPayrollRun(profile, payroll, {
+        employeeId,
+      });
+      if (removed) await persistPayrollHeaderFromValidItems(supabase, profile, payroll);
+      continue;
+    }
     if (period.kind !== "current") continue;
 
     const periodEnd = getMonthDateRange(month, year).endDate;
@@ -4128,7 +4237,8 @@ export async function createReimbursement(
     const canCreateForOthers =
       profile.permissionCodes.includes("reimbursement.create") ||
       profile.permissionCodes.includes("payroll.create") ||
-      profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr);
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr) ||
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo);
     if (!canCreateForOthers) {
       throw new Error("You can only submit reimbursement claims for yourself.");
     }
@@ -4289,7 +4399,7 @@ async function assertReimbursementDecisionAccess(
 }
 
 export async function updatePendingReimbursement(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: {
     reimbursementId: string;
@@ -4302,7 +4412,8 @@ export async function updatePendingReimbursement(
   options?: { employeeId?: string },
 ): Promise<void> {
   const receiptPaths = (input.receiptPaths ?? []).filter(Boolean).slice(0, 5);
-  let query = supabase
+  const admin = createAdminClient();
+  let query = admin
     .schema("hrms")
     .from("employee_reimbursements")
     .update({
@@ -4421,6 +4532,86 @@ export async function createSalaryRevision(
   return data.id;
 }
 
+/**
+ * Drop resigned/terminated employees from the open payroll run.
+ * Approved, paid, locked, and past-month rows are left in place.
+ */
+async function detachInactiveWorkforceFromPayrollRun(
+  profile: UserProfile,
+  payroll: {
+    id: string;
+    payroll_month: string;
+    payroll_status: string;
+    is_locked?: boolean | null;
+  },
+  options?: { employeeId?: string },
+): Promise<boolean> {
+  if (
+    !payrollRunIncludesOnlyActiveWorkforce({
+      payrollStatus: payroll.payroll_status,
+      isLocked: payroll.is_locked,
+      payrollMonth: String(payroll.payroll_month),
+    })
+  ) {
+    return false;
+  }
+
+  const admin = createAdminClient();
+  let query = admin
+    .schema("hrms")
+    .from("payroll_items")
+    .select("id, employee_id, breakdown, employees!inner(employment_status)")
+    .eq("payroll_id", payroll.id)
+    .is("deleted_at", null);
+  if (options?.employeeId) {
+    query = query.eq("employee_id", options.employeeId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const staleIds = (data ?? [])
+    .filter((row) => {
+      if (isImmutablePayrollItem(row.breakdown as PayrollBreakdown | null)) return false;
+      const employee = unwrapRelation(
+        row.employees as
+          | { employment_status?: string | null }
+          | { employment_status?: string | null }[]
+          | null,
+      );
+      return !isActiveEmploymentStatus(employee?.employment_status);
+    })
+    .map((row) => String(row.id));
+
+  if (staleIds.length === 0) return false;
+
+  const now = new Date().toISOString();
+  const { error: itemError } = await admin
+    .schema("hrms")
+    .from("payroll_items")
+    .update({
+      deleted_at: now,
+      updated_by: actorUserId(profile),
+    })
+    .in("id", staleIds)
+    .is("deleted_at", null);
+  if (itemError) throw new Error(itemError.message);
+
+  const { error: payslipError } = await admin
+    .schema("hrms")
+    .from("payslips")
+    .update({ deleted_at: now })
+    .in("payroll_item_id", staleIds)
+    .is("deleted_at", null)
+    .is("email_sent_at", null)
+    .is("published_at", null);
+  if (payslipError && !isRowLevelSecurityError(payslipError)) {
+    throw new Error(payslipError.message);
+  }
+
+  return true;
+}
+
 export async function syncActiveEmployeesIntoPayrollRun(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -4439,6 +4630,11 @@ export async function syncActiveEmployeesIntoPayrollRun(
 
   if (error) throw new Error(error.message);
   if (!payroll || payroll.is_locked) return;
+
+  const detachedFormerEmployees = await detachInactiveWorkforceFromPayrollRun(
+    profile,
+    payroll,
+  );
 
   const monthDate = new Date(`${String(payroll.payroll_month).slice(0, 10)}T00:00:00.000Z`);
   const month = monthDate.getUTCMonth() + 1;
@@ -4468,7 +4664,16 @@ export async function syncActiveEmployeesIntoPayrollRun(
   }
 
   const missing = employees.filter((employee) => !activeIds.has(employee.id));
-  if (missing.length === 0) return;
+  if (missing.length === 0) {
+    if (detachedFormerEmployees) {
+      try {
+        await persistPayrollHeaderFromValidItems(supabase, profile, payroll);
+      } catch (headerError) {
+        if (!isRowLevelSecurityError(headerError)) throw headerError;
+      }
+    }
+    return;
+  }
 
   const payrollSettings = await getPayrollSettings(supabase, organizationId);
   const asOfDate = new Date();
@@ -4556,6 +4761,55 @@ export async function syncActiveEmployeesIntoPayrollRun(
   }
 }
 
+/** Display-only CL/EL dates from attendance already classified for payroll. Does not change amounts. */
+async function loadPayrollLeaveDatesByEmployee(
+  admin: ReturnType<typeof createAdminClient>,
+  employeeIds: string[],
+  month: number,
+  year: number,
+): Promise<Map<string, { clDates: string[]; elDates: string[] }>> {
+  const datesByEmployee = new Map<string, { clDates: string[]; elDates: string[] }>();
+  if (employeeIds.length === 0) return datesByEmployee;
+
+  const applicable = resolvePayrollApplicablePeriod(month, year);
+  if (applicable.kind === "future" || applicable.periodEnd < applicable.periodStart) {
+    return datesByEmployee;
+  }
+
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("attendance")
+    .select("employee_id, attendance_date, attendance_status, notes")
+    .in("employee_id", employeeIds)
+    .gte("attendance_date", applicable.periodStart)
+    .lte("attendance_date", applicable.periodEnd)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  const rowsByEmployee = new Map<string, PayrollAttendanceDayRow[]>();
+  for (const row of data ?? []) {
+    const employeeId = String(row.employee_id);
+    const rows = rowsByEmployee.get(employeeId) ?? [];
+    rows.push({
+      attendance_status: row.attendance_status,
+      notes: row.notes,
+      attendance_date: String(row.attendance_date).slice(0, 10),
+    });
+    rowsByEmployee.set(employeeId, rows);
+  }
+
+  for (const [employeeId, rows] of rowsByEmployee) {
+    const markers = tallyAttendanceLeaveMarkers(rows);
+    datesByEmployee.set(employeeId, {
+      clDates: [...markers.clDates].sort(),
+      elDates: [...markers.elDates].sort(),
+    });
+  }
+
+  return datesByEmployee;
+}
+
 export async function getPayrollRunById(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -4607,6 +4861,7 @@ export async function getPayrollRunById(
           date_of_joining,
           app_hidden_at,
           deleted_at,
+          employment_status,
           departments:department_id (name),
           designations:designation_id (title),
           employment_types:employment_type_id (name)
@@ -4640,17 +4895,31 @@ export async function getPayrollRunById(
   if (approvalsError) throw new Error(approvalsError.message);
 
   const monthDate = new Date(`${String(payroll.payroll_month).slice(0, 10)}T00:00:00.000Z`);
+  const leaveDatesByEmployee = await loadPayrollLeaveDatesByEmployee(
+    admin,
+    (items ?? []).map((row) => String(row.employee_id)),
+    monthDate.getUTCMonth() + 1,
+    monthDate.getUTCFullYear(),
+  );
   const periodEnd = getMonthDateRange(
     monthDate.getUTCMonth() + 1,
     monthDate.getUTCFullYear(),
   ).endDate;
+  const activeWorkforceOnly = payrollRunIncludesOnlyActiveWorkforce({
+    payrollStatus: payroll.payroll_status,
+    isLocked: payroll.is_locked,
+    payrollMonth: String(payroll.payroll_month),
+  });
 
   const visibleItems = (items ?? []).flatMap((row) => {
       const employee = unwrapRelation(row.employees);
       const mappedEmployee = payrollEmployeeFromJoin(
         employee as Parameters<typeof payrollEmployeeFromJoin>[0],
       );
-      if (!isPayrollEligibleEmployee(mappedEmployee, periodEnd)) {
+      const eligible = activeWorkforceOnly
+        ? isActiveWorkforcePayrollEmployee(mappedEmployee, periodEnd)
+        : isPayrollEligibleEmployee(mappedEmployee, periodEnd);
+      if (!eligible) {
         return [];
       }
       const department = employee
@@ -4669,7 +4938,7 @@ export async function getPayrollRunById(
           | { id: string; email_sent_at: string | null; published_at?: string | null }[]
           | null,
       );
-      const breakdown = (row.breakdown as PayrollBreakdown) ?? {
+      const storedBreakdown = (row.breakdown as PayrollBreakdown) ?? {
         earnings: [],
         deductions: [],
         attendance: {
@@ -4679,6 +4948,21 @@ export async function getPayrollRunById(
           lopDays: 0,
           leaveLopDays: 0,
           overtimeHours: 0,
+        },
+      };
+      const leaveDates = leaveDatesByEmployee.get(String(row.employee_id));
+      const breakdown: PayrollBreakdown = {
+        ...storedBreakdown,
+        attendance: {
+          ...storedBreakdown.attendance,
+          clDates:
+            leaveDates && leaveDates.clDates.length > 0
+              ? leaveDates.clDates
+              : (storedBreakdown.attendance.clDates ?? []),
+          elDates:
+            leaveDates && leaveDates.elDates.length > 0
+              ? leaveDates.elDates
+              : (storedBreakdown.attendance.elDates ?? []),
         },
       };
       const payslipSent =
@@ -4948,7 +5232,7 @@ export async function getPayslipById(
     supabase
       .schema("hrms")
       .from("bank_accounts")
-      .select("bank_name, account_number, ifsc_code, account_holder_name, branch_name")
+      .select("id, bank_name, account_number, ifsc_code, account_holder_name, branch_name")
       .eq("employee_id", payslip.employee_id)
       .eq("is_primary", true)
       .is("deleted_at", null)
@@ -4996,9 +5280,18 @@ export async function getPayslipById(
     }
   }
 
+  const payslipNumber = resolveDisplayedPayslipNumber({
+    storedNumber: payslip.payslip_number,
+    employeeCode: employee.employee_code,
+    payrollMonth: payroll.payroll_month,
+  });
+  if (payslipNumber && payslipNumber !== payslip.payslip_number) {
+    await persistOfficialPayslipNumber(payslip.id, payslipNumber);
+  }
+
   const detail: PayslipDetail = {
     id: payslip.id,
-    payslipNumber: payslip.payslip_number,
+    payslipNumber,
     issuedAt: payslip.issued_at,
     payrollMonth: payroll.payroll_month,
     payrollStatus: payroll.payroll_status,
@@ -5047,16 +5340,24 @@ export async function getPayslipById(
     employerContributionTotal,
     breakdown,
     employerContributions,
-    bankAccount: (() => {
+    bankAccount: await (async () => {
       const isReleased = Boolean(payslip.published_at || payslip.email_sent_at);
       const resolved = resolvePayslipBankAccount(breakdown, bankAccount, isReleased);
       if (!resolved) return null;
+      const { resolveMissingBankBranch } = await import(
+        "@/lib/payroll/services/ifsc-branch-lookup"
+      );
+      const enriched = await resolveMissingBankBranch(resolved, {
+        bankAccountId: bankAccount?.id,
+      });
       return {
-        bankName: resolved.bankName,
+        bankName: enriched.bankName || resolved.bankName,
         accountNumberMasked: resolved.accountNumber,
-        ifscCode: resolved.ifscCode,
+        ifscCode: enriched.ifscCode
+          ? String(enriched.ifscCode).trim().toUpperCase()
+          : resolved.ifscCode,
         accountHolderName: resolved.accountHolderName,
-        branchName: resolved.branchName,
+        branchName: enriched.branchName ?? resolved.branchName,
       };
     })(),
     leaveBalances,

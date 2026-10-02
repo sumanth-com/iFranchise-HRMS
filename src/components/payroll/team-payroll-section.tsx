@@ -6,6 +6,7 @@ import { PayrollSettingsForm } from "@/components/payroll/payroll-settings-form"
 import { PayslipHistoryView } from "@/components/payroll/payslip-history-view";
 import { ReimbursementTable } from "@/components/payroll/reimbursement-management";
 import { SalaryStructureTable } from "@/components/payroll/salary-structure-table";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { fetchPayrollSettingsAction } from "@/lib/payroll/actions";
 import {
   canApproveBonus,
@@ -277,7 +278,7 @@ export async function TeamPayrollSection({
         employees={lookups.employees}
         canApprove={canDecide}
         canDelete={false}
-        canCreate={false}
+        canCreate={profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo)}
       />
     );
   }

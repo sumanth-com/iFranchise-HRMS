@@ -20,7 +20,9 @@ import {
 } from "@/lib/payroll/salary-structure-breakdown";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { resolvePayslipDisplayTotals, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc } from "@/lib/payroll/services/payroll-utils";
+import { ensureOfficialPayslipNumbers } from "@/lib/payroll/services/payslip-number-backfill";
+import { resolvePayslipDisplayTotals, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc, resolveDisplayedPayslipNumber } from "@/lib/payroll/services/payroll-utils";
+import { resolveMissingBankBranch } from "@/lib/payroll/services/ifsc-branch-lookup";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
@@ -150,6 +152,7 @@ function buildPublishedPayslipDisplaySummary(
     totalAllowances: latest.totalAllowances,
     grossSalary: latest.grossSalary,
     totalDeductions: latest.totalDeductions,
+    netSalary: latest.netSalary,
     employmentType: latest.employee.employmentType,
   });
 
@@ -286,6 +289,7 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
 ): Promise<EmployeePayrollData> {
   const employeeId = options?.targetEmployeeId ?? profile.employee.id;
   const organizationId = profile.employee.organizationId;
+  await ensureOfficialPayslipNumbers(organizationId);
   // Payslip publication is owned by /api/cron/publish-payslips — never kick off
   // org-wide sequential getPayslipById/PDF/email work on navigation paint.
   void options?.appOrigin;
@@ -403,7 +407,7 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
         .schema("hrms")
         .from("bank_accounts")
         .select(
-          "bank_name, account_holder_name, account_number, ifsc_code, branch_name, account_type, is_primary",
+          "id, bank_name, account_holder_name, account_number, ifsc_code, branch_name, account_type, is_primary",
         )
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
@@ -531,7 +535,11 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
     );
     return {
       id: row.id,
-      payslipNumber: row.payslip_number,
+      payslipNumber: resolveDisplayedPayslipNumber({
+        storedNumber: row.payslip_number,
+        employeeCode: employeeMeta.employeeCode,
+        payrollMonth: payroll?.payroll_month,
+      }),
       employeeId,
       employeeCode: employeeMeta.employeeCode,
       employeeName: `${employeeMeta.firstName} ${employeeMeta.lastName}`.trim(),
@@ -705,7 +713,11 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
     );
     return {
       id: row.id,
-      payslipNumber: row.payslip_number,
+      payslipNumber: resolveDisplayedPayslipNumber({
+        storedNumber: row.payslip_number,
+        employeeCode: employeeMeta.employeeCode,
+        payrollMonth: payroll?.payroll_month,
+      }),
       issuedAt: row.issued_at,
       payrollMonth,
       payrollStatus: payroll?.payroll_status ?? "draft",
@@ -820,13 +832,23 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
     };
   }
 
+  const resolvedBank = bankRow
+    ? await resolveMissingBankBranch(
+        {
+          bankName: bankRow.bank_name,
+          ifscCode: bankRow.ifsc_code ?? null,
+          branchName: bankRow.branch_name ?? null,
+        },
+        { bankAccountId: bankRow.id },
+      )
+    : null;
   const bank = bankRow
     ? displaySalaryBankDetails({
-        bankName: bankRow.bank_name,
+        bankName: resolvedBank?.bankName || bankRow.bank_name,
         accountHolderName: bankRow.account_holder_name,
         accountNumberMasked: bankRow.account_number,
         ifscCode: bankRow.ifsc_code ?? null,
-        branchName: bankRow.branch_name ?? null,
+        branchName: resolvedBank?.branchName ?? bankRow.branch_name ?? null,
         accountType: bankRow.account_type,
       })
     : null;

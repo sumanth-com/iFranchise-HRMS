@@ -22,6 +22,7 @@ import type {
 } from "@/types/ceo-leave";
 import type { HalfDayPeriod, LeaveLookups, LeaveStatus } from "@/types/leave";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { ensureEmployeeMonthlyLeaveAccruals } from "@/lib/leave/services/leave-monthly-accrual";
 import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
@@ -519,6 +520,21 @@ export async function getCeoLeaveSummary(
   const summaryMonth = Number.parseInt(today.slice(5, 7), 10);
   const monthRange = getMonthDateRange(summaryMonth, summaryYear);
   const horizon = format(addDays(new Date(`${today}T00:00:00`), 30), "yyyy-MM-dd");
+
+  const { data: workforce } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .in("employment_status", [...activeEmploymentStatusFilter()])
+    .is("deleted_at", null);
+
+  for (const employee of workforce ?? []) {
+    await ensureEmployeeMonthlyLeaveAccruals(supabase, String(employee.id), {
+      balanceYear: summaryYear,
+      asOfDate: today,
+    });
+  }
 
   const [onLeaveResult, upcomingResult, approvedResult, rejectedResult, balancesResult] =
     await Promise.all([

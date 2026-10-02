@@ -106,16 +106,16 @@ describe("company attendance policy — late / early checkout / hours", () => {
     assert.ok(!notes?.includes("src:LOP"));
   });
 
-  it("10:12 → 18:59 = Absent", () => {
+  it("10:12 → 18:59 = half day after a completed first half", () => {
     const checkIn = `${date}T10:12:00+05:30`;
     const checkOut = `${date}T18:59:00+05:30`;
     const outcome = resolvePunchAttendanceResult(checkIn, checkOut, date, rules, {
       finalizeHours: true,
     });
-    assert.equal(outcome.status, "absent");
-    assert.equal(outcome.earlyLogout, "full_lop");
+    assert.equal(outcome.status, "half_day");
+    assert.equal(outcome.earlyLogout, "half_day");
     assert.equal(outcome.isLateEntry, true);
-    assert.ok(!outcome.policyNoteTags.includes(LATE_ENTRY_NOTE_TAG));
+    assert.ok(outcome.policyNoteTags.includes("early-logout:half"));
   });
 
   it("10:12 → 19:00 = Late", () => {
@@ -127,7 +127,7 @@ describe("company attendance policy — late / early checkout / hours", () => {
     assert.equal(outcome.status, "late");
     assert.equal(outcome.earlyLogout, "none");
     assert.equal(outcome.isLateEntry, true);
-    assert.equal(outcome.policyNoteTags.length, 0);
+    assert.deepEqual(outcome.policyNoteTags, [LATE_ENTRY_NOTE_TAG]);
   });
 
   it("10:08 → 19:15 = Late", () => {
@@ -181,7 +181,8 @@ describe("company attendance policy — late / early checkout / hours", () => {
       rules,
       { finalizeHours: true },
     );
-    assert.equal(earlyOnTime.status, "absent");
+    assert.equal(earlyOnTime.status, "half_day");
+    assert.equal(earlyOnTime.earlyLogout, "half_day");
 
     const correctedPresent = resolvePunchAttendanceResult(
       onTimeIn,
@@ -308,5 +309,48 @@ describe("company attendance policy — late / early checkout / hours", () => {
     applyPayrollAttendanceDay(mixed, "absent", 0, "late-entry|early-logout:full");
     assert.equal(mixed.lateDays, 0);
     assert.equal(mixed.absentDays, 2);
+
+    const approved: PayrollAttendanceSummary = {
+      presentDays: 0,
+      absentDays: 0,
+      halfDays: 0,
+      onLeaveDays: 0,
+      weekOffDays: 0,
+      holidayDays: 0,
+      overtimeHours: 0,
+      lateDays: 0,
+    };
+    applyPayrollAttendanceDay(approved, "late", 0, "late-entry|late-approved");
+    applyPayrollAttendanceDay(approved, "late", 0, "late-entry");
+    applyPayrollAttendanceDay(approved, "late", 0, "late-entry");
+    applyPayrollAttendanceDay(approved, "half_day", 0, "early-logout:half");
+    assert.equal(approved.lateDays, 2);
+    assert.equal(approved.halfDays, 1);
+    assert.equal(approved.presentDays, 3);
+    assert.equal(lateEntryPenaltyDays(approved.lateDays), 0);
+    assert.equal(approved.halfDays * 0.5, 0.5);
+  });
+
+  it("morning checkout is a full day and a completed first half is a half day", () => {
+    assert.equal(resolveEarlyLogoutKind(`${date}T13:30:00+05:30`), "full_lop");
+    assert.equal(resolveEarlyLogoutKind(`${date}T14:00:00+05:30`), "half_day");
+    assert.equal(resolveEarlyLogoutKind(`${date}T15:10:00+05:30`), "half_day");
+    const half = resolvePunchAttendanceResult(
+      `${date}T10:00:00+05:30`,
+      `${date}T15:10:00+05:30`,
+      date,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(half.status, "half_day");
+    const morning = resolvePunchAttendanceResult(
+      `${date}T10:00:00+05:30`,
+      `${date}T13:00:00+05:30`,
+      date,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(morning.status, "absent");
+    assert.equal(morning.earlyLogout, "full_lop");
   });
 });

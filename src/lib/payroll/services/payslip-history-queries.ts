@@ -7,7 +7,8 @@ import {
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
-import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
+import { ensureOfficialPayslipNumbers } from "@/lib/payroll/services/payslip-number-backfill";
+import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel, resolveDisplayedPayslipNumber } from "@/lib/payroll/services/payroll-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 import type { UserProfile } from "@/types/auth";
@@ -137,6 +138,7 @@ export async function listPayslipHistory(
   profile: UserProfile,
   params: PayslipHistoryParams,
 ): Promise<PayslipHistoryResult> {
+  await ensureOfficialPayslipNumbers(profile.employee.organizationId);
   const parsed = payslipHistoryParamsSchema.parse(params);
   const isHr = canViewPayroll(profile.permissionCodes);
   const yearResolved = resolveYearFilter(parsed.yearFilter, parsed.year);
@@ -357,7 +359,13 @@ async function listHrPayslipsFromPayrollRun(
 
     rows.push({
       id: payslipReady ? payslip!.id : "",
-      payslipNumber: payslipReady ? payslip!.payslip_number : "Pending",
+      payslipNumber: payslipReady
+        ? resolveDisplayedPayslipNumber({
+            storedNumber: payslip!.payslip_number,
+            employeeCode: employee?.employee_code,
+            payrollMonth,
+          })
+        : "Pending",
       employeeId: row.employee_id,
       employeeCode: employee?.employee_code ?? "",
       employeeName: employee
@@ -596,7 +604,11 @@ async function listStoredPayslipHistory(
 
     return {
       id: row.id,
-      payslipNumber: row.payslip_number,
+      payslipNumber: resolveDisplayedPayslipNumber({
+        storedNumber: row.payslip_number,
+        employeeCode: employee?.employee_code,
+        payrollMonth: payrollMonthValue,
+      }),
       employeeId: row.employee_id,
       employeeCode: employee?.employee_code ?? "",
       employeeName: employee
@@ -736,6 +748,30 @@ export async function listPayslipVersions(
     return [];
   }
 
+  const { data: parent } = await supabase
+    .schema("hrms")
+    .from("payslips")
+    .select(
+      `
+        payslip_number,
+        employees:employee_id (employee_code),
+        payrolls:payroll_id (payroll_month)
+      `,
+    )
+    .eq("id", payslipId)
+    .maybeSingle();
+  const parentEmployee = unwrapRelation(
+    parent?.employees as { employee_code?: string | null } | { employee_code?: string | null }[] | null,
+  );
+  const parentPayroll = unwrapRelation(
+    parent?.payrolls as { payroll_month?: string | null } | { payroll_month?: string | null }[] | null,
+  );
+  const officialNumber = resolveDisplayedPayslipNumber({
+    storedNumber: parent?.payslip_number,
+    employeeCode: parentEmployee?.employee_code,
+    payrollMonth: parentPayroll?.payroll_month,
+  });
+
   const { data, error } = await supabase
     .schema("hrms")
     .from("payslip_versions")
@@ -751,7 +787,7 @@ export async function listPayslipVersions(
     id: row.id,
     payslipId: row.payslip_id,
     versionNumber: row.version_number,
-    payslipNumber: row.payslip_number,
+    payslipNumber: officialNumber || row.payslip_number,
     storagePath: row.storage_path,
     salaryCreditDate: row.salary_credit_date,
     publishedAt: row.published_at,

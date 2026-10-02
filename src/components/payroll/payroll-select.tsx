@@ -65,6 +65,7 @@ type LabeledSelectProps = {
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
   alignItemWithTrigger?: boolean;
+  nowrapItems?: boolean;
 };
 
 export function LabeledSelect({
@@ -79,6 +80,7 @@ export function LabeledSelect({
   align = "start",
   side = "bottom",
   alignItemWithTrigger = false,
+  nowrapItems = false,
 }: LabeledSelectProps) {
   const safeValue = items.some((item) => item.value === value) ? value : null;
 
@@ -103,7 +105,15 @@ export function LabeledSelect({
       >
         {items.map((item) => (
           <SelectItem key={item.value} value={item.value} className="py-2">
-            <span className="block whitespace-normal leading-snug">{item.label}</span>
+            <span
+              className={
+                nowrapItems
+                  ? "block whitespace-nowrap"
+                  : "block whitespace-normal leading-snug"
+              }
+            >
+              {item.label}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>

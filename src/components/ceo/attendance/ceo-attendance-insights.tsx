@@ -4,6 +4,7 @@ import { Home, Loader2, TrendingDown, Users } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import {
   Select,
   SelectContent,
@@ -203,7 +204,7 @@ export function CeoAttendanceInsights({
                 Overtime
               </p>
               <p className="mt-1 text-xl font-semibold tabular-nums">
-                {kpis.overtimeHours.toFixed(1)}h
+                {formatHoursLabel(kpis.overtimeHours)}
               </p>
             </div>
           </div>
@@ -211,7 +212,7 @@ export function CeoAttendanceInsights({
           <div className="mt-auto pt-3">
             <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
               Monthly {formatCeoPercent(overview.monthlyAttendancePercent)} · Avg{" "}
-              {overview.averageWorkingHours.toFixed(1)} hrs
+              {formatHoursLabel(overview.averageWorkingHours)}
             </div>
           </div>
         </section>

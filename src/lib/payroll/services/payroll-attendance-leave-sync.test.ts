@@ -83,6 +83,30 @@ describe("payroll attendance ↔ leave sync", () => {
     assert.equal(markers.lopDays, 0);
   });
 
+  it("lists CL and EL dates from the same attendance markers without changing day counts", () => {
+    const rows = [
+      { attendance_status: "on_leave", notes: "src:CL", attendance_date: "2026-09-21" },
+      { attendance_status: "on_leave", notes: "src:CL", attendance_date: "2026-09-05" },
+      { attendance_status: "on_leave", notes: "src:EL", attendance_date: "2026-09-25" },
+      { attendance_status: "on_leave", notes: "src:EL", attendance_date: "2026-09-23" },
+      { attendance_status: "present", notes: "src:P", attendance_date: "2026-09-01" },
+    ];
+    const markers = tallyAttendanceLeaveMarkers(rows);
+    assert.equal(markers.clDays, 2);
+    assert.equal(markers.elDays, 2);
+    assert.deepEqual(markers.clDates, ["2026-09-21", "2026-09-05"]);
+    assert.deepEqual(markers.elDates, ["2026-09-25", "2026-09-23"]);
+
+    const leave = mergePayrollLeaveSummary({
+      attendanceRows: rows,
+      requestSummary: { lopDays: 0, paidLeaveDays: 0, clDays: 0, elDays: 0 },
+    });
+    assert.equal(leave.clDays, 2);
+    assert.equal(leave.elDays, 2);
+    assert.deepEqual(leave.clDates, ["2026-09-21", "2026-09-05"]);
+    assert.deepEqual(leave.elDates, ["2026-09-25", "2026-09-23"]);
+  });
+
   it("does not invent LOP when CL/EL exist on attendance but leave-request breakdown says LOP", () => {
     const leave = mergePayrollLeaveSummary({
       attendanceRows: omSeptemberAttendanceRows(),
@@ -162,11 +186,11 @@ describe("payroll attendance ↔ leave sync", () => {
     assert.equal(result.breakdown.attendance.elDays, 1);
     assert.equal(result.breakdown.attendance.lopDays, 0);
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, 20_833.33);
-    assert.equal(result.netSalary, 20_633.33);
+    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.netSalary, 24_800);
     assert.equal(
       resolveFinalPayableAmount(result.netSalary, result.breakdown, result.totalAllowances),
-      20_633.33,
+      24_800,
     );
   });
 
@@ -220,8 +244,8 @@ describe("payroll attendance ↔ leave sync", () => {
       totals.totalGross,
       roundCurrency(rows.reduce((sum, row) => sum + row.grossSalary, 0)),
     );
-    assert.equal(om.grossSalary, 20_833.33);
-    assert.equal(diksha.grossSalary, 40_000);
+    assert.equal(om.grossSalary, 25_000);
+    assert.equal(diksha.grossSalary, roundCurrency(50_000 - 50_000 / 30));
   });
 
   it("counts early logout as unpaid absence and three late markers as half-day LOP", () => {
@@ -249,7 +273,7 @@ describe("payroll attendance ↔ leave sync", () => {
 
     assert.equal(result.breakdown.attendance.paidDays, 2.5);
     assert.equal(result.breakdown.attendance.lopDays, 2);
-    assert.equal(result.grossSalary, 2_500);
+    assert.equal(result.grossSalary, 28_000);
     const displayed = [result, result].map((row) => {
       const amounts = mapPayrollDisplayAmounts({
         basicSalary: row.basicSalary,
@@ -307,7 +331,7 @@ describe("payroll attendance ↔ leave sync", () => {
     assert.equal(leave.elDays, 1);
     assert.equal(leave.lopDays, 1);
     assert.equal(result.breakdown.attendance.paidDays, 2);
-    assert.equal(result.grossSalary, 2_000);
+    assert.equal(result.grossSalary, 29_000);
     assert.equal(result.breakdown.attendance.lopDays, 1);
   });
 });

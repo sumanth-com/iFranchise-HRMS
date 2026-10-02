@@ -33,6 +33,7 @@ import {
   createTeamPromotionAction,
   fetchTeamMemberDetailAction,
 } from "@/lib/manager/actions/team-actions";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { ASSIGNMENT_STATUS_LABELS } from "@/lib/assets/constants";
 import { FEEDBACK_TYPE_LABELS } from "@/lib/performance/constants";
@@ -361,14 +362,6 @@ function TeamMemberTabHeader({ detail }: { detail: TeamMemberDetailBundle }) {
   );
 }
 
-function formatWorkHours(hours: number) {
-  if (hours <= 0) return "—";
-  const wholeHours = Math.floor(hours);
-  const minutes = Math.round((hours - wholeHours) * 60);
-  if (minutes <= 0) return `${wholeHours}h`;
-  return `${wholeHours}h ${minutes}m`;
-}
-
 function TeamMemberEmbeddedTabContent({
   activeTab,
   detail,
@@ -451,7 +444,7 @@ function TeamMemberAttendancePanel({ detail }: { detail: TeamMemberDetailBundle 
     {
       key: "work_hours",
       header: "Work hours",
-      render: (row) => formatWorkHours(Number(row.work_hours ?? 0)),
+      render: (row) => formatHoursLabel(Number(row.work_hours ?? 0)),
     },
   ];
 
@@ -478,7 +471,7 @@ function TeamMemberAttendancePanel({ detail }: { detail: TeamMemberDetailBundle 
         />
         <AttendanceSummaryCard
           label="Total hours"
-          value={formatWorkHours(summary.totalWorkHours)}
+          value={formatHoursLabel(summary.totalWorkHours)}
           accent="text-sky-600 dark:text-sky-400"
         />
       </section>
@@ -537,7 +530,7 @@ function TeamMemberProfileLayout({ detail }: { detail: TeamMemberDetailBundle })
           />
           <ProfileInfoRow
             label="Attendance summary"
-            value={`${detail.attendanceSummary.presentDays} present day(s) · ${detail.attendanceSummary.totalWorkHours.toFixed(1)} total hours`}
+            value={`${detail.attendanceSummary.presentDays} present day(s) · ${formatHoursLabel(detail.attendanceSummary.totalWorkHours)}`}
           />
         </dl>
 
@@ -590,7 +583,7 @@ function OverviewTab({ detail }: { detail: TeamMemberDetailBundle }) {
         <p className="text-xs text-muted-foreground">Attendance summary</p>
         <p className="mt-1 text-sm">
           {detail.attendanceSummary.presentDays} present day(s) ·{" "}
-          {detail.attendanceSummary.totalWorkHours.toFixed(1)} total hours
+          {formatHoursLabel(detail.attendanceSummary.totalWorkHours)}
         </p>
       </div>
     </div>

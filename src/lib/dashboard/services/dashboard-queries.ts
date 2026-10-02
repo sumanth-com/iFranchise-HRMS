@@ -651,7 +651,12 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
           PAYROLL_STATUS_LABELS[row.payroll_status as PayrollStatus] ?? row.payroll_status,
         meta:
           row.total_net != null
-            ? `₹${Number(row.total_net).toLocaleString("en-IN")}`
+            ? new Intl.NumberFormat("en-IN", {
+                style: "currency",
+                currency: "INR",
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }).format(Number(row.total_net))
             : "—",
         href: PAYROLL_ROUTES.detail(row.id),
       };

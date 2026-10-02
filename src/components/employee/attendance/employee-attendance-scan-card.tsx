@@ -1,6 +1,7 @@
 import { CalendarCheck, Clock3, Plane, Star, UserRoundX } from "lucide-react";
 
 import { siteConfig } from "@/config/site";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { EmployeeAttendanceCardSnapshot } from "@/types/employee-attendance-card";
 
 function Stat({
@@ -101,9 +102,7 @@ export function EmployeeAttendanceScanCard({
               Avg hours
             </p>
             <p className="mt-1 text-base font-semibold tabular-nums">
-              {snapshot.averageWorkingHours > 0
-                ? `${snapshot.averageWorkingHours}h`
-                : "—"}
+              {formatHoursLabel(snapshot.averageWorkingHours)}
             </p>
           </div>
 

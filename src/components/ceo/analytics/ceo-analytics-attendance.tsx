@@ -3,6 +3,7 @@ import {
   CeoStatCard,
   formatCeoPercent,
 } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import {
   CeoAnalyticsEmptyNote,
   CeoAnalyticsSectionHeading,
@@ -74,7 +75,7 @@ export function CeoAnalyticsAttendancePanel({
           />
           <CeoStatCard
             label="Avg Hours"
-            value={`${attendance.averageWorkingHours.toFixed(1)}h`}
+            value={formatHoursLabel(attendance.averageWorkingHours)}
           />
         </div>
       ) : null}

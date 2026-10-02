@@ -1,6 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { resolveInternProbationClEntitlement } from "@/lib/leave/leave-entitlement";
+import {
+  resolveInternClStoredBalance,
+  resolveInternProbationClEntitlement,
+} from "@/lib/leave/leave-entitlement";
+import type { LeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { paidDaysFromLeaveRequest, roundLeaveDays } from "@/lib/leave/services/leave-usage";
@@ -85,9 +89,8 @@ export function resolveExpectedMonthlyAccrualAllocatedDays(input: {
 
 /**
  * EL remaining from before `balanceYear`.
- * Always derives policy-earned remaining from joining-month credits minus paid EL
- * usage. A prior-year ledger balance may reduce carry further but can never inflate
- * it above policy (blocks seeded annual pools from carrying into the new year).
+ * When a prior-year ledger balance exists, that remaining balance carries in full
+ * for as long as the employee is employed. It is not capped at one year's credits.
  * CL never carries.
  */
 export function resolveExpectedEarnedLeaveCarryForward(input: {
@@ -101,6 +104,13 @@ export function resolveExpectedEarnedLeaveCarryForward(input: {
   const join = input.joiningDate.slice(0, 10);
   if (Number(join.slice(0, 4)) >= input.balanceYear) return 0;
 
+  if (
+    input.previousYearLedgerBalance != null &&
+    Number.isFinite(Number(input.previousYearLedgerBalance))
+  ) {
+    return roundLeaveDays(Math.max(0, Number(input.previousYearLedgerBalance)));
+  }
+
   const prevYear = input.balanceYear - 1;
   const expectedPrevCredits = resolveExpectedMonthlyAccrualAllocatedDays({
     leaveTypeCode: "EL",
@@ -108,22 +118,61 @@ export function resolveExpectedEarnedLeaveCarryForward(input: {
     balanceYear: prevYear,
     asOfDate: `${prevYear}-12-31`,
     daysPerYear: input.daysPerYear || 12,
-    // Immediate prior year only — no recursive seeded carry into the derivation.
     carriedFromPreviousYear: 0,
   });
   const paidUsed = Math.max(0, Number(input.previousYearPaidUsedDays) || 0);
-  const policyRemaining = roundLeaveDays(Math.max(0, expectedPrevCredits - paidUsed));
+  return roundLeaveDays(Math.max(0, expectedPrevCredits - paidUsed));
+}
 
-  if (
-    input.previousYearLedgerBalance != null &&
-    Number.isFinite(Number(input.previousYearLedgerBalance))
-  ) {
-    return roundLeaveDays(
-      Math.min(Math.max(0, Number(input.previousYearLedgerBalance)), policyRemaining),
-    );
+/** Full-time CL/EL start on the conversion date. Intern/probation CL uses joining date. */
+export function resolveLeaveAccrualStartDate(input: {
+  joiningDate: string | null | undefined;
+  fullTimeEffectiveDate?: string | null;
+  leaveEligibilityBand: LeaveEligibilityBand;
+}): string | null {
+  const joining = input.joiningDate ? input.joiningDate.slice(0, 10) : null;
+  if (input.leaveEligibilityBand !== "full_time_confirmed") return joining;
+  const effective = input.fullTimeEffectiveDate
+    ? input.fullTimeEffectiveDate.slice(0, 10)
+    : null;
+  return effective || joining;
+}
+
+async function loadMonthLeaveUsage(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  leaveTypeId: string,
+  asOfDate: string,
+): Promise<{ used: number; pending: number }> {
+  const monthStart = monthStartDate(asOfDate);
+  const [year, month] = monthStart.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const monthEnd = `${monthStart.slice(0, 7)}-${String(lastDay).padStart(2, "0")}`;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select("leave_status, total_days, duration_breakdown, start_date")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .in("leave_status", ["approved", "pending"])
+    .gte("start_date", monthStart)
+    .lte("start_date", monthEnd)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("[leave] monthly CL usage load failed", error.message);
+    return { used: 0, pending: 0 };
   }
 
-  return policyRemaining;
+  let used = 0;
+  let pending = 0;
+  for (const request of data ?? []) {
+    const paid = paidDaysFromLeaveRequest(request);
+    if (request.leave_status === "approved") used += paid;
+    else if (request.leave_status === "pending") pending += paid;
+  }
+  return { used: roundLeaveDays(used), pending: roundLeaveDays(pending) };
 }
 
 type BalanceAccrualRow = {
@@ -139,6 +188,71 @@ type BalanceAccrualRow = {
     | { code: string; days_per_year?: number | string | null }[]
     | null;
 };
+
+type EmployeeAccrualProfile = {
+  employmentStatus: string;
+  joiningDate: string | null;
+  fullTimeEffectiveDate: string | null;
+  employmentTypeCode: string | null;
+  isFullTime: boolean | null;
+};
+
+const EMPLOYEE_ACCRUAL_SELECT_WITH_CONVERSION =
+  "employment_status, date_of_joining, full_time_effective_date, employment_types:employment_type_id (code, is_full_time)";
+const EMPLOYEE_ACCRUAL_SELECT =
+  "employment_status, date_of_joining, employment_types:employment_type_id (code, is_full_time)";
+
+async function loadEmployeeAccrualProfile(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+): Promise<{ profile: EmployeeAccrualProfile | null; error: string | null }> {
+  let result = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select(EMPLOYEE_ACCRUAL_SELECT_WITH_CONVERSION)
+    .eq("id", employeeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (result.error && /full_time_effective_date/.test(result.error.message)) {
+    result = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select(EMPLOYEE_ACCRUAL_SELECT)
+      .eq("id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
+  }
+
+  if (result.error) {
+    return { profile: null, error: result.error.message };
+  }
+
+  const row = result.data as
+    | {
+        employment_status?: string | null;
+        date_of_joining?: string | null;
+        full_time_effective_date?: string | null;
+        employment_types?:
+          | { code?: string | null; is_full_time?: boolean | null }
+          | { code?: string | null; is_full_time?: boolean | null }[]
+          | null;
+      }
+    | null;
+  const typeRaw = row?.employment_types;
+  const typeRow = Array.isArray(typeRaw) ? typeRaw[0] : typeRaw;
+
+  return {
+    profile: {
+      employmentStatus: String(row?.employment_status ?? "active"),
+      joiningDate: row?.date_of_joining ?? null,
+      fullTimeEffectiveDate: row?.full_time_effective_date ?? null,
+      employmentTypeCode: typeRow?.code ?? null,
+      isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
+    },
+    error: null,
+  };
+}
 
 function unwrapLeaveType(leaveTypes: BalanceAccrualRow["leave_types"]): {
   code: string | null;
@@ -167,29 +281,23 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
   const balanceYear = options?.balanceYear ?? getCurrentBalanceYear(asOf);
   const currentMonthStart = monthStartDate(asOf);
 
-  const { data: employeeRow } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select(
-      "employment_status, date_of_joining, employment_types:employment_type_id (code, is_full_time)",
-    )
-    .eq("id", employeeId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const { profile, error: employeeError } = await loadEmployeeAccrualProfile(supabase, employeeId);
+  if (employeeError || !profile) {
+    console.error("[leave] monthly accrual employee load failed", employeeError ?? "employee not found");
+    return;
+  }
 
-  const employmentStatus = String(employeeRow?.employment_status ?? "active");
-  const typeRaw = employeeRow?.employment_types as
-    | { code?: string | null; is_full_time?: boolean | null }
-    | { code?: string | null; is_full_time?: boolean | null }[]
-    | null
-    | undefined;
-  const typeRow = Array.isArray(typeRaw) ? typeRaw[0] : typeRaw;
   const leaveEligibilityBand = resolveLeaveEligibilityBand({
-    employmentStatus,
-    employmentTypeCode: typeRow?.code ?? null,
-    isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
+    employmentStatus: profile.employmentStatus,
+    employmentTypeCode: profile.employmentTypeCode,
+    isFullTime: profile.isFullTime,
   });
-  const joiningDate = (employeeRow?.date_of_joining as string | null) ?? null;
+  const joiningDate = profile.joiningDate;
+  const accrualStartDate = resolveLeaveAccrualStartDate({
+    joiningDate,
+    fullTimeEffectiveDate: profile.fullTimeEffectiveDate,
+    leaveEligibilityBand,
+  });
 
   const { data, error } = await supabase
     .schema("hrms")
@@ -251,13 +359,21 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
       if (code === "CL") {
         const entitlement = resolveInternProbationClEntitlement({
           joiningDate,
-          employmentStatus,
+          employmentStatus: profile.employmentStatus,
           leaveEligibilityBand,
           asOfDate: asOf,
         });
         const monthly = entitlement?.monthlyEntitlement ?? 0;
-        const allocated = roundLeaveDays(Math.max(monthly, used + pending));
-        const balanceDays = roundLeaveDays(Math.max(0, allocated - used - pending));
+        const monthUsage = await loadMonthLeaveUsage(supabase, employeeId, row.leave_type_id, asOf);
+        const stored = resolveInternClStoredBalance({
+          monthlyEntitlement: monthly,
+          yearUsedDays: used,
+          yearPendingDays: pending,
+          monthUsedDays: monthUsage.used,
+          monthPendingDays: monthUsage.pending,
+        });
+        const allocated = stored.allocatedDays;
+        const balanceDays = stored.balanceDays;
         const accruedThrough = row.accrued_through_month
           ? String(row.accrued_through_month).slice(0, 10)
           : null;
@@ -323,7 +439,7 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
     }
 
     const carriedFromPreviousYear = resolveExpectedEarnedLeaveCarryForward({
-      joiningDate,
+      joiningDate: accrualStartDate,
       balanceYear,
       daysPerYear: daysPerYear || 12,
       previousYearLedgerBalance,
@@ -332,7 +448,7 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
 
     const expectedAllocated = resolveExpectedMonthlyAccrualAllocatedDays({
       leaveTypeCode: code,
-      joiningDate,
+      joiningDate: accrualStartDate,
       balanceYear,
       asOfDate: asOf,
       daysPerYear: daysPerYear || 12,
@@ -386,6 +502,8 @@ export async function resolveMonthlyAccrualOpeningAllocation(
     leaveTypeCode?: string;
     daysPerYear?: number;
     joiningDate?: string | null;
+    fullTimeEffectiveDate?: string | null;
+    leaveEligibilityBand?: LeaveEligibilityBand;
   },
 ): Promise<{ allocatedDays: number; accruedThroughMonth: string }> {
   const currentMonthStart = monthStartDate(asOfDate);
@@ -393,15 +511,40 @@ export async function resolveMonthlyAccrualOpeningAllocation(
   const daysPerYear = options?.daysPerYear ?? 12;
 
   let joiningDate = options?.joiningDate ?? null;
-  if (joiningDate == null) {
-    const { data: employeeRow } = await supabase
-      .schema("hrms")
-      .from("employees")
-      .select("date_of_joining")
-      .eq("id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    joiningDate = (employeeRow?.date_of_joining as string | null) ?? null;
+  let fullTimeEffectiveDate = options?.fullTimeEffectiveDate ?? null;
+  let leaveEligibilityBand = options?.leaveEligibilityBand ?? "full_time_confirmed";
+  if (joiningDate == null || options?.leaveEligibilityBand == null) {
+    const { profile, error: employeeError } = await loadEmployeeAccrualProfile(supabase, employeeId);
+    if (employeeError || !profile) {
+      console.error("[leave] opening allocation employee load failed", employeeError ?? "employee not found");
+      return { allocatedDays: 0, accruedThroughMonth: currentMonthStart };
+    }
+    joiningDate = joiningDate ?? profile.joiningDate;
+    fullTimeEffectiveDate = fullTimeEffectiveDate ?? profile.fullTimeEffectiveDate;
+    leaveEligibilityBand = resolveLeaveEligibilityBand({
+      employmentStatus: profile.employmentStatus,
+      employmentTypeCode: profile.employmentTypeCode,
+      isFullTime: profile.isFullTime,
+    });
+  }
+
+  const accrualStartDate = resolveLeaveAccrualStartDate({
+    joiningDate,
+    fullTimeEffectiveDate,
+    leaveEligibilityBand,
+  });
+
+  if (leaveEligibilityBand === "cl_only" && code === "CL") {
+    const entitlement = resolveInternProbationClEntitlement({
+      joiningDate,
+      employmentStatus: "active",
+      leaveEligibilityBand,
+      asOfDate,
+    });
+    return {
+      allocatedDays: entitlement?.monthlyEntitlement ?? 0,
+      accruedThroughMonth: currentMonthStart,
+    };
   }
 
   let carried = 0;
@@ -430,7 +573,7 @@ export async function resolveMonthlyAccrualOpeningAllocation(
     ]);
 
     carried = resolveExpectedEarnedLeaveCarryForward({
-      joiningDate,
+      joiningDate: accrualStartDate,
       balanceYear,
       daysPerYear,
       previousYearLedgerBalance: previous
@@ -447,7 +590,7 @@ export async function resolveMonthlyAccrualOpeningAllocation(
 
   const allocatedDays = resolveExpectedMonthlyAccrualAllocatedDays({
     leaveTypeCode: code || "CL",
-    joiningDate,
+    joiningDate: accrualStartDate,
     balanceYear,
     asOfDate,
     daysPerYear,

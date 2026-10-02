@@ -1,4 +1,5 @@
 import { BarRow } from "@/components/reports/report-chart-cards";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { CeoAttendanceAnalytics } from "@/types/ceo-attendance";
 
 function TrendCard({
@@ -110,7 +111,7 @@ export function CeoAttendanceAnalytics({
         title="Overtime Trend"
         items={analytics.overtimeTrend}
         color="bg-rose-500"
-        formatValue={(value) => `${value} hrs`}
+        formatValue={(value) => formatHoursLabel(value)}
       />,
     );
   }

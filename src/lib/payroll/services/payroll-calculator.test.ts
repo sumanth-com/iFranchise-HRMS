@@ -146,7 +146,7 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
     });
     assert.equal(result.breakdown.attendance.clDays, 2);
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 25));
+    assert.equal(result.grossSalary, 25_000);
   });
 
   it("counts EL as paid days", () => {
@@ -159,7 +159,7 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
     });
     assert.equal(result.breakdown.attendance.elDays, 1);
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 25));
+    assert.equal(result.grossSalary, 25_000);
   });
 
   it("excludes LOP from Total Working Days", () => {
@@ -184,7 +184,7 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
       lop: 1,
     });
     assert.equal(result.breakdown.attendance.paidDays, 24);
-    assert.equal(result.grossSalary, 40_000);
+    assert.equal(result.grossSalary, roundCurrency(50_000 - 50_000 / 30));
   });
 
   it("excludes Absent from Total Working Days", () => {
@@ -212,7 +212,7 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
     assert.equal(resolveProfessionalTaxForMonthlySalary(50_000, 2), 300);
   });
 
-  it("matches Sept-2026 Excel Om: 19+4+1+1=25 → ₹20,833.33 − PT ₹200", () => {
+  it("keeps full monthly salary when CL and EL are paid and there is no LOP", () => {
     const result = septRow({
       salary: 25_000,
       present: 19,
@@ -221,49 +221,49 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
       el: 1,
     });
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, 20_833.33);
-    assert.equal(result.netSalary, 20_633.33);
+    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.netSalary, 24_800);
   });
 
-  it("matches Sept-2026 Excel Himani: 21+4=25 → ₹20,833.33 − PT ₹200", () => {
+  it("keeps full monthly salary for present and holiday with no LOP", () => {
     const result = septRow({ salary: 25_000, present: 21, holiday: 4 });
-    assert.equal(result.grossSalary, 20_833.33);
-    assert.equal(result.netSalary, 20_633.33);
+    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.netSalary, 24_800);
   });
 
-  it("matches Sept-2026 Excel Akshita: 21+4=25 → ₹5,833.33 (no PT)", () => {
+  it("keeps a below-PT salary whole when there is no LOP", () => {
     const result = septRow({ salary: 7_000, present: 21, holiday: 4 });
-    assert.equal(result.grossSalary, 5_833.33);
-    assert.equal(result.netSalary, 5_833.33);
+    assert.equal(result.grossSalary, 7_000);
+    assert.equal(result.netSalary, 7_000);
   });
 
-  it("matches Sept-2026 Excel Ekta: 18+5+2=25 → ₹20,833.33 − PT ₹200", () => {
+  it("does not reduce salary for CL when there is no LOP", () => {
     const result = septRow({ salary: 25_000, present: 18, holiday: 5, cl: 2 });
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, 20_833.33);
-    assert.equal(result.netSalary, 20_633.33);
+    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.netSalary, 24_800);
   });
 
-  it("matches Sept-2026 Excel Diksha: 20+4=24 (LOP excluded) → ₹40,000 − PT ₹200", () => {
+  it("deducts one recorded LOP day from the full monthly salary", () => {
     const result = septRow({ salary: 50_000, present: 20, holiday: 4, lop: 1 });
     assert.equal(result.breakdown.attendance.paidDays, 24);
-    assert.equal(result.grossSalary, 40_000);
-    assert.equal(result.netSalary, 39_800);
+    assert.equal(result.grossSalary, roundCurrency(50_000 - 50_000 / 30));
+    assert.equal(result.netSalary, roundCurrency(result.grossSalary - 200));
   });
 
-  it("matches Sept-2026 Excel Swetha: 21+4=25 → ₹41,666.67 − PT ₹200", () => {
+  it("keeps full monthly salary for a completed month with no LOP", () => {
     const result = septRow({ salary: 50_000, present: 21, holiday: 4 });
-    assert.equal(result.grossSalary, 41_666.67);
-    assert.equal(result.netSalary, 41_466.67);
+    assert.equal(result.grossSalary, 50_000);
+    assert.equal(result.netSalary, 49_800);
   });
 
-  it("matches Sept-2026 Excel Sumanth: 21+4=25 → ₹10,000 (no PT)", () => {
+  it("keeps a stipend whole when there is no LOP", () => {
     const result = septRow({ salary: 12_000, present: 21, holiday: 4 });
-    assert.equal(result.grossSalary, 10_000);
-    assert.equal(result.netSalary, 10_000);
+    assert.equal(result.grossSalary, 12_000);
+    assert.equal(result.netSalary, 12_000);
   });
 
-  it("matches Sept-2026 Excel Sneha / Prajjwal / Syed / Hemavathi: ₹8,333.33", () => {
+  it("does not reduce ₹10,000 salaries for CL or present-only months without LOP", () => {
     for (const row of [
       { present: 20, holiday: 4, cl: 1 },
       { present: 21, holiday: 4 },
@@ -271,27 +271,27 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
       { present: 21, holiday: 4 },
     ]) {
       const result = septRow({ salary: 10_000, ...row });
-      assert.equal(result.grossSalary, 8_333.33);
-      assert.equal(result.netSalary, 8_333.33);
+      assert.equal(result.grossSalary, 10_000);
+      assert.equal(result.netSalary, 10_000);
     }
   });
 
-  it("matches Sept-2026 Excel Vivek: 20+4+1=25 → ₹45,138.89 − PT ₹200", () => {
+  it("keeps Vivek's monthly salary when CL is paid and there is no LOP", () => {
     const result = septRow({
       salary: 54_166.67,
       present: 20,
       holiday: 4,
       cl: 1,
     });
-    assert.equal(result.grossSalary, 45_138.89);
-    assert.equal(result.netSalary, 44_938.89);
+    assert.equal(result.grossSalary, 54_166.67);
+    assert.equal(result.netSalary, roundCurrency(54_166.67 - 200));
   });
 
-  it("matches Sept-2026 Excel Shakshay / Shiwali: 21+4=25 → ₹41,666.67 − PT ₹200", () => {
+  it("keeps ₹50,000 salaries whole when there is no LOP", () => {
     for (const _ of [0, 1]) {
       const result = septRow({ salary: 50_000, present: 21, holiday: 4 });
-      assert.equal(result.grossSalary, 41_666.67);
-      assert.equal(result.netSalary, 41_466.67);
+      assert.equal(result.grossSalary, 50_000);
+      assert.equal(result.netSalary, 49_800);
     }
   });
 
@@ -339,14 +339,14 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
     assert.equal(reimbLines.length, 1);
     assert.equal(reimbLines[0]?.amount, 600);
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, 10_000);
-    assert.equal(result.netSalary, 10_000);
+    assert.equal(result.grossSalary, 12_000);
+    assert.equal(result.netSalary, 12_000);
     const finalPayable = resolveFinalPayableAmount(
       result.netSalary,
       result.breakdown,
       result.totalAllowances,
     );
-    assert.equal(finalPayable, 10_600);
+    assert.equal(finalPayable, 12_600);
   });
 
   it("dashboard totals equal the sum of employee-row amounts", () => {
@@ -378,13 +378,13 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
       totals.totalNet,
       roundCurrency(rows.reduce((sum, row) => sum + row.netSalary, 0)),
     );
-    assert.equal(rows[0]?.grossSalary, 20_833.33);
-    assert.equal(rows[1]?.grossSalary, 40_000);
-    assert.equal(rows[2]?.grossSalary, 5_833.33);
+    assert.equal(rows[0]?.grossSalary, 25_000);
+    assert.equal(rows[1]?.grossSalary, roundCurrency(50_000 - 50_000 / 30));
+    assert.equal(rows[2]?.grossSalary, 7_000);
     assert.equal(rows[3]?.grossSalary, 12_000);
     assert.equal(
       totals.totalGross,
-      roundCurrency(20_833.33 + 40_000 + 5_833.33 + 12_000),
+      roundCurrency(rows.reduce((sum, row) => sum + row.grossSalary, 0)),
     );
   });
 
@@ -420,7 +420,7 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
     assert.equal(totals.totalFinalPayable, 332_004);
   });
 
-  it("does not invent a monthly-minus-LOP formula when paid days < 30", () => {
+  it("keeps the full monthly salary when paid days are below 30 and there is no LOP", () => {
     const result = septRow({
       salary: 25_000,
       present: 19,
@@ -428,8 +428,9 @@ describe("payroll calculator — Excel Attendance Sheet formula", () => {
       cl: 1,
       el: 1,
     });
-    assert.notEqual(result.grossSalary, 25_000);
-    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 25));
+    assert.equal(result.breakdown.attendance.paidDays, 25);
+    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.netSalary, 24_800);
   });
 });
 
@@ -498,10 +499,10 @@ describe("payroll calculator", () => {
     const lop = result.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(result.breakdown.attendance.workingDays, 30);
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.grossSalary, 28_000);
     assert.equal(lop?.amount, 2_000);
     assert.equal(result.totalDeductions, 500);
-    assert.equal(result.netSalary, 24_500);
+    assert.equal(result.netSalary, 27_500);
   });
 
   it("does not invent salary when no structure is configured", () => {
@@ -619,7 +620,7 @@ describe("payroll calculator", () => {
     assert.equal(result.breakdown.attendance.workingDays, 30);
     assert.equal(result.breakdown.attendance.paidDays, 3);
     assert.equal(result.breakdown.attendance.dailyRate, 1_000);
-    assert.equal(result.grossSalary, 3_000);
+    assert.equal(result.grossSalary, 30_000);
   });
 
   it("shows zero attendance for a future payroll month", () => {
@@ -663,7 +664,7 @@ describe("payroll calculator", () => {
     });
     assert.equal(result.breakdown.attendance.dailyRate, 1_000);
     assert.equal(result.breakdown.attendance.paidDays, 22);
-    assert.equal(result.grossSalary, 22_000);
+    assert.equal(result.grossSalary, 30_000);
   });
 
   it("normalizes invalid persisted amounts before database writes", () => {
@@ -719,7 +720,7 @@ describe("payroll calculator", () => {
     assert.equal(result.breakdown.attendance.workingDays, 30);
     assert.equal(result.breakdown.attendance.paidDays, 1);
     assert.equal(result.breakdown.attendance.dailyRate, 1_000);
-    assert.equal(result.grossSalary, 1_000);
+    assert.equal(result.grossSalary, 30_000);
   });
 
   it("pays present, holiday, CL, and EL through mid-month and excludes future days", () => {
@@ -740,12 +741,12 @@ describe("payroll calculator", () => {
     });
 
     assert.equal(result.breakdown.attendance.paidDays, 12);
-    assert.equal(result.grossSalary, 12_000);
+    assert.equal(result.grossSalary, 29_000);
     assert.equal(result.breakdown.attendance.lopDays, 1);
     const lop = result.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 1_000);
     assert.equal(result.totalDeductions, 200);
-    assert.equal(result.netSalary, 11_800);
+    assert.equal(result.netSalary, 28_800);
   });
 
   it("does not pay invented attendance for a future month", () => {
@@ -782,5 +783,101 @@ describe("payroll calculator", () => {
       result.breakdown.deductions.find((line) => line.code === "lop")?.amount,
       500,
     );
+    assert.equal(result.grossSalary, 29_500);
+    assert.equal(result.netSalary, roundCurrency(29_500 - 200));
+  });
+
+  it("pays the full monthly salary on day 1 and day 2 when there is no LOP", () => {
+    for (const asOfDate of [new Date("2026-10-01"), new Date("2026-10-02")]) {
+      const result = calculateEmployeePayroll({
+        month: 10,
+        year: 2026,
+        asOfDate,
+        salaryStructure: structure(25_000),
+        attendance: { ...emptyAttendance, presentDays: 1, holidayDays: 0, weekOffDays: 0 },
+        leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+        bonuses: [],
+        reimbursements: [],
+      });
+      assert.equal(result.grossSalary, 25_000);
+      assert.equal(result.totalDeductions, 200);
+      assert.equal(result.netSalary, 24_800);
+    }
+  });
+
+  it("deducts one full LOP, two LOP days, and a half-day LOP from the full salary", () => {
+    const one = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-02"),
+      salaryStructure: structure(25_000),
+      attendance: { ...emptyAttendance, presentDays: 1, absentDays: 1, holidayDays: 0, weekOffDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(one.grossSalary, roundCurrency(25_000 - 25_000 / 30));
+    assert.equal(one.netSalary, roundCurrency(one.grossSalary - 200));
+
+    const two = calculateEmployeePayroll({
+      month: 12,
+      year: 2026,
+      asOfDate: new Date("2026-12-10"),
+      salaryStructure: structure(25_000),
+      attendance: { ...emptyAttendance, presentDays: 4, absentDays: 2, holidayDays: 0, weekOffDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(two.grossSalary, roundCurrency(25_000 - (25_000 / 30) * 2));
+    assert.equal(two.netSalary, roundCurrency(two.grossSalary - 200));
+
+    const half = calculateEmployeePayroll({
+      month: 11,
+      year: 2026,
+      asOfDate: new Date("2026-11-06"),
+      salaryStructure: structure(25_000),
+      attendance: { ...emptyAttendance, presentDays: 3, halfDays: 1, holidayDays: 0, weekOffDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(half.breakdown.attendance.lopDays, 0.5);
+    assert.equal(half.grossSalary, roundCurrency(25_000 - (25_000 / 30) * 0.5));
+  });
+
+  it("does not reduce salary for CL or EL, and adds reimbursement after PT", () => {
+    const leave = calculateEmployeePayroll({
+      month: 10,
+      year: 2026,
+      asOfDate: new Date("2026-10-02"),
+      salaryStructure: structure(25_000),
+      attendance: { ...emptyAttendance, presentDays: 0, holidayDays: 0, weekOffDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 2, clDays: 1, elDays: 1 },
+      bonuses: [],
+      reimbursements: [{ amount: 500, category: "travel" }],
+    });
+    assert.equal(leave.grossSalary, 25_000);
+    assert.equal(leave.netSalary, 24_800);
+    assert.equal(
+      resolveFinalPayableAmount(leave.netSalary, leave.breakdown, leave.totalAllowances),
+      25_300,
+    );
+  });
+
+  it("keeps a completed month on the same full-salary minus actual LOP model", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: new Date("2026-10-02"),
+      salaryStructure: structure(25_000),
+      attendance: { ...emptyAttendance, presentDays: 20, absentDays: 2, holidayDays: 4, weekOffDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 2, clDays: 1, elDays: 1 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.breakdown.attendance.paidDays, 26);
+    assert.equal(result.grossSalary, roundCurrency(25_000 - (25_000 / 30) * 2));
+    assert.equal(result.netSalary, roundCurrency(result.grossSalary - 200));
   });
 });

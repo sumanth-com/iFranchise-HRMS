@@ -6,11 +6,38 @@ import {
   completedWorkHoursFromPunches,
   dayTotalSecondsAfterCheckout,
   elapsedWorkingSeconds,
+  formatHoursLabel,
   formatLiveWorkingDuration,
   formatWorkingDuration,
   sessionWorkingSeconds,
   workHoursFromCheckInOut,
 } from "./attendance-format";
+
+describe("formatHoursLabel", () => {
+  it("converts a decimal hour fraction into clock minutes", () => {
+    assert.equal(formatHoursLabel(8.6), "8h 36m");
+    assert.equal(formatHoursLabel(9 + 4 / 60), "9h 04m");
+    assert.equal(formatHoursLabel(6 + 4 / 60), "6h 04m");
+    assert.equal(formatHoursLabel(0), "0h 00m");
+  });
+
+  it("formats 10:26 to 19:02 as 8h 36m, not 8.60h", () => {
+    const hours = workHoursFromCheckInOut(
+      "2026-10-02T04:56:00.000Z",
+      "2026-10-02T13:32:00.000Z",
+    );
+    assert.equal(Math.round(hours * 100) / 100, 8.6);
+    assert.equal(formatHoursLabel(hours), "8h 36m");
+    assert.equal(formatWorkingDuration(Math.round(hours * 3600)), "8h 36m");
+  });
+
+  it("pads single-digit minutes and rolls 60 rounded minutes into the next hour", () => {
+    assert.equal(formatHoursLabel(1.999), "2h 00m");
+    assert.equal(formatHoursLabel(Number.NaN), "0h 00m");
+    assert.equal(formatWorkingDuration(9 * 3600 + 4 * 60), "9h 04m");
+    assert.equal(formatWorkingDuration(0), "0h 00m");
+  });
+});
 
 describe("elapsedWorkingSeconds", () => {
   it("counts check-in to current time while still checked in", () => {
@@ -39,7 +66,7 @@ describe("elapsedWorkingSeconds", () => {
       "2026-09-02T12:30:00.000Z", // 18:00 IST
     );
     assert.equal(seconds, 9 * 3600);
-    assert.equal(formatWorkingDuration(seconds), "9h 0m");
+    assert.equal(formatWorkingDuration(seconds), "9h 00m");
   });
 
   it("is zero without check-in", () => {
@@ -64,7 +91,7 @@ describe("elapsedWorkingSeconds", () => {
       5 * 3600,
     );
     assert.equal(seconds, 5 * 3600);
-    assert.equal(formatWorkingDuration(seconds), "5h 0m");
+    assert.equal(formatWorkingDuration(seconds), "5h 00m");
   });
 
   it("does not double-count when prior_work_seconds already equals the session (legacy day total)", () => {

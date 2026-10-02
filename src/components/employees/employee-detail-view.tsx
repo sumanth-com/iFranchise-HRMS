@@ -25,6 +25,7 @@ import {
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { SECTION_HEADING_ROW_CLASS } from "@/components/common/table-header-classes";
 import { resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { type EmployeeTab } from "@/lib/employees/constants";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
@@ -644,8 +645,8 @@ function EmployeeAttendanceTab({
 
   const avgHoursPerDay =
     hasPeriod && attendanceSummary.presentDays > 0
-      ? (attendanceSummary.totalWorkHours / attendanceSummary.presentDays).toFixed(2)
-      : "0";
+      ? formatHoursLabel(attendanceSummary.totalWorkHours / attendanceSummary.presentDays)
+      : "0h 00m";
 
   const filteredAttendance = (() => {
     if (!historyFilter) return attendance;
@@ -696,7 +697,7 @@ function EmployeeAttendanceTab({
         />
         <EmployeeStatCard
           label="Total work hours"
-          value={String(hasPeriod ? attendanceSummary.totalWorkHours : 0)}
+          value={formatHoursLabel(hasPeriod ? attendanceSummary.totalWorkHours : 0)}
           icon={Clock3}
           accent="text-sky-600 dark:text-sky-400"
           iconBg="bg-sky-500/10"
@@ -769,7 +770,7 @@ function EmployeeAttendanceTab({
                   render: (row) => {
                     const hours = Number(row.work_hours ?? 0);
                     if (row.attendance_status === "upcoming") return "—";
-                    return Number.isFinite(hours) ? hours.toFixed(2) : "0";
+                    return formatHoursLabel(hours);
                   },
                 },
               ]}

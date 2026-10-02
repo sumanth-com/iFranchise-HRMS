@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   applyLeavePolicyToBalanceSnapshot,
   resolveEmploymentServiceMonth,
+  resolveInternClStoredBalance,
   resolveInternProbationClEntitlement,
   resolvePolicyAdjustedClBalance,
 } from "@/lib/leave/leave-entitlement";
@@ -98,5 +99,33 @@ describe("leave entitlement — intern / probation", () => {
     );
     assert.equal(snapshot.allocatedDays, 1);
     assert.equal(snapshot.balanceDays, 1);
+  });
+
+  it("gives intern month 1/2/3 a fresh CL and stores the same balance the screen shows", () => {
+    const joiningDate = "2026-06-15";
+    for (const [asOfDate, expected] of [
+      ["2026-06-20", 0],
+      ["2026-07-10", 1],
+      ["2026-08-03", 1],
+    ] as const) {
+      const screen = resolvePolicyAdjustedClBalance({
+        joiningDate,
+        employmentStatus: "probation",
+        leaveEligibilityBand: "cl_only",
+        asOfDate,
+        monthUsedDays: 0,
+        monthPendingDays: 0,
+        probationUsedAndPendingCl: 2,
+      });
+      const stored = resolveInternClStoredBalance({
+        monthlyEntitlement: screen?.allocatedDays ?? 0,
+        yearUsedDays: 2,
+        yearPendingDays: 0,
+        monthUsedDays: 0,
+        monthPendingDays: 0,
+      });
+      assert.equal(screen?.balanceDays, expected);
+      assert.equal(stored.balanceDays, expected);
+    }
   });
 });

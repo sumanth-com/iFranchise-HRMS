@@ -14,6 +14,7 @@ import {
   isWorkFromHomeBranch,
 } from "@/lib/manager/services/attendance-correction-service";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { activeEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import {
   formatEmployeeName,
@@ -967,7 +968,7 @@ export async function getCeoAttendanceExceptions(
         label: employee
           ? formatEmployeeName(employee.first_name, employee.last_name)
           : id,
-        meta: `${Math.round(hours * 10) / 10} OT hrs`,
+        meta: `${formatHoursLabel(hours)} OT`,
       };
     });
 

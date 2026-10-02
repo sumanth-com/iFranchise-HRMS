@@ -9,6 +9,7 @@ import {
   dedupePayslipEmployeeDocuments,
   upsertPayslipEmployeeDocument,
 } from "@/lib/payroll/services/payslip-to-employee-document";
+import { resolveDisplayedPayslipNumber } from "@/lib/payroll/services/payroll-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type { PayslipDetail, PayrollBreakdown } from "@/types/payroll";
@@ -20,6 +21,10 @@ type PayslipSyncRow = {
   email_sent_at: string | null;
   published_at: string | null;
   employee_id: string;
+  employees:
+    | { employee_code: string | null }
+    | { employee_code: string | null }[]
+    | null;
   payrolls:
     | { payroll_month: string; organization_id: string }
     | { payroll_month: string; organization_id: string }[]
@@ -66,6 +71,7 @@ export async function syncReleasedPayslipsToEmployeeDocuments(
         email_sent_at,
         published_at,
         employee_id,
+        employees:employee_id (employee_code),
         payrolls!inner (payroll_month, organization_id),
         payroll_items:payroll_item_id (breakdown)
       `,
@@ -88,6 +94,12 @@ export async function syncReleasedPayslipsToEmployeeDocuments(
   for (const row of (data ?? []) as PayslipSyncRow[]) {
     const payroll = unwrapRelation(row.payrolls);
     if (!payroll || payroll.organization_id !== input.organizationId) continue;
+    const employee = unwrapRelation(row.employees);
+    const payslipNumber = resolveDisplayedPayslipNumber({
+      storedNumber: row.payslip_number,
+      employeeCode: employee?.employee_code,
+      payrollMonth: payroll.payroll_month,
+    });
 
     const item = unwrapRelation(row.payroll_items);
     const released = isPayslipOfficiallyReleasedToEmployee({
@@ -126,7 +138,7 @@ export async function syncReleasedPayslipsToEmployeeDocuments(
         organizationId: input.organizationId,
         payslip: {
           id: row.id,
-          payslipNumber: row.payslip_number,
+          payslipNumber,
           payrollMonth: payroll.payroll_month,
           employee: {
             id: row.employee_id,

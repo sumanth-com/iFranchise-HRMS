@@ -33,15 +33,16 @@ describe("official sandwich leave policy", () => {
     });
 
     assert.equal(duration.sandwichDays, 1);
-    assert.equal(duration.totalLeaveDays, 3);
+    assert.equal(duration.totalLeaveDays, 2);
     assert.ok(duration.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
+    assert.equal(duration.days.some((day) => day.date === "2026-09-14" && day.kind === "sandwich"), false);
 
     const allocations = allocateLeaveDaysByBalance(duration, 3, {
       calendar: cal,
       isPaidLeaveType: true,
     });
     const split = splitLeaveDaysFromAllocations(allocations, true);
-    assert.equal(split.paidDays, 3);
+    assert.equal(split.paidDays, 2);
     assert.equal(split.lopDays, 0);
   });
 
@@ -59,7 +60,7 @@ describe("official sandwich leave policy", () => {
       isPaidLeaveType: true,
     });
     const split = splitLeaveDaysFromAllocations(allocations, true);
-    assert.equal(split.lopDays, 3);
+    assert.equal(split.lopDays, 2);
     assert.equal(
       allocations.filter((day) => day.date === "2026-09-13" && day.kind === "lop").length,
       1,
@@ -135,48 +136,24 @@ describe("official sandwich leave policy", () => {
     );
   });
 
-  it("TEST 4c: Monday-only leave with sufficient CL covers preceding Sunday from CL", () => {
+  it("TEST 4c: Monday-only leave does not charge the previous Sunday", () => {
     const duration = calculateLeaveDuration({
       startDate: "2026-09-14",
       endDate: "2026-09-14",
       isHalfDay: false,
       calendar: calendar(),
     });
-    assert.equal(duration.sandwichDays, 1);
-    assert.ok(duration.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
-    assert.equal(duration.totalLeaveDays, 2);
+    assert.equal(duration.sandwichDays, 0);
+    assert.equal(duration.days.some((day) => day.date === "2026-09-13"), false);
+    assert.equal(duration.totalLeaveDays, 1);
 
-    const allocations = allocateLeaveDaysByBalance(duration, 2, {
-      calendar: calendar(),
-      isPaidLeaveType: true,
-    });
-    const split = splitLeaveDaysFromAllocations(allocations, true);
-    assert.equal(split.paidDays, 2);
-    assert.equal(split.lopDays, 0);
-    assert.equal(
-      allocations.filter((day) => day.date === "2026-09-13" && day.kind === "sandwich").length,
-      1,
-    );
-  });
-
-  it("TEST 4c-insufficient: Monday-only with 1 CL → Sunday becomes LOP", () => {
-    const duration = calculateLeaveDuration({
-      startDate: "2026-09-14",
-      endDate: "2026-09-14",
-      isHalfDay: false,
-      calendar: calendar(),
-    });
     const allocations = allocateLeaveDaysByBalance(duration, 1, {
       calendar: calendar(),
       isPaidLeaveType: true,
     });
     const split = splitLeaveDaysFromAllocations(allocations, true);
     assert.equal(split.paidDays, 1);
-    assert.equal(split.lopDays, 1);
-    assert.equal(
-      allocations.filter((day) => day.date === "2026-09-13" && day.kind === "lop").length,
-      1,
-    );
+    assert.equal(split.lopDays, 0);
   });
 
   it("TEST 4d: normal Sunday with no adjacent leave is not sandwiched", () => {
@@ -191,12 +168,12 @@ describe("official sandwich leave policy", () => {
     assert.equal(sandwiched.size, 0);
   });
 
-  it("TEST 5: leave before and after a configured public holiday sandwiches the holiday", () => {
+  it("TEST 5: leave around a declared holiday never makes the holiday sandwich LOP", () => {
     const cal = calendar(["2026-09-16"]);
     const requested = ["2026-09-15", "2026-09-16", "2026-09-17"];
     const absence = absenceLeaveDatesForRange(requested, cal);
     const sandwiched = sandwichedInterveningDates(absence, "2026-09-15", "2026-09-17", cal);
-    assert.equal(sandwiched.has("2026-09-16"), true);
+    assert.equal(sandwiched.has("2026-09-16"), false);
 
     const duration = calculateLeaveDuration({
       startDate: "2026-09-15",
@@ -204,8 +181,9 @@ describe("official sandwich leave policy", () => {
       isHalfDay: false,
       calendar: cal,
     });
-    assert.equal(duration.sandwichDays, 1);
-    assert.equal(duration.totalLeaveDays, 3);
+    assert.equal(duration.sandwichDays, 0);
+    assert.equal(duration.days.some((day) => day.date === "2026-09-16" && day.kind === "sandwich"), false);
+    assert.equal(duration.totalLeaveDays, 2);
   });
 });
 
@@ -264,9 +242,9 @@ describe("leave apply preview integration", () => {
     });
 
     assert.ok(preview);
-    assert.equal(preview.summary.requestedLeaveDays, 2);
+    assert.equal(preview.summary.requestedLeaveDays, 1);
     assert.equal(preview.summary.sandwichLeaveDays, 1);
-    assert.equal(preview.summary.totalLeaveDaysCounted, 3);
+    assert.equal(preview.summary.totalLeaveDaysCounted, 2);
     assert.equal(preview.summary.lopDays, 0);
   });
 });

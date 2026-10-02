@@ -13,6 +13,7 @@ import {
   isLeaveTypeAllowedForBand,
 } from "@/lib/leave/leave-eligibility";
 import { isFormerEmploymentStatus } from "@/lib/employees/employment-eligibility";
+import { resolveEmploymentServiceMonth } from "@/lib/leave/leave-service-month";
 import { shouldBlockInternProbationFirstMonthLeave } from "@/lib/leave/leave-entitlement";
 
 export const PERIOD_LEAVE_CODE = "PL";
@@ -105,8 +106,6 @@ export function getProbationSnapshot(
 
   const joining = parseISO(employee.joiningDate);
   const endsOn = format(addMonths(joining, rules.durationMonths), "yyyy-MM-dd");
-  const monthOneEnds = format(addMonths(joining, 1), "yyyy-MM-dd");
-  const monthTwoEnds = format(addMonths(joining, 2), "yyyy-MM-dd");
   const stillInWindow = asOf < endsOn;
   const confirmed = employee.employmentStatus === "active";
   const onProbation =
@@ -116,7 +115,9 @@ export function getProbationSnapshot(
     return { onProbation: false, month: null, endsOn };
   }
 
-  const month: 1 | 2 | 3 = asOf < monthOneEnds ? 1 : asOf < monthTwoEnds ? 2 : 3;
+  const serviceMonth = resolveEmploymentServiceMonth(employee.joiningDate, asOf);
+  const month: 1 | 2 | 3 =
+    serviceMonth == null ? 1 : serviceMonth <= 1 ? 1 : serviceMonth === 2 ? 2 : 3;
   return { onProbation: true, month, endsOn };
 }
 
@@ -266,12 +267,7 @@ export function validateLeavePolicy(input: {
   }
 
   if (probation.onProbation) {
-    if (probation.month === 1 && !probationRules.firstMonthLeaveAllowed) {
-      issues.push({
-        code: "probation_month_1",
-        message: "Leave is not permitted during the first month of probation.",
-      });
-    } else if (isPl) {
+    if (isPl) {
       if (probationRules.periodLeaveFemaleOnly && !isFemale) {
         issues.push({
           code: "pl_gender",
@@ -286,13 +282,7 @@ export function validateLeavePolicy(input: {
         });
       }
     } else if (isCl) {
-      const used = input.employee.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0;
-      if (used + input.duration.totalLeaveDays > probationRules.casualLeaveCap) {
-        issues.push({
-          code: "cl_cap",
-          message: `During probation you can take a total of ${probationRules.casualLeaveCap} Casual Leave days in the second and third months.`,
-        });
-      }
+      // Monthly entitlement is enforced by the shared CL balance. No lifetime cap.
     } else if (isOptionalHolidayCode(code)) {
       issues.push({
         code: "eligibility",

@@ -37,6 +37,10 @@ import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import { PeoplePageSizeSelect } from "@/components/common/people-page-size-select";
 import {
+  ATTENDANCE_PAGE_SIZE,
+  attendancePageNumbers,
+} from "@/lib/attendance/attendance-pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -64,6 +68,7 @@ import {
   ATTENDANCE_UI_DISPLAY_LABELS,
 } from "@/lib/attendance/manual-status";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import type {
@@ -146,83 +151,15 @@ function formatDateRangeLabel(
 
 type AttendanceColumnMeta = {
   align?: "left" | "center";
-  sticky?: "select" | "id" | "name";
+  width?: string;
 };
 
 const TABLE_HEAD_ROW_CLASS =
   "border-white/10 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:bg-transparent";
 const TABLE_HEAD_CELL_BASE =
-  "h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white";
-const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
-const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
-const STICKY_SELECT_WIDTH = "min-w-[2.75rem] w-[2.75rem]";
-const STICKY_ID_WIDTH = "min-w-[8.75rem] w-[8.75rem]";
-const STICKY_NAME_WIDTH = "min-w-[12.5rem] w-[12.5rem]";
-const STICKY_SELECT_LEFT = "left-0";
-const STICKY_ID_LEFT = "left-0";
-const STICKY_ID_LEFT_WITH_SELECT = "left-[2.75rem]";
-const STICKY_NAME_LEFT = "left-[8.75rem]";
-const STICKY_NAME_LEFT_WITH_SELECT = "left-[11.5rem]";
-const STICKY_HEADER_SELECT_CLASS = cn(
-  TABLE_HEAD_CELL_BASE,
-  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 px-2 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
-  STICKY_SELECT_LEFT,
-  STICKY_SELECT_WIDTH,
-);
-const STICKY_BODY_SELECT_CLASS = cn(
-  TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white px-2 shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
-  STICKY_SELECT_LEFT,
-  STICKY_SELECT_WIDTH,
-);
-const STICKY_HEADER_ID_CLASS = cn(
-  TABLE_HEAD_CELL_BASE,
-  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
-  STICKY_ID_LEFT,
-  STICKY_ID_WIDTH,
-);
-const STICKY_HEADER_ID_WITH_SELECT_CLASS = cn(
-  TABLE_HEAD_CELL_BASE,
-  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
-  STICKY_ID_LEFT_WITH_SELECT,
-  STICKY_ID_WIDTH,
-);
-const STICKY_HEADER_NAME_CLASS = cn(
-  TABLE_HEAD_CELL_BASE,
-  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
-  STICKY_NAME_LEFT,
-  STICKY_NAME_WIDTH,
-);
-const STICKY_HEADER_NAME_WITH_SELECT_CLASS = cn(
-  TABLE_HEAD_CELL_BASE,
-  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
-  STICKY_NAME_LEFT_WITH_SELECT,
-  STICKY_NAME_WIDTH,
-);
-const STICKY_BODY_ID_CLASS = cn(
-  TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
-  STICKY_ID_LEFT,
-  STICKY_ID_WIDTH,
-);
-const STICKY_BODY_ID_WITH_SELECT_CLASS = cn(
-  TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
-  STICKY_ID_LEFT_WITH_SELECT,
-  STICKY_ID_WIDTH,
-);
-const STICKY_BODY_NAME_CLASS = cn(
-  TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
-  STICKY_NAME_LEFT,
-  STICKY_NAME_WIDTH,
-);
-const STICKY_BODY_NAME_WITH_SELECT_CLASS = cn(
-  TABLE_DATA_CELL_BASE,
-  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] table-sticky-solid group-hover:bg-zinc-50",
-  STICKY_NAME_LEFT_WITH_SELECT,
-  STICKY_NAME_WIDTH,
-);
+  "h-auto min-h-11 whitespace-normal bg-transparent px-2 py-2 align-middle text-xs font-semibold uppercase tracking-wide text-white";
+const TABLE_DATA_CELL_BASE = "whitespace-normal px-2 py-2 align-middle";
+const TABLE_ACTIONS_CELL_CLASS = "px-1 py-2 text-center align-middle";
 
 const FILTER_CONTROL_CLASS =
   "h-10 w-full min-w-0 gap-2 rounded-lg border-border/80 bg-white font-semibold text-foreground dark:bg-input [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
@@ -479,7 +416,7 @@ export function AttendanceTable({
                   onCheckedChange={selection.toggleAll}
                 />
               ),
-              meta: { sticky: "select" } satisfies AttendanceColumnMeta,
+              meta: { width: "3%" } satisfies AttendanceColumnMeta,
               cell: ({ row }: { row: { original: AttendanceListItem } }) => (
                 <ApprovalSelectCheckbox
                   checked={selection.selectedIds.has(row.original.id)}
@@ -494,67 +431,63 @@ export function AttendanceTable({
           ]
         : []),
       {
-        id: "employeeCode",
-        accessorKey: "employeeCode",
-        header: "Employee ID",
-        meta: { align: "left", sticky: "id" } satisfies AttendanceColumnMeta,
-        cell: ({ row }) => row.original.employeeCode,
-      },
-      {
         id: "employeeName",
         accessorKey: "employeeName",
-        header: "Employee Name",
-        meta: { align: "left", sticky: "name" } satisfies AttendanceColumnMeta,
+        header: "Employee",
+        meta: { align: "left", width: showManualStatusAction ? "17%" : "20%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <span className="font-medium tracking-normal not-italic">
-            {row.original.employeeName}
-          </span>
+          <div className="min-w-0 leading-tight">
+            <p className="font-medium tracking-normal">{row.original.employeeName}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              ({row.original.employeeCode})
+            </p>
+          </div>
         ),
       },
       {
         id: "departmentName",
         header: "Department",
-        meta: { align: "left" } satisfies AttendanceColumnMeta,
+        meta: { align: "left", width: "12%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.departmentName ?? "—",
       },
       {
         id: "designationTitle",
         header: "Designation",
-        meta: { align: "left" } satisfies AttendanceColumnMeta,
+        meta: { align: "left", width: "14%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.designationTitle ?? "—",
       },
       {
         id: "attendanceDate",
         accessorKey: "attendanceDate",
         header: "Attendance Date",
-        meta: { align: "center" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "11%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) =>
           format(parseISO(row.original.attendanceDate), "dd MMM yyyy"),
       },
       {
         id: "checkInAt",
         header: "Check In",
-        meta: { align: "center" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "9%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => formatDateTime(row.original.checkInAt),
       },
       {
         id: "checkOutAt",
         header: "Check Out",
-        meta: { align: "center" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "9%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => formatDateTime(row.original.checkOutAt),
       },
       {
         id: "workHours",
         header: "Working Hours",
-        meta: { align: "center" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <span className="tabular-nums">{row.original.workHours.toFixed(2)}h</span>
+          <span className="tabular-nums">{formatHoursLabel(row.original.workHours)}</span>
         ),
       },
       {
         id: "attendanceStatus",
         header: "Status",
-        meta: { align: "center" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "9%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
           <AttendanceStatusBadge
             status={row.original.attendanceStatus}
@@ -565,7 +498,7 @@ export function AttendanceTable({
       {
         id: "actions",
         header: "Actions",
-        meta: { align: "center" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => {
           const pending =
             row.original.correctionStatus === "pending" && row.original.correctionId;
@@ -881,6 +814,7 @@ export function AttendanceTable({
           totalRecords={rowTotal}
           disabled={isPending}
           valueLabel="number"
+          step={ATTENDANCE_PAGE_SIZE}
           className="ml-auto"
           onChange={(nextSize) =>
             updateParams({ pageSize: String(nextSize), page: "1" })
@@ -928,10 +862,10 @@ export function AttendanceTable({
         </div>
       ) : null}
 
-      <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
+      <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-x-hidden overflow-y-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
         <table
           data-slot="table"
-        className="w-full min-w-[72rem] caption-bottom bg-white text-sm dark:bg-input"
+        className="w-full table-fixed caption-bottom bg-white text-sm dark:bg-input"
         >
           <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 shadow-[0_1px_0_rgba(255,255,255,0.12)]">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -940,24 +874,13 @@ export function AttendanceTable({
                   const meta = header.column.columnDef.meta as AttendanceColumnMeta | undefined;
                   const isActions = header.column.id === "actions";
                   const isCenter = meta?.align === "center";
-                  const stickyClass =
-                    meta?.sticky === "select"
-                      ? STICKY_HEADER_SELECT_CLASS
-                      : meta?.sticky === "id"
-                        ? showManualStatusAction
-                          ? STICKY_HEADER_ID_WITH_SELECT_CLASS
-                          : STICKY_HEADER_ID_CLASS
-                        : meta?.sticky === "name"
-                          ? showManualStatusAction
-                            ? STICKY_HEADER_NAME_WITH_SELECT_CLASS
-                            : STICKY_HEADER_NAME_CLASS
-                          : null;
 
                   return (
                     <TableHead
                       key={header.id}
+                      style={meta?.width ? { width: meta.width } : undefined}
                       className={cn(
-                        stickyClass ?? TABLE_HEAD_CELL_BASE,
+                        TABLE_HEAD_CELL_BASE,
                         isActions && TABLE_ACTIONS_CELL_CLASS,
                         isCenter && "text-center",
                       )}
@@ -995,25 +918,12 @@ export function AttendanceTable({
                     const isActions = cell.column.id === "actions";
                     const isSelect = cell.column.id === "select";
                     const isCenter = meta?.align === "center";
-                    const stickyClass =
-                      meta?.sticky === "select"
-                        ? STICKY_BODY_SELECT_CLASS
-                        : meta?.sticky === "id"
-                          ? showManualStatusAction
-                            ? STICKY_BODY_ID_WITH_SELECT_CLASS
-                            : STICKY_BODY_ID_CLASS
-                          : meta?.sticky === "name"
-                            ? showManualStatusAction
-                              ? STICKY_BODY_NAME_WITH_SELECT_CLASS
-                              : STICKY_BODY_NAME_CLASS
-                            : null;
 
                     return (
                       <TableCell
                         key={cell.id}
                         className={cn(
-                          stickyClass ??
-                            (isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_DATA_CELL_BASE),
+                          isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_DATA_CELL_BASE,
                           isCenter && "text-center",
                         )}
                         onClick={
@@ -1033,12 +943,58 @@ export function AttendanceTable({
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="text-sm font-medium text-foreground/80">
           Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
           {Math.min(page * pageSize, rowTotal)} of {rowTotal}
           {isEmployeeHistoryView ? " for selected employee and date range" : ""}
         </p>
+        {totalPages > 1 ? (
+          <div className="flex max-w-full flex-wrap items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5"
+              disabled={page <= 1 || isPending}
+              onClick={() => updateParams({ page: String(page - 1) })}
+            >
+              Previous
+            </Button>
+            {attendancePageNumbers(page, totalPages).map((item, index) =>
+              item === "ellipsis" ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="px-1 text-sm text-muted-foreground"
+                >
+                  …
+                </span>
+              ) : (
+                <Button
+                  key={item}
+                  type="button"
+                  variant={item === page ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 min-w-8 px-2"
+                  disabled={isPending || item === page}
+                  onClick={() => updateParams({ page: String(item) })}
+                >
+                  {item}
+                </Button>
+              ),
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5"
+              disabled={page >= totalPages || isPending}
+              onClick={() => updateParams({ page: String(page + 1) })}
+            >
+              Next
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {teamRegularizationMode ? (

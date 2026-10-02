@@ -25,6 +25,8 @@ import {
   isValidLatLng,
   resolveAttendanceLocationFlags,
 } from "@/lib/attendance/services/attendance-location";
+import { isQualifyingLateAttendance } from "@/lib/attendance/late-warning";
+import { scheduleLateCheckInWarning } from "@/lib/attendance/late-warning-delivery";
 import {
   notifyAttendanceCheckedIn,
   notifyAttendanceCheckedOut,
@@ -1489,6 +1491,22 @@ export async function punchManagerAttendance(
     if (result.action === "already_checked_in") {
       // Concurrent / double-submit on the same personal row — treat as success.
       return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
+    }
+
+    if (isQualifyingLateAttendance(result.attendance_status, punchNotes)) {
+      const employeeName = [profile.employee.firstName, profile.employee.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      scheduleLateCheckInWarning({
+        organizationId: profile.employee.organizationId,
+        userId: profile.userId,
+        employeeId,
+        employeeName: employeeName || profile.employee.firstName || "Employee",
+        employeeEmail: profile.employee.email || profile.email,
+        attendanceDate: result.attendance_date || today,
+        checkInAt: result.check_in_at || nowIso,
+      });
     }
 
     await writeApplicationAudit(supabase, {

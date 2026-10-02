@@ -74,6 +74,7 @@ import {
   payrollRunSchema,
   reimbursementDecisionSchema,
   reimbursementFormSchema,
+  reimbursementOrgUpdateSchema,
   reimbursementListParamsSchema,
   reimbursementUpdatePendingSchema,
   salaryRevisionFormSchema,
@@ -441,12 +442,14 @@ export async function createSalaryStructureAction(
       "salary.edit",
       "salary_structure.edit",
       "salary_structure.create",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     salaryStructureFormSchema.parse(input);
     const id = await createSalaryStructure(supabase, profile, input);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS["salary-structures"]}`);
     revalidatePath(PAYROLL_ROUTES.run);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
     return { success: true, data: id };
@@ -467,12 +470,14 @@ export async function updateSalaryStructureAction(
       "salary.edit",
       "salary_structure.edit",
       "salary_structure.create",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     salaryStructureFormSchema.parse(input);
     await updateSalaryStructure(supabase, profile, structureId, input);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS["salary-structures"]}`);
     revalidatePath(PAYROLL_ROUTES.run);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
     return { success: true, data: structureId };
@@ -493,11 +498,13 @@ export async function deleteSalaryStructureAction(
       "salary_structure.edit",
       "salary_structure.create",
       "salary_structure.delete",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     await deleteSalaryStructure(supabase, profile, structureId);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS["salary-structures"]}`);
     revalidatePath(PAYROLL_ROUTES.run);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
     return { success: true, data: structureId };
@@ -595,6 +602,32 @@ export async function createReimbursementAction(
     return {
       success: false,
       message: toUserFriendlyError(error, "Failed to create reimbursement"),
+    };
+  }
+}
+
+export async function updateOrgPendingReimbursementAction(
+  input: unknown,
+): Promise<PayrollActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([PORTAL_PERMISSIONS.ceo]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = reimbursementOrgUpdateSchema.parse(input);
+    await updatePendingReimbursement(supabase, profile, {
+      reimbursementId: parsed.reimbursementId,
+      category: parsed.category,
+      amount: parsed.amount,
+      expenseDate: parsed.expenseDate,
+      description: parsed.description,
+      receiptPaths: parsed.receiptPaths ?? [],
+    });
+    revalidateReimbursementViews();
+    revalidateEmployeePayrollViews();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to update reimbursement"),
     };
   }
 }
@@ -776,6 +809,7 @@ export async function uploadReimbursementAttachmentAction(
       PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
+      PORTAL_PERMISSIONS.ceo,
       SYSTEM_ADMIN_PERMISSION,
     ]);
     const file = formData.get("file");

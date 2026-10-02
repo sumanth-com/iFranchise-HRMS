@@ -5,7 +5,9 @@ import {
   isEmployeeAppVisible,
   normalizeEmployeeEmail,
 } from "@/lib/employees/app-hidden";
+import { isActiveEmploymentStatus } from "@/lib/employees/employment-eligibility";
 import { isItSystemAccount } from "@/lib/employees/it-system-account";
+import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
 import { employeeJoinedBy } from "@/lib/payroll/salary-structure-period";
 import { roundCurrency, sumPayrollEmployeeRowTotals } from "@/lib/payroll/services/payroll-utils";
 
@@ -21,6 +23,7 @@ export type PayrollIntegrityEmployee = {
   app_hidden_at?: string | null;
   deleted_at?: string | null;
   designationTitle?: string | null;
+  employment_status?: string | null;
 };
 
 export type PayrollIntegrityItem = {
@@ -92,9 +95,46 @@ export function isPayrollEligibleEmployee(
   return true;
 }
 
+/**
+ * Current and future payroll runs use the same active-workforce rule as
+ * Employee Directory, Attendance, and Leave Balance.
+ * Historical rows stay eligible without this check.
+ */
+export function isActiveWorkforcePayrollEmployee(
+  employee: PayrollIntegrityEmployee | null | undefined,
+  periodEnd?: string,
+): boolean {
+  if (!isPayrollEligibleEmployee(employee, periodEnd)) return false;
+  return isActiveEmploymentStatus(employee?.employment_status);
+}
+
+/**
+ * Open and upcoming runs include only the active workforce.
+ * Past months, and approved, paid, cancelled, or locked runs, keep stored rows.
+ */
+export function payrollRunIncludesOnlyActiveWorkforce(input: {
+  payrollStatus: string;
+  isLocked?: boolean | null;
+  payrollMonth: string;
+  today?: Date;
+}): boolean {
+  if (input.isLocked) return false;
+  const status = input.payrollStatus;
+  if (status === "paid" || status === "approved" || status === "cancelled") return false;
+  const monthDate = new Date(`${String(input.payrollMonth).slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(monthDate.getTime())) return false;
+  const period = resolvePayrollApplicablePeriod(
+    monthDate.getUTCMonth() + 1,
+    monthDate.getUTCFullYear(),
+    { today: input.today },
+  );
+  return period.kind !== "past";
+}
+
 export function ineligibilityReason(
   employee: PayrollIntegrityEmployee | null | undefined,
   periodEnd?: string,
+  options?: { requireActiveEmployment?: boolean },
 ): PayrollIntegrityIssue | null {
   if (!employee) {
     return { code: "hidden_or_excluded", message: "Payroll item has no employee record." };
@@ -147,6 +187,16 @@ export function ineligibilityReason(
       message: `${code} joined ${String(employee.date_of_joining).slice(0, 10)} after payroll period ending ${periodEnd}.`,
     };
   }
+  if (
+    options?.requireActiveEmployment &&
+    !isActiveEmploymentStatus(employee.employment_status)
+  ) {
+    return {
+      code: "hidden_or_excluded",
+      employeeCode: code,
+      message: `${code} is not in the active workforce and cannot be included in the current payroll run.`,
+    };
+  }
   return null;
 }
 
@@ -193,6 +243,8 @@ export function evaluatePayrollIntegrity(input: {
   headerDeductions: number;
   headerNet: number;
   periodEnd: string;
+  /** Current and future runs only. Historical runs keep former employees. */
+  requireActiveEmployment?: boolean;
 }): PayrollIntegrityReport {
   const issues: PayrollIntegrityIssue[] = [];
   const eligibleItems: PayrollIntegrityItem[] = [];
@@ -200,7 +252,9 @@ export function evaluatePayrollIntegrity(input: {
   const seenEmails = new Map<string, string>();
 
   for (const item of input.items) {
-    const reason = ineligibilityReason(item.employee, input.periodEnd);
+    const reason = ineligibilityReason(item.employee, input.periodEnd, {
+      requireActiveEmployment: input.requireActiveEmployment,
+    });
     if (reason) {
       issues.push(reason);
       continue;

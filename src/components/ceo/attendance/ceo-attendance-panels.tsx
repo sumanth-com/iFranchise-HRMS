@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, Building2, Clock } from "lucide-react";
 
 import { BarRow } from "@/components/reports/report-chart-cards";
 import { formatCeoPercent } from "@/components/ceo/ceo-module-primitives";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type {
   CeoAttendanceDepartmentRow,
   CeoAttendanceExceptions,
@@ -147,7 +148,7 @@ function NeedsAttentionPanel({
         />
         <PriorityTile
           label="Overtime"
-          value={`${kpis.overtimeHours.toFixed(1)} hrs`}
+          value={formatHoursLabel(kpis.overtimeHours)}
           detail="Company overtime this period"
           icon={<Clock className="size-3.5" />}
           tone={kpis.overtimeHours > 0 ? "text-violet-600 dark:text-violet-400" : undefined}

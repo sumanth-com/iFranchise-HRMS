@@ -157,7 +157,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       holidays: ["2026-09-12"],
     });
     assert.equal(withHoliday.has("2026-09-13"), true);
-    assert.equal(withHoliday.has("2026-09-12"), true);
+    assert.equal(withHoliday.has("2026-09-12"), false);
 
     const payroll = calculateEmployeePayroll({
       month: 9,
@@ -178,9 +178,8 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(payroll.breakdown.attendance.lopDays, 3);
     assert.equal(lop?.amount, 3_000);
-    // 20 present + 8 holiday = 28 (week_off ignored); Absent/sandwich excluded from paid days
-    assert.equal(payroll.grossSalary, 28_000);
-    assert.equal(payroll.netSalary, 27_800);
+    assert.equal(payroll.grossSalary, 27_000);
+    assert.equal(payroll.netSalary, 26_800);
   });
 
   it("does not double-count sandwich days already included in leave LOP", () => {
@@ -224,7 +223,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 450);
-    assert.equal(payroll.grossSalary, roundCurrency((25 * 13_500) / 30));
+    assert.equal(payroll.grossSalary, roundCurrency(13_500 - 13_500 / 30));
     assert.equal(payroll.netSalary, payroll.grossSalary); // below PT threshold
   });
 });

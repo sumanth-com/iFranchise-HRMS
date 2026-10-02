@@ -39,19 +39,21 @@ export function PeoplePageSizeSelect({
   className,
   totalRecords,
   valueLabel = "people",
+  step = 20,
 }: {
   value: number;
   disabled?: boolean;
   onChange: (pageSize: number) => void;
   className?: string;
-  /** When set, options are 20, 40, 60… based on this count. */
+  /** When set, options are step, step*2, step*3… based on this count. */
   totalRecords?: number;
-  /** `number` shows only 20, 40… without the “people” suffix. */
+  /** `number` shows only the size without the “people” suffix. */
   valueLabel?: "people" | "number";
+  step?: number;
 }) {
   const sizes =
     typeof totalRecords === "number"
-      ? buildSteppedPeoplePageSizes(totalRecords)
+      ? buildSteppedPeoplePageSizes(totalRecords, step)
       : [...PEOPLE_PAGE_SIZES];
 
   const options = sizes.includes(value) ? sizes : [...sizes, value].sort((a, b) => a - b);

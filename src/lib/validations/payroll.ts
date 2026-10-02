@@ -227,6 +227,10 @@ export const reimbursementFormSchema = z.object({
   receiptPaths: z.array(z.string().trim().min(1).max(500)).max(5).optional().default([]),
 });
 
+export const reimbursementOrgUpdateSchema = reimbursementFormSchema.extend({
+  reimbursementId: z.string().uuid(),
+});
+
 export const employeeReimbursementClaimSchema = z.object({
   category: z.enum([
     "food",

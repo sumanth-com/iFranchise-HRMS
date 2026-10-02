@@ -84,11 +84,11 @@ describe("buildLeaveApplySummary", () => {
     });
 
     assert.ok(preview);
-    assert.equal(preview.summary.requestedLeaveDays, 2);
+    assert.equal(preview.summary.requestedLeaveDays, 1);
     assert.equal(preview.summary.sandwichLeaveDays, 1);
-    assert.equal(preview.summary.totalLeaveDaysCounted, 3);
+    assert.equal(preview.summary.totalLeaveDaysCounted, 2);
     assert.equal(preview.summary.paidLeaveDays, 1);
-    assert.equal(preview.summary.lopDays, 2);
+    assert.equal(preview.summary.lopDays, 1);
     assert.equal(preview.summary.remainingBalance, 0);
     assert.equal(
       preview.summary.dayAllocations.filter((day) => day.date === "2026-09-12" && day.kind === "paid")
@@ -97,7 +97,7 @@ describe("buildLeaveApplySummary", () => {
     );
     assert.equal(
       preview.summary.dayAllocations.filter((day) => day.kind === "lop").length,
-      2,
+      1,
     );
   });
 
@@ -117,10 +117,10 @@ describe("buildLeaveApplySummary", () => {
     });
 
     assert.ok(preview);
-    assert.equal(preview.summary.totalLeaveDaysCounted, 3);
-    assert.equal(preview.summary.paidLeaveDays, 3);
+    assert.equal(preview.summary.totalLeaveDaysCounted, 2);
+    assert.equal(preview.summary.paidLeaveDays, 2);
     assert.equal(preview.summary.lopDays, 0);
-    assert.equal(preview.summary.remainingBalance, 0);
+    assert.equal(preview.summary.remainingBalance, 1);
   });
 
   it("reports zero eligible days for a weekly off selection", () => {

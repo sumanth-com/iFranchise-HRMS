@@ -46,6 +46,40 @@ export function resolveBankNameFromIfsc(ifscCode: string | null | undefined): st
   return IFSC_BANK_CODE_NAMES[bankCode] ?? null;
 }
 
+/** True when a branch was actually saved and must not be replaced. */
+export function isStoredBankBranch(value: string | null | undefined): boolean {
+  const stored = (value ?? "").trim();
+  if (!stored || stored === "—" || stored === "-") return false;
+  if (/^pending-/i.test(stored)) return false;
+  if (stored.toLowerCase() === "imported") return false;
+  return true;
+}
+
+/**
+ * Keep a saved branch. Use an IFSC lookup only when the stored branch is missing.
+ */
+export function applyIfscBranch<
+  T extends {
+    bankName?: string | null;
+    ifscCode?: string | null;
+    branchName?: string | null;
+  },
+>(
+  bank: T,
+  resolved: { bankName?: string | null; branchName?: string | null } | null,
+): T {
+  const bankName =
+    resolveEmployeeBankName(bank.bankName, bank.ifscCode) ||
+    resolved?.bankName?.trim() ||
+    bank.bankName;
+  if (isStoredBankBranch(bank.branchName)) {
+    return { ...bank, bankName };
+  }
+  const branchName = resolved?.branchName?.trim() || null;
+  if (!branchName) return { ...bank, bankName };
+  return { ...bank, bankName, branchName };
+}
+
 /** Prefer stored bank name; fall back to IFSC-derived name. */
 export function resolveEmployeeBankName(
   bankName: string | null | undefined,

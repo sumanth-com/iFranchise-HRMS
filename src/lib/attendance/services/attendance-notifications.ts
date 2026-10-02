@@ -1,15 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { requireActiveCeoApproverEmployeeIds } from "@/lib/leave/services/leave-queries";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
-
-function formatHoursLabel(hours: number) {
-  const wholeHours = Math.floor(hours);
-  const minutes = Math.round((hours - wholeHours) * 60);
-  return `${wholeHours}h ${minutes}m`;
-}
 
 export async function notifyAttendanceCheckedIn(
   supabase: AuthSupabaseClient,

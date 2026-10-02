@@ -80,6 +80,7 @@ export default async function CeoEmployeesPage({ searchParams }: EmployeesPagePr
             canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
             canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
             routesBasePath={CEO_ROUTES.employees}
+            employeePicker
           />
         </Suspense>
       </div>

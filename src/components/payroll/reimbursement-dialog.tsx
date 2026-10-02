@@ -7,13 +7,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ReimbursementForm } from "@/components/payroll/reimbursement-management";
+import { ReimbursementForm, type ReimbursementClaimDraft } from "@/components/payroll/reimbursement-management";
 import type { LookupOption } from "@/types/employee";
 
 type ReimbursementDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   employees: LookupOption[];
+  claim?: ReimbursementClaimDraft;
   onSaved?: () => void;
 };
 
@@ -21,6 +22,7 @@ export function ReimbursementDialog({
   open,
   onOpenChange,
   employees,
+  claim,
   onSaved,
 }: ReimbursementDialogProps) {
   function handleSaved() {
@@ -35,17 +37,21 @@ export function ReimbursementDialog({
         showCloseButton
       >
         <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
-          <DialogTitle className="text-lg font-semibold">Submit expense claim</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">
+            {claim ? "Edit expense claim" : "Submit expense claim"}
+          </DialogTitle>
           <DialogDescription className="text-sm">
-            Record an employee expense for reimbursement. Approved claims are included in the next
-            payroll run.
+            {claim
+              ? "Update this pending claim. Approved and paid claims stay unchanged."
+              : "Record an employee expense for reimbursement. Approved claims are included in the next payroll run."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <ReimbursementForm
-            key={open ? "open" : "closed"}
+            key={claim ? claim.id : open ? "open" : "closed"}
             employees={employees}
+            claim={claim}
             variant="dialog"
             onSuccess={handleSaved}
             onCancel={() => onOpenChange(false)}

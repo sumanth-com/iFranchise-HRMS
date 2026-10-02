@@ -8,6 +8,7 @@ import {
   MONTHLY_ACCRUAL_DAYS_PER_MONTH,
   resolveExpectedEarnedLeaveCarryForward,
   resolveExpectedMonthlyAccrualAllocatedDays,
+  resolveLeaveAccrualStartDate,
 } from "@/lib/leave/services/leave-monthly-accrual";
 
 describe("leave monthly accrual helpers", () => {
@@ -100,17 +101,16 @@ describe("leave monthly accrual helpers", () => {
     );
   });
 
-  it("caps seeded prior-year EL ledger at policy-earned remaining", () => {
-    // Seeded 12-day 2025 pool cannot carry into 2026 when only Dec was earned.
+  it("carries the full prior-year EL ledger across years", () => {
     assert.equal(
       resolveExpectedEarnedLeaveCarryForward({
-        joiningDate: "2025-12-01",
+        joiningDate: "2024-01-01",
         balanceYear: 2026,
         daysPerYear: 12,
-        previousYearLedgerBalance: 12,
+        previousYearLedgerBalance: 20,
         previousYearPaidUsedDays: 0,
       }),
-      1,
+      20,
     );
   });
 
@@ -146,6 +146,31 @@ describe("leave monthly accrual helpers", () => {
         previousYearLedgerBalance: null,
       }),
       0,
+    );
+  });
+
+  it("starts full-time accrual on the conversion date", () => {
+    const start = resolveLeaveAccrualStartDate({
+      joiningDate: "2026-01-17",
+      fullTimeEffectiveDate: "2026-06-01",
+      leaveEligibilityBand: "full_time_confirmed",
+    });
+    assert.equal(start, "2026-06-01");
+    assert.equal(
+      countMonthlyAccrualCredits({
+        joiningDate: start,
+        balanceYear: 2026,
+        asOfDate: "2026-09-22",
+      }),
+      4,
+    );
+    assert.equal(
+      resolveLeaveAccrualStartDate({
+        joiningDate: "2026-06-01",
+        fullTimeEffectiveDate: null,
+        leaveEligibilityBand: "cl_only",
+      }),
+      "2026-06-01",
     );
   });
 

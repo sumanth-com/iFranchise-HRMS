@@ -105,7 +105,7 @@ export async function AttendanceHubSection({
       lateMinutes: 0,
       isLocked: false,
       lockMessage: null,
-      workingDurationLabel: "0h 0m",
+      workingDurationLabel: "0h 00m",
       hasCheckInLocation: false,
       hasCheckOutLocation: false,
     },

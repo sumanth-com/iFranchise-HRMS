@@ -26,6 +26,7 @@ import {
   rejectTeamAttendanceCorrectionAction,
 } from "@/lib/manager/actions/manager-attendance-actions";
 import { formatAttendanceTime, toDisplayAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceStatus } from "@/types/attendance";
 import type { TeamAttendanceDetailBundle } from "@/types/manager-attendance";
 import { cn } from "@/lib/utils";
@@ -37,14 +38,6 @@ function DetailField({ label, value }: { label: string; value: string }) {
       <p className="text-sm font-medium">{value}</p>
     </div>
   );
-}
-
-function formatHours(hours: number) {
-  if (hours <= 0) return "—";
-  const wholeHours = Math.floor(hours);
-  const minutes = Math.round((hours - wholeHours) * 60);
-  if (minutes <= 0) return `${wholeHours}h`;
-  return `${wholeHours}h ${minutes}m`;
 }
 
 function formatBreakMinutes(minutes: number) {
@@ -111,7 +104,7 @@ export function ManagerAttendanceDetailDrawer({
     {
       key: "workHours",
       header: "Hours",
-      render: (row) => formatHours(row.workHours),
+      render: (row) => formatHoursLabel(row.workHours),
     },
     {
       key: "attendanceStatus",
@@ -225,9 +218,9 @@ export function ManagerAttendanceDetailDrawer({
             <section className="grid gap-3 sm:grid-cols-2">
               <DetailField label="Check In" value={formatAttendanceTime(detail.checkInAt)} />
               <DetailField label="Check Out" value={formatAttendanceTime(detail.checkOutAt)} />
-              <DetailField label="Total Hours" value={formatHours(detail.workHours)} />
+              <DetailField label="Total Hours" value={formatHoursLabel(detail.workHours)} />
               <DetailField label="Break Duration" value={formatBreakMinutes(detail.breakMinutes)} />
-              <DetailField label="Overtime" value={formatHours(detail.overtimeHours)} />
+              <DetailField label="Overtime" value={formatHoursLabel(detail.overtimeHours)} />
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>
                 <AttendanceStatusBadge status={detail.attendanceStatus} notes={detail.notes} />

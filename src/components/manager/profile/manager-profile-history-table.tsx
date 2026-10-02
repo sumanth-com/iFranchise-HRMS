@@ -230,7 +230,7 @@ export function ManagerProfileHistoryTable({
                   {formatAttendanceTime(row.checkOutAt)}
                 </td>
                 <td className="px-4 py-3">
-                  {row.workHours > 0 ? formatHoursLabel(row.workHours) : "—"}
+                  {formatHoursLabel(row.workHours)}
                 </td>
                 <td className="px-4 py-3">
                   {row.lateMinutes > 0 ? `${row.lateMinutes}m` : "—"}
@@ -322,8 +322,7 @@ export function ManagerProfileHistoryTable({
 
 function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
   const expectedHours = DEFAULT_ATTENDANCE_RULES.fullDayMinimumHours;
-  const workedLabel =
-    row.workHours > 0 ? formatHoursLabel(row.workHours) : "—";
+  const workedLabel = formatHoursLabel(row.workHours);
   const expectedLabel = formatHoursLabel(expectedHours);
   const isComplete =
     row.workHours >= expectedHours ||
