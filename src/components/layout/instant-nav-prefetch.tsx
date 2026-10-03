@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 
@@ -22,14 +22,13 @@ function isAuthorizedPath(path: string, allowedPrefixes: string[]) {
 }
 
 /**
- * Warm the App Router cache for routes the current user can already see in nav.
- * Priority routes prefetch immediately; the rest warm on idle.
- *
- * Avoid focusin + pathname-tied re-warm: those fire competing RSC bursts while
- * the user is still navigating / tabbing through the shell.
+ * Warm the route the user is about to open.
+ * The current page is already loaded. Portal home warms on idle.
+ * Other modules prefetch on hover or pointer down, not as a sidebar burst.
  */
 export function InstantNavPrefetch() {
   const router = useRouter();
+  const pathname = usePathname();
   const { navigation, portalHome } = useSidebarNavigation();
 
   // Persisted across navigations: re-warming every module on each pathname change
@@ -63,37 +62,14 @@ export function InstantNavPrefetch() {
       }
     };
 
-    const warmPriorityModules = () => {
-      prefetch(portalHome);
-      for (const href of navHrefs) {
-        const path = toInternalPath(href);
-        if (!path) continue;
-        // High-frequency modules: warm immediately (not only on idle).
-        if (
-          /\/(documents|payroll|attendance|approvals|notifications|leave)(\/|$|\?)/.test(
-            path,
-          ) ||
-          path === portalHome
-        ) {
-          prefetch(href);
-        }
-      }
-    };
-
-    // Warm priority routes right away; remaining nav on idle.
-    warmPriorityModules();
-
-    const warmNavModules = () => {
-      prefetch(portalHome);
-      for (const href of navHrefs) {
-        prefetch(href);
-      }
-    };
-
     const supportsIdle = typeof window.requestIdleCallback === "function";
     const warmHandle = supportsIdle
-      ? window.requestIdleCallback(warmNavModules, { timeout: 2000 })
-      : window.setTimeout(warmNavModules, 300);
+      ? window.requestIdleCallback(() => {
+          if (portalHome && portalHome !== pathname) prefetch(portalHome);
+        })
+      : window.setTimeout(() => {
+          if (portalHome && portalHome !== pathname) prefetch(portalHome);
+        }, 1500);
 
     const onPointerOver = (event: Event) => {
       const target = event.target;
@@ -129,7 +105,7 @@ export function InstantNavPrefetch() {
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
     };
-  }, [navKey, portalHome, router]);
+  }, [navKey, pathname, portalHome, router]);
 
   return null;
 }

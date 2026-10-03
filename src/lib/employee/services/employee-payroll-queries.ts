@@ -20,7 +20,6 @@ import {
 } from "@/lib/payroll/salary-structure-breakdown";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { ensureOfficialPayslipNumbers } from "@/lib/payroll/services/payslip-number-backfill";
 import { resolvePayslipDisplayTotals, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc, resolveDisplayedPayslipNumber } from "@/lib/payroll/services/payroll-utils";
 import { resolveMissingBankBranch } from "@/lib/payroll/services/ifsc-branch-lookup";
 import type { UserProfile } from "@/types/auth";
@@ -289,7 +288,6 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
 ): Promise<EmployeePayrollData> {
   const employeeId = options?.targetEmployeeId ?? profile.employee.id;
   const organizationId = profile.employee.organizationId;
-  await ensureOfficialPayslipNumbers(organizationId);
   // Payslip publication is owned by /api/cron/publish-payslips — never kick off
   // org-wide sequential getPayslipById/PDF/email work on navigation paint.
   void options?.appOrigin;

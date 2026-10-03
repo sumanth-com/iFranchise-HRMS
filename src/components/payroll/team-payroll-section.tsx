@@ -30,10 +30,8 @@ import {
   listSalaryStructures,
 } from "@/lib/payroll/services/payroll-queries";
 import {
-  ensureCompanyPayrollRun,
   getPayrollRunById,
   previewPayrollRun,
-  syncActiveEmployeesIntoPayrollRun,
 } from "@/lib/payroll/services/payroll-mutations";
 import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
@@ -63,10 +61,9 @@ async function loadCompanyPayrollInitialPanel(params: {
   profile: Awaited<ReturnType<typeof requireServerAnyPermission>>;
   month: number;
   year: number;
-  canRun: boolean;
   teamBasePath?: string;
 }): Promise<CompanyPayrollInitialPanel> {
-  const { supabase, profile, month, year, canRun, teamBasePath } = params;
+  const { supabase, profile, month, year, teamBasePath } = params;
   const runSectionLabel = teamBasePath?.startsWith("/ceo/payroll")
     ? "Team Payroll"
     : "Company Payroll";
@@ -82,12 +79,6 @@ async function loadCompanyPayrollInitialPanel(params: {
   }
 
   try {
-    if (canRun) {
-      const payrollId = await ensureCompanyPayrollRun(supabase, profile, { month, year });
-      const detail = await getPayrollRunById(supabase, profile, payrollId);
-      if (detail) return { kind: "run", data: detail, mode: "existing" };
-    }
-
     const runs = await listPayrollRuns(supabase, profile, {
       month,
       year,
@@ -95,13 +86,9 @@ async function loadCompanyPayrollInitialPanel(params: {
       pageSize: 1,
     });
     if (runs.data[0]) {
-      // Even view-only loads must sync newly eligible employees into the run.
-      try {
-        await syncActiveEmployeesIntoPayrollRun(supabase, profile, runs.data[0].id);
-      } catch (error) {
-        console.error("[payroll] sync on view-only load failed:", error);
-      }
-      const detail = await getPayrollRunById(supabase, profile, runs.data[0].id);
+      const detail = await getPayrollRunById(supabase, profile, runs.data[0].id, {
+        syncActiveEmployees: false,
+      });
       if (detail) return { kind: "run", data: detail, mode: "existing" };
     }
 
@@ -160,7 +147,6 @@ export async function TeamPayrollSection({
       profile,
       month,
       year,
-      canRun,
       teamBasePath,
     });
     return (

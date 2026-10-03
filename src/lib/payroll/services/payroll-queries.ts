@@ -25,7 +25,6 @@ import {
 import {
   resolveSalaryBreakdownFromStructure,
 } from "@/lib/payroll/salary-structure-breakdown";
-import { ensureOfficialPayslipNumbers } from "@/lib/payroll/services/payslip-number-backfill";
 import {
   getMonthDateRange,
   getPayrollMonthDate,
@@ -587,7 +586,6 @@ export async function listPayslips(
   profile: UserProfile,
   params: PayrollListParams,
 ): Promise<PayslipListResult> {
-  await ensureOfficialPayslipNumbers(profile.employee.organizationId);
   const parsed = payslipListParamsSchema.parse(params);
   const { page, pageSize, search, month, year, employeeId } = parsed;
   const from = (page - 1) * pageSize;

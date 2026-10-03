@@ -7,7 +7,6 @@ import {
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
-import { ensureOfficialPayslipNumbers } from "@/lib/payroll/services/payslip-number-backfill";
 import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel, resolveDisplayedPayslipNumber } from "@/lib/payroll/services/payroll-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
@@ -138,7 +137,6 @@ export async function listPayslipHistory(
   profile: UserProfile,
   params: PayslipHistoryParams,
 ): Promise<PayslipHistoryResult> {
-  await ensureOfficialPayslipNumbers(profile.employee.organizationId);
   const parsed = payslipHistoryParamsSchema.parse(params);
   const isHr = canViewPayroll(profile.permissionCodes);
   const yearResolved = resolveYearFilter(parsed.yearFilter, parsed.year);
@@ -262,7 +260,6 @@ async function listHrPayslipsFromPayrollRun(
 
     if (payslipError) throw new Error(payslipError.message);
 
-    const softDeletedIds: string[] = [];
     for (const entry of payslipRows ?? []) {
       const itemId = String(entry.payroll_item_id);
       const current = payslipByItemId.get(itemId);
@@ -278,25 +275,6 @@ async function listHrPayslipsFromPayrollRun(
           payslip_version: entry.payslip_version,
           deleted_at: entry.deleted_at,
         });
-      }
-      if (entry.deleted_at) softDeletedIds.push(entry.id);
-    }
-
-    if (softDeletedIds.length > 0) {
-      await admin
-        .schema("hrms")
-        .from("payslips")
-        .update({
-          deleted_at: null,
-          is_current: true,
-          archived_at: null,
-        })
-        .in("id", softDeletedIds);
-
-      for (const [itemId, entry] of payslipByItemId) {
-        if (entry.deleted_at && softDeletedIds.includes(entry.id)) {
-          payslipByItemId.set(itemId, { ...entry, deleted_at: null, archived_at: null });
-        }
       }
     }
   }
@@ -352,8 +330,8 @@ async function listHrPayslipsFromPayrollRun(
       : null;
     const payslip = payslipByItemId.get(row.id) ?? null;
 
-    // Soft-deleted rows are restored in a single batch above. Do not create
-    // missing payslips during list load — View/Send handle that on demand.
+    // Read only. Do not restore or renumber payslips during list load —
+    // View/Send and payroll mutations handle that on demand.
     const sent = isPayslipHrSent({ emailSentAt: payslip?.email_sent_at ?? null });
     const payslipReady = Boolean(payslip?.id && !payslip.deleted_at);
 

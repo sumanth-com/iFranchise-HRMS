@@ -118,7 +118,11 @@ async function backfillOrganizationPayslipNumbers(organizationId: string): Promi
   }
 }
 
-/** Correct stored payslip numbers for every month in this organization, once per process. */
+/**
+ * One-time/admin correction of stored payslip numbers.
+ * Do not call this from page render or list queries — those paths only read.
+ * Payroll mutations keep official numbers via persistOfficialPayslipNumber.
+ */
 export function ensureOfficialPayslipNumbers(organizationId: string): Promise<void> {
   const existing = backfillByOrganization.get(organizationId);
   if (existing) return existing;

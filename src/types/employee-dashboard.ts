@@ -1,4 +1,5 @@
 import type { AttendanceStatus } from "@/types/attendance";
+import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
 export type EmployeeGreeting = {
@@ -49,6 +50,7 @@ export type EmployeeDashboardData = {
   kpis: EmployeeDashboardKpis;
   referenceDate: string;
   upcomingHolidays: EmployeeUpcomingEvent[];
+  companyAnnouncements: CompanyAnnouncementEmployeeView[];
   canManageAnnouncements?: boolean;
   /** HR / executive only — employees see checkout as read-only after check-out. */
   canUpdateCheckout?: boolean;

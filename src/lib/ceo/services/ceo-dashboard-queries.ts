@@ -16,6 +16,7 @@ import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approva
 import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
 import { loadUpcomingCelebrations } from "@/lib/employee/services/employee-dashboard-queries";
+import { listEmployeeAnnouncements } from "@/lib/organization/services/company-announcement-queries";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { formerEmploymentStatusFilter } from "@/lib/employees/employment-eligibility";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
@@ -98,6 +99,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     exitingRes,
     pendingApprovalsRes,
     holidaysResult,
+    companyAnnouncements,
     recruitmentSummary,
   ] = await Promise.all([
     // Same queue as Approvals → Leave (not all org-wide pending leave_requests).
@@ -128,6 +130,14 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     loadUpcomingCelebrations(supabase, organizationId, today).catch((error) => {
       console.error("[ceo-dashboard] upcoming celebrations query failed", error);
       return [] as Awaited<ReturnType<typeof loadUpcomingCelebrations>>;
+    }),
+    listEmployeeAnnouncements(
+      supabase,
+      organizationId,
+      profile.employee.id,
+    ).catch((error) => {
+      console.error("[ceo-dashboard] company announcements failed", error);
+      return [] as Awaited<ReturnType<typeof listEmployeeAnnouncements>>;
     }),
     getRecruitmentSummary(supabase, profile).catch((error) => {
       console.error("[ceo-dashboard] recruitment summary failed", error);
@@ -251,6 +261,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       onLeaveToday,
     },
     upcomingHolidays: upcomingCelebrations,
+    companyAnnouncements,
     canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
     activities: [],
     approvals: [],

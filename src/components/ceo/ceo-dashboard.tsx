@@ -116,6 +116,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
               canManageAnnouncements={data.canManageAnnouncements === true}
               pairHolidayBirthday
               showImportantNotices
+              companyAnnouncements={data.companyAnnouncements ?? []}
               className={DASHBOARD_HOME_EVENTS}
             />
           </div>

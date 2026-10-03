@@ -4814,15 +4814,19 @@ export async function getPayrollRunById(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   payrollId: string,
+  options?: { syncActiveEmployees?: boolean },
 ): Promise<PayrollDetail | null> {
   const organizationId = profile.employee.organizationId;
   const admin = createAdminClient();
 
-  // Keep unlocked runs aligned with current eligible employees (includes IT Team).
-  try {
-    await syncActiveEmployeesIntoPayrollRun(supabase, profile, payrollId);
-  } catch (error) {
-    console.error("[payroll] syncActiveEmployeesIntoPayrollRun failed:", error);
+  // Page renders pass syncActiveEmployees: false and only read persisted items.
+  // Explicit payroll refresh/detail workflows keep the default sync.
+  if (options?.syncActiveEmployees !== false) {
+    try {
+      await syncActiveEmployeesIntoPayrollRun(supabase, profile, payrollId);
+    } catch (error) {
+      console.error("[payroll] syncActiveEmployeesIntoPayrollRun failed:", error);
+    }
   }
 
   const { data: payroll, error } = await admin

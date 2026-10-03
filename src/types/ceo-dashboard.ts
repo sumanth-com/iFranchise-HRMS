@@ -1,3 +1,4 @@
+import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 import type { EmployeeUpcomingEvent } from "@/types/employee-dashboard";
 
 export type CeoInsightPriority = "high" | "medium" | "low";
@@ -132,6 +133,7 @@ export type CeoDashboardData = {
   activities: CeoActivityItem[];
   approvals: CeoApprovalItem[];
   upcomingHolidays: EmployeeUpcomingEvent[];
+  companyAnnouncements: CompanyAnnouncementEmployeeView[];
   canManageAnnouncements?: boolean;
   charts: CeoDashboardCharts;
 };

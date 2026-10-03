@@ -551,6 +551,7 @@ export function EmployeeUpcomingEvents({
   canManageAnnouncements = false,
   pairHolidayBirthday = false,
   showImportantNotices = false,
+  companyAnnouncements: initialCompanyAnnouncements,
 }: {
   events: EmployeeUpcomingEvent[];
   referenceDate: string;
@@ -558,6 +559,8 @@ export function EmployeeUpcomingEvents({
   canManageAnnouncements?: boolean;
   pairHolidayBirthday?: boolean;
   showImportantNotices?: boolean;
+  /** Server-loaded notices. When set, the panel does not fetch them again. */
+  companyAnnouncements?: CompanyAnnouncementEmployeeView[];
 }) {
   const router = useRouter();
   const pairedSlides = useMemo(
@@ -576,7 +579,7 @@ export function EmployeeUpcomingEvents({
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [companyAnnouncements, setCompanyAnnouncements] = useState<
     CompanyAnnouncementEmployeeView[]
-  >([]);
+  >(initialCompanyAnnouncements ?? []);
   const [viewedKeys, setViewedKeys] = useState<Set<string>>(new Set());
   const multi = slideCount > 1;
   const showDashboardManage = canManageAnnouncements && !showImportantNotices;
@@ -586,6 +589,10 @@ export function EmployeeUpcomingEvents({
   useEffect(() => {
     if (!showImportantNotices) return;
     setViewedKeys(readLocalAnnouncementViews());
+    if (initialCompanyAnnouncements) {
+      setCompanyAnnouncements(initialCompanyAnnouncements);
+      return;
+    }
     let cancelled = false;
     void listEmployeeAnnouncementsAction()
       .then((result) => {
@@ -598,7 +605,7 @@ export function EmployeeUpcomingEvents({
     return () => {
       cancelled = true;
     };
-  }, [showImportantNotices]);
+  }, [showImportantNotices, initialCompanyAnnouncements]);
 
   const handleViewAnnouncement = useCallback((item: CompanyAnnouncementEmployeeView) => {
     rememberLocalAnnouncementView(item.id, item.versionId);

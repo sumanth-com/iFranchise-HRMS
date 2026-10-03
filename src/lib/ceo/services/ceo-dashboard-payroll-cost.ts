@@ -13,12 +13,10 @@ import {
 import type { UserProfile } from "@/types/auth";
 import type { PayrollBreakdown } from "@/types/payroll";
 
-const CLOSED_PAYROLL_ITEM_SELECT = `
+/** Columns required to apply the existing Final Payable formula and eligibility filter. */
+const PERSISTED_PAYROLL_COST_SELECT = `
   employee_id,
-  basic_salary,
   total_allowances,
-  total_deductions,
-  gross_salary,
   net_salary,
   breakdown,
   employees (
@@ -85,9 +83,9 @@ function employeeFromPayrollItemJoin(
  * CEO Dashboard Payroll Cost — same employee population and Final Payable formula
  * as Team Payroll (attendance-driven calculator + approved extras).
  *
- * When a Team Payroll run already exists for the month, use persisted payroll_items
- * Final Payable (same values Team Payroll / payslips show). Live preview is only
- * used when no run has been created yet.
+ * When a run exists, sum persisted item amounts with that formula. payrolls.total_net
+ * is net salary, not Final Payable, so it is not the KPI. Live preview runs only
+ * when no payroll has been created yet.
  */
 export async function getCeoDashboardPayrollCost(
   supabase: AuthSupabaseClient,
@@ -133,7 +131,7 @@ export async function getCeoDashboardPayrollCost(
   const { data: items, error: itemsError } = await supabase
     .schema("hrms")
     .from("payroll_items")
-    .select(CLOSED_PAYROLL_ITEM_SELECT)
+    .select(PERSISTED_PAYROLL_COST_SELECT)
     .eq("payroll_id", currentPayroll.id)
     .is("deleted_at", null);
 
@@ -161,10 +159,10 @@ export async function getCeoDashboardPayrollCost(
 
     seenEmployeeIds.add(employeeId);
     payableItems.push({
-      basicSalary: Number(item.basic_salary ?? 0),
-      grossSalary: Number(item.gross_salary ?? 0),
+      basicSalary: 0,
+      grossSalary: 0,
       netSalary: Number(item.net_salary ?? 0),
-      totalDeductions: Number(item.total_deductions ?? 0),
+      totalDeductions: 0,
       totalAllowances: Number(item.total_allowances ?? 0),
       breakdown: (item.breakdown as PayrollBreakdown | null) ?? null,
     });

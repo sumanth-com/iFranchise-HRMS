@@ -415,6 +415,13 @@ export function CeoAttendanceOverviewPanel({
   useEffect(() => {
     if (selectedEmployeeId) return;
 
+    const serverMonth = periodFilters.month ?? new Date().getMonth() + 1;
+    const serverYear = periodFilters.year ?? new Date().getFullYear();
+    if (chartMonth === serverMonth && chartYear === serverYear) {
+      setCompanyOverview(overview);
+      return;
+    }
+
     startOverviewTransition(async () => {
       const data = await fetchCeoAttendanceOverviewAction({
         departmentId: periodFilters.departmentId,
@@ -426,9 +433,12 @@ export function CeoAttendanceOverviewPanel({
       setCompanyOverview(data);
     });
   }, [
+    overview,
     selectedEmployeeId,
     chartMonth,
     chartYear,
+    periodFilters.month,
+    periodFilters.year,
     periodFilters.departmentId,
     periodFilters.attendanceStatus,
     periodFilters.employeeId,

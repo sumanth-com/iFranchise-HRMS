@@ -4,6 +4,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
+import { listEmployeeAnnouncements } from "@/lib/organization/services/company-announcement-queries";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { getDirectoryAssetPhotoUrl } from "@/lib/employee/directory-asset-photos";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
@@ -330,7 +331,7 @@ export async function getEmployeeDashboardData(
   const organizationId = profile.employee.organizationId;
   const greeting = greetingFromProfile(profile);
 
-  const [todayPanel, leave, upcomingHolidays] = await Promise.all([
+  const [todayPanel, leave, upcomingHolidays, companyAnnouncements] = await Promise.all([
     getSelfTodayAttendance(supabase, profile).catch((error) => {
       console.error("[employee-dashboard] today attendance failed", error);
       // Do not invent a fake "not checked in" state — empty panel without times
@@ -342,6 +343,10 @@ export async function getEmployeeDashboardData(
       pendingCount: 0,
     }),
     safe(() => loadUpcomingCelebrations(supabase, organizationId, today), []),
+    listEmployeeAnnouncements(supabase, organizationId, employeeId).catch((error) => {
+      console.error("[employee-dashboard] company announcements failed", error);
+      return [];
+    }),
   ]);
 
   return {
@@ -356,6 +361,7 @@ export async function getEmployeeDashboardData(
     },
     referenceDate: today,
     upcomingHolidays,
+    companyAnnouncements,
     canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
     canUpdateCheckout: canUpdateOwnCheckout(profile),
   };

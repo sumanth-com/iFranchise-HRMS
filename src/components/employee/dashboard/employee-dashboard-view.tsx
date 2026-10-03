@@ -24,6 +24,7 @@ export function EmployeeDashboardView({
   kpis,
   referenceDate,
   upcomingHolidays,
+  companyAnnouncements,
   canManageAnnouncements = false,
   canUpdateCheckout = false,
   subtitle,
@@ -76,6 +77,7 @@ export function EmployeeDashboardView({
                 canManageAnnouncements={canManageAnnouncements}
                 pairHolidayBirthday={pairHolidayBirthday}
                 showImportantNotices={showImportantNotices}
+                companyAnnouncements={companyAnnouncements}
                 className={DASHBOARD_HOME_EVENTS}
               />
             </div>
