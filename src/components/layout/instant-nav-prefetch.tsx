@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 
@@ -23,12 +23,11 @@ function isAuthorizedPath(path: string, allowedPrefixes: string[]) {
 
 /**
  * Warm the route the user is about to open.
- * The current page is already loaded. Portal home warms on idle.
- * Other modules prefetch on hover or pointer down, not as a sidebar burst.
+ * Prefetch runs on hover or pointer down, not as an idle portal-home request
+ * and not as a sidebar burst.
  */
 export function InstantNavPrefetch() {
   const router = useRouter();
-  const pathname = usePathname();
   const { navigation, portalHome } = useSidebarNavigation();
 
   // Persisted across navigations: re-warming every module on each pathname change
@@ -62,15 +61,6 @@ export function InstantNavPrefetch() {
       }
     };
 
-    const supportsIdle = typeof window.requestIdleCallback === "function";
-    const warmHandle = supportsIdle
-      ? window.requestIdleCallback(() => {
-          if (portalHome && portalHome !== pathname) prefetch(portalHome);
-        })
-      : window.setTimeout(() => {
-          if (portalHome && portalHome !== pathname) prefetch(portalHome);
-        }, 1500);
-
     const onPointerOver = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
@@ -97,15 +87,10 @@ export function InstantNavPrefetch() {
     // and prefetched every module as competing RSC requests.
 
     return () => {
-      if (supportsIdle) {
-        window.cancelIdleCallback(warmHandle);
-      } else {
-        window.clearTimeout(warmHandle);
-      }
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
     };
-  }, [navKey, pathname, portalHome, router]);
+  }, [navKey, portalHome, router]);
 
   return null;
 }
