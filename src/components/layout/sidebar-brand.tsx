@@ -21,7 +21,6 @@ export function SidebarBrand({
   return (
     <Link
       href={href}
-      prefetch
       onClick={onNavigate}
       className={cn(
         "group/brand flex min-w-0 items-center",

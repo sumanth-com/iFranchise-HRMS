@@ -9,8 +9,11 @@ import type {
 } from "@/types/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getOrganizationLogoSignedUrl } from "@/lib/organization/services/org-logo";
+import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import { isEmployeeAppVisible } from "@/lib/employees/app-hidden";
+import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
+import { createSignedStorageUrlIfExists } from "@/lib/storage/signed-url";
 
 export type AuthSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -67,7 +70,10 @@ function mapOrganization(
   };
 }
 
-function mapEmployee(row: EmployeeRow): Employee {
+function mapEmployee(
+  row: EmployeeRow,
+  photo?: { storagePath: string | null; url: string | null },
+): Employee {
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -80,6 +86,8 @@ function mapEmployee(row: EmployeeRow): Employee {
     accountStatus: row.account_status,
     status: row.status,
     tabletAccessEnabled: row.tablet_access_enabled === true,
+    profileImageStoragePath: photo?.storagePath ?? null,
+    profileImageUrl: photo?.url ?? null,
   };
 }
 
@@ -220,6 +228,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
   const [
     { data: organizationRow, error: organizationError },
     { data: userRoleRows, error: userRolesError },
+    profileImageResult,
   ] = await Promise.all([
     supabase
       .schema("hrms")
@@ -235,6 +244,13 @@ export const loadUserProfile = cache(async function loadUserProfile(
       .eq("user_id", userId)
       .is("deleted_at", null)
       .eq("status", "active"),
+    supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("profile_image_storage_path")
+      .eq("employee_id", employeeRow.id)
+      .is("deleted_at", null)
+      .maybeSingle(),
   ]);
   mark("organization+user_roles");
 
@@ -281,14 +297,36 @@ export const loadUserProfile = cache(async function loadUserProfile(
         p_user_id: userId,
       });
 
+  let profileImageStoragePath: string | null = null;
+  if (!profileImageResult.error) {
+    const rawPath = profileImageResult.data?.profile_image_storage_path?.trim() || null;
+    if (rawPath) {
+      try {
+        assertOrganizationStoragePath(rawPath, employeeRow.organization_id);
+        profileImageStoragePath = rawPath;
+      } catch {
+        profileImageStoragePath = null;
+      }
+    }
+  }
+  const profileImageUrlPromise = profileImageStoragePath
+    ? createSignedStorageUrlIfExists(
+        supabase,
+        EMPLOYEE_STORAGE_BUCKETS.profileImages,
+        profileImageStoragePath,
+      ).catch(() => null)
+    : Promise.resolve(null);
+
   const [
     organizationLogoUrl,
     { data: roleRows, error: rolesError },
     { data: rpcCodes, error: rpcCodesError },
+    profileImageUrl,
   ] = await Promise.all([
     logoPromise,
     rolesPromise,
     permissionCodesRpcPromise,
+    profileImageUrlPromise,
   ]);
   mark(
     cachedPermissionCodes
@@ -394,7 +432,10 @@ export const loadUserProfile = cache(async function loadUserProfile(
     profile: {
       userId,
       email,
-      employee: mapEmployee(employeeRow),
+      employee: mapEmployee(employeeRow, {
+        storagePath: profileImageStoragePath,
+        url: profileImageUrl,
+      }),
       organization,
       roles,
       permissions,

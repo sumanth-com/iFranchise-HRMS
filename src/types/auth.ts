@@ -30,6 +30,10 @@ export type Employee = {
   status: RecordStatus;
   /** Explicit grant required to use the HRMS on a tablet. Desktop is always allowed. */
   tabletAccessEnabled?: boolean;
+  /** Storage path from the layout profile. Null when the employee has no photo. */
+  profileImageStoragePath?: string | null;
+  /** Signed URL from the layout profile. Set only when a storage path exists. */
+  profileImageUrl?: string | null;
 };
 
 export type Organization = {

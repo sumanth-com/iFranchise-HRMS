@@ -1,41 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MandatoryAnnouncementDialog } from "@/components/employee/announcements/mandatory-announcement-dialog";
-import { listPendingMandatoryAnnouncementsAction } from "@/lib/organization/actions/company-announcement-actions";
 import {
   rememberLocalAnnouncementAck,
   wasAnnouncementAckedLocally,
 } from "@/lib/organization/mandatory-announcement-ack-storage";
 import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 
-export function EmployeeAnnouncementGate() {
+export function EmployeeAnnouncementGate({
+  initialAnnouncements,
+}: {
+  initialAnnouncements: CompanyAnnouncementEmployeeView[];
+}) {
   const [remaining, setRemaining] = useState<CompanyAnnouncementEmployeeView[]>([]);
-  const loaded = useRef(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
-
-    void listPendingMandatoryAnnouncementsAction()
-      .then((result) => {
-        if (!result.success) return;
-        setRemaining(
-          result.data.filter(
-            (item) => !wasAnnouncementAckedLocally(item.id, item.versionId),
-          ),
-        );
-      })
-      .catch((error) => {
-        // Non-critical gate — never crash the portal shell.
-        console.error("[employee-announcement-gate] load failed", error);
-      });
-  }, []);
+    setRemaining(
+      initialAnnouncements.filter(
+        (item) => !wasAnnouncementAckedLocally(item.id, item.versionId),
+      ),
+    );
+    setReady(true);
+  }, [initialAnnouncements]);
 
   const current = useMemo(() => remaining[0] ?? null, [remaining]);
 
-  if (!current) return null;
+  if (!ready || !current) return null;
 
   return (
     <MandatoryAnnouncementDialog

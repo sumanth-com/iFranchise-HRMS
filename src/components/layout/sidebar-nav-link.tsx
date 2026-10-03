@@ -35,7 +35,6 @@ export function SidebarNavLink({
   return (
     <AppNavLink
       href={disabled ? "#" : href}
-      prefetch
       aria-disabled={disabled}
       aria-current={active ? "page" : undefined}
       title={collapsed ? title : undefined}

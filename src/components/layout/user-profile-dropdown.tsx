@@ -24,7 +24,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getPortalHelpHref } from "@/lib/auth/portal-account-menu";
-import { getMyProfileImageUrlAction } from "@/lib/employees/profile-image-actions";
 import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useAuth } from "@/providers/auth-provider";
@@ -60,28 +59,23 @@ export function UserProfileDropdown() {
     const requestId = avatarRequestIdRef.current + 1;
     avatarRequestIdRef.current = requestId;
     let cancelled = false;
+    const signedUrl = profile.employee.profileImageUrl?.trim() || null;
 
-    // Defer avatar signing so shell + page data are not competing on first paint.
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        const result = await getMyProfileImageUrlAction();
-        if (cancelled || requestId !== avatarRequestIdRef.current) return;
-        if (!result.success || !result.data) {
-          setAvatarUrl(null);
-          return;
-        }
+    if (!profile.employee.profileImageStoragePath || !signedUrl) {
+      setAvatarUrl(null);
+      return;
+    }
 
-        const canDisplay = await canDisplayImageUrl(result.data);
-        if (cancelled || requestId !== avatarRequestIdRef.current) return;
-        setAvatarUrl(canDisplay ? result.data : null);
-      })();
-    }, 1200);
+    void (async () => {
+      const canDisplay = await canDisplayImageUrl(signedUrl);
+      if (cancelled || requestId !== avatarRequestIdRef.current) return;
+      setAvatarUrl(canDisplay ? signedUrl : null);
+    })();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, [profile.employee.id]);
+  }, [profile.employee.id, profile.employee.profileImageStoragePath, profile.employee.profileImageUrl]);
 
   useEffect(() => {
     return subscribeProfilePhotoChanged((detail) => {

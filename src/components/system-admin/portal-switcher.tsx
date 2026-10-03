@@ -29,13 +29,14 @@ export function PortalSwitcher() {
   const { activePortal, setActivePortal } = useActivePortal();
   const pathname = usePathname();
   const refreshingRef = useRef(false);
+  const syncedRef = useRef(false);
   const prefetchedRef = useRef<Set<string>>(new Set());
 
   const allowed =
     canSeePortalSwitcher(profile.email) ||
     canSeePortalSwitcher(profile.employee?.email);
 
-  // Seed from AuthProvider, then replace with live RPC (cookie-bypass) state.
+  // Layout permission cookie. Live RPC runs once when the menu is opened.
   const [availablePortals, setAvailablePortals] = useState<PortalSwitchLink[]>(
     () => (allowed ? filterPortalSwitchLinks(permissionCodes) : []),
   );
@@ -73,34 +74,8 @@ export function PortalSwitcher() {
       setAvailablePortals([]);
       return;
     }
-    const seeded = filterPortalSwitchLinks(permissionCodes);
-    setAvailablePortals(seeded);
-    prefetchPortals(seeded);
-  }, [allowed, permissionCodes, prefetchPortals]);
-
-  // Defer live RPC so it never competes with the in-flight portal RSC.
-  // Seeded AuthProvider links already cover switching; sync heals grants later.
-  useEffect(() => {
-    if (!allowed) return;
-    const run = () => {
-      void syncFromServer();
-    };
-    const supportsIdle = typeof window.requestIdleCallback === "function";
-    const handle = supportsIdle
-      ? window.requestIdleCallback(run, { timeout: 4000 })
-      : window.setTimeout(run, 1500);
-    return () => {
-      if (supportsIdle) {
-        window.cancelIdleCallback(handle as number);
-      } else {
-        window.clearTimeout(handle as number);
-      }
-    };
-  }, [allowed, syncFromServer]);
-
-  useEffect(() => {
-    prefetchPortals(availablePortals);
-  }, [availablePortals, prefetchPortals]);
+    setAvailablePortals(filterPortalSwitchLinks(permissionCodes));
+  }, [allowed, permissionCodes]);
 
   // Visibility: only it@ifranchise.in. Also hide when there is nothing to switch.
   if (!allowed || availablePortals.length <= 1) {
@@ -119,7 +94,11 @@ export function PortalSwitcher() {
   return (
     <DropdownMenu
       onOpenChange={(open) => {
-        if (open) prefetchPortals(availablePortals);
+        if (!open) return;
+        prefetchPortals(availablePortals);
+        if (syncedRef.current) return;
+        syncedRef.current = true;
+        void syncFromServer();
       }}
     >
       <DropdownMenuTrigger

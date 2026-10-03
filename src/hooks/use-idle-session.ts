@@ -119,7 +119,8 @@ export function useIdleSession() {
       }
     };
 
-    recordActivity(true);
+    // Local idle clock only. Middleware refreshes the activity cookie on navigation.
+    recordActivity(false);
 
     for (const eventName of ACTIVITY_EVENTS) {
       window.addEventListener(eventName, handleActivity, { passive: true });

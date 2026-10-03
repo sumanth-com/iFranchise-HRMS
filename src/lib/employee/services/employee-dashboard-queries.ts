@@ -4,7 +4,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
-import { listEmployeeAnnouncements } from "@/lib/organization/services/company-announcement-queries";
+import { loadEmployeeAnnouncementsForRequest } from "@/lib/organization/services/employee-announcement-request";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { getDirectoryAssetPhotoUrl } from "@/lib/employee/directory-asset-photos";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
@@ -343,7 +343,7 @@ export async function getEmployeeDashboardData(
       pendingCount: 0,
     }),
     safe(() => loadUpcomingCelebrations(supabase, organizationId, today), []),
-    listEmployeeAnnouncements(supabase, organizationId, employeeId).catch((error) => {
+    loadEmployeeAnnouncementsForRequest(organizationId, employeeId).catch((error) => {
       console.error("[employee-dashboard] company announcements failed", error);
       return [];
     }),

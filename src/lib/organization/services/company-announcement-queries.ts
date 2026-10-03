@@ -639,11 +639,17 @@ async function mapEmployeeAnnouncementViews(
   return views;
 }
 
+export function selectPendingMandatoryAnnouncements(
+  items: CompanyAnnouncementEmployeeView[],
+): CompanyAnnouncementEmployeeView[] {
+  return items.filter((item) => item.requiresAcknowledgement && !item.acknowledgedAt);
+}
+
 export async function listPendingMandatoryAnnouncements(
   supabase: AuthSupabaseClient,
   organizationId: string,
   employeeId: string,
 ): Promise<CompanyAnnouncementEmployeeView[]> {
   const items = await listEmployeeAnnouncements(supabase, organizationId, employeeId);
-  return items.filter((item) => item.requiresAcknowledgement && !item.acknowledgedAt);
+  return selectPendingMandatoryAnnouncements(items);
 }

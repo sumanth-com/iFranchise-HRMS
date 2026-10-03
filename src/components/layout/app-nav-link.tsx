@@ -22,9 +22,9 @@ function hrefToPath(href: AppNavLinkProps["href"]): string | null {
   return null;
 }
 
-/** In-app link that fully prefetches dynamic RSC payloads (Next 15 default is partial). */
+/** In-app link. Full RSC prefetch runs on pointer/hover, not on first paint. */
 export function AppNavLink({
-  prefetch = true,
+  prefetch = false,
   onMouseEnter,
   onPointerDown,
   href,
