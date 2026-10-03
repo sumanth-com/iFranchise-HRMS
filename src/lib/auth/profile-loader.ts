@@ -107,6 +107,12 @@ export type LoadUserProfileOptions = {
   /** When false, skip storage signed-URL work (layout critical path). */
   includeOrganizationLogo?: boolean;
   /**
+   * When false, keep the stored photo path but do not sign it.
+   * The portal shell signs that path in a separate Suspense slot so the
+   * sidebar and page are not blocked on storage.
+   */
+  includeProfileImageUrl?: boolean;
+  /**
    * HMAC-verified permission codes from the signed cookie.
    * When provided and non-empty, skips get_user_permission_codes RPC.
    * Callers must only pass codes from getVerifiedPermissionCodesForUser.
@@ -309,13 +315,15 @@ export const loadUserProfile = cache(async function loadUserProfile(
       }
     }
   }
-  const profileImageUrlPromise = profileImageStoragePath
-    ? createSignedStorageUrlIfExists(
-        supabase,
-        EMPLOYEE_STORAGE_BUCKETS.profileImages,
-        profileImageStoragePath,
-      ).catch(() => null)
-    : Promise.resolve(null);
+  const includeProfileImageUrl = options?.includeProfileImageUrl !== false;
+  const profileImageUrlPromise =
+    includeProfileImageUrl && profileImageStoragePath
+      ? createSignedStorageUrlIfExists(
+          supabase,
+          EMPLOYEE_STORAGE_BUCKETS.profileImages,
+          profileImageStoragePath,
+        ).catch(() => null)
+      : Promise.resolve(null);
 
   const [
     organizationLogoUrl,
@@ -335,6 +343,9 @@ export const loadUserProfile = cache(async function loadUserProfile(
   );
   if (options?.includeOrganizationLogo === false) {
     mark("logo_skipped");
+  }
+  if (!includeProfileImageUrl) {
+    mark("profile_image_deferred");
   }
 
   if (rolesError || !roleRows?.length) {

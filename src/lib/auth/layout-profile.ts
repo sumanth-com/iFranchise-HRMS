@@ -13,6 +13,7 @@ import { getVerifiedPermissionCodesForUser } from "@/lib/auth/permission-cache";
  *
  * Layout critical path:
  * - skips organization logo signed URL (non-blocking; sidebar loads after paint)
+ * - skips employee photo signing (shell Suspense slot signs the stored path)
  * - reuses HMAC-verified permission cookie when valid (else RPC fail-closed)
  */
 export const getLayoutUserProfile = cache(async function getLayoutUserProfile(
@@ -37,6 +38,7 @@ export const getLayoutUserProfile = cache(async function getLayoutUserProfile(
 
   return loadUserProfile(userId, email, supabaseClient, {
     includeOrganizationLogo: false,
+    includeProfileImageUrl: false,
     verifiedPermissionCodes,
   });
 });

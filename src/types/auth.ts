@@ -32,7 +32,7 @@ export type Employee = {
   tabletAccessEnabled?: boolean;
   /** Storage path from the layout profile. Null when the employee has no photo. */
   profileImageStoragePath?: string | null;
-  /** Signed URL from the layout profile. Set only when a storage path exists. */
+  /** Signed header photo URL. Null until the shell avatar slot resolves, or when no object exists. */
   profileImageUrl?: string | null;
 };
 

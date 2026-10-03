@@ -53,6 +53,8 @@ type AuthContextValue = {
   hasAllPermissions: (permissions: string[]) => boolean;
   hasAnyRole: (roleCodes: string[]) => boolean;
   refreshProfile: () => Promise<void>;
+  /** Header photo only. Does not replace roles, permissions, or employee fields. */
+  applyShellProfileImageUrl: (employeeId: string, imageUrl: string) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -154,6 +156,23 @@ export function AuthProvider({
   const signOut = useCallback(async () => {
     await performSignOut(true);
   }, [performSignOut]);
+
+  const applyShellProfileImageUrl = useCallback((employeeId: string, imageUrl: string) => {
+    const nextUrl = imageUrl.trim();
+    if (!employeeId || !nextUrl) return;
+    setProfile((current) => {
+      if (current.employee.id !== employeeId) return current;
+      if (!current.employee.profileImageStoragePath) return current;
+      if (current.employee.profileImageUrl === nextUrl) return current;
+      return {
+        ...current,
+        employee: {
+          ...current.employee,
+          profileImageUrl: nextUrl,
+        },
+      };
+    });
+  }, []);
 
   const refreshProfile = useCallback(async () => {
     try {
@@ -282,6 +301,7 @@ export function AuthProvider({
       isLoading,
       signOut,
       refreshProfile,
+      applyShellProfileImageUrl,
       hasPermission: (permission: string) =>
         hasPermission(permissionCodes, permission),
       hasAnyPermission: (permissions: string[]) =>
@@ -300,6 +320,7 @@ export function AuthProvider({
       isLoading,
       signOut,
       refreshProfile,
+      applyShellProfileImageUrl,
     ],
   );
 

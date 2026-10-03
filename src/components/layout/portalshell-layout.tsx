@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
+import { ShellProfileAvatar } from "@/components/layout/shell-profile-avatar";
 import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
 import { TabletAccessDenied } from "@/components/layout/tablet-access-denied";
@@ -122,6 +123,15 @@ async function ResolvedPortalShell({
           <TabletAccessDenied />
         )}
       </DesktopOnlyGate>
+      {tabletAllowed ? (
+        <Suspense fallback={null}>
+          <ShellProfileAvatar
+            employeeId={profileResult.profile.employee.id}
+            organizationId={profileResult.profile.employee.organizationId}
+            storagePath={profileResult.profile.employee.profileImageStoragePath ?? null}
+          />
+        </Suspense>
+      ) : null}
     </AuthProvider>
   );
 }
