@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Loader2,
   MapPin,
+  MoreHorizontal,
   Pencil,
   Trash2,
   CalendarDays,
@@ -47,6 +48,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   TableBody,
   TableCell,
@@ -434,7 +442,7 @@ export function AttendanceTable({
         id: "employeeName",
         accessorKey: "employeeName",
         header: "Employee",
-        meta: { align: "left", width: showManualStatusAction ? "17%" : "20%" } satisfies AttendanceColumnMeta,
+        meta: { align: "left", width: showManualStatusAction ? "15%" : "18%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
           <div className="min-w-0 leading-tight">
             <p className="font-medium tracking-normal">{row.original.employeeName}</p>
@@ -447,33 +455,39 @@ export function AttendanceTable({
       {
         id: "departmentName",
         header: "Department",
-        meta: { align: "left", width: "12%" } satisfies AttendanceColumnMeta,
+        meta: { align: "left", width: "11%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.departmentName ?? "—",
       },
       {
         id: "designationTitle",
         header: "Designation",
-        meta: { align: "left", width: "14%" } satisfies AttendanceColumnMeta,
-        cell: ({ row }) => row.original.designationTitle ?? "—",
+        // No fixed width: takes the space left after the other columns.
+        meta: { align: "left" } satisfies AttendanceColumnMeta,
+        cell: ({ row }) => {
+          const designation = row.original.designationTitle ?? "—";
+          return (
+            <span className="block break-words leading-snug">{designation}</span>
+          );
+        },
       },
       {
         id: "attendanceDate",
         accessorKey: "attendanceDate",
         header: "Attendance Date",
-        meta: { align: "center", width: "11%" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "10%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) =>
           format(parseISO(row.original.attendanceDate), "dd MMM yyyy"),
       },
       {
         id: "checkInAt",
         header: "Check In",
-        meta: { align: "center", width: "9%" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => formatDateTime(row.original.checkInAt),
       },
       {
         id: "checkOutAt",
         header: "Check Out",
-        meta: { align: "center", width: "9%" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => formatDateTime(row.original.checkOutAt),
       },
       {
@@ -487,7 +501,7 @@ export function AttendanceTable({
       {
         id: "attendanceStatus",
         header: "Status",
-        meta: { align: "center", width: "9%" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
           <AttendanceStatusBadge
             status={row.original.attendanceStatus}
@@ -498,7 +512,7 @@ export function AttendanceTable({
       {
         id: "actions",
         header: "Actions",
-        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "4.5rem" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => {
           const pending =
             row.original.correctionStatus === "pending" && row.original.correctionId;
@@ -517,90 +531,90 @@ export function AttendanceTable({
               ? "View check-out location"
               : "View check-in location";
 
+          const showCorrectionReview =
+            teamRegularizationMode && canApproveCorrections && Boolean(pending);
+
           return (
-            <div className="flex items-center justify-center gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="View attendance"
-                title="View"
-                onClick={() => openAttendanceRecord(row.original)}
-              >
-                <Eye className="size-4" />
-              </Button>
-              {hasLocation ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={locationTitle}
-                  title={locationTitle}
-                  className="text-violet-700"
-                  onClick={() =>
-                    setLocationTarget({
-                      attendanceId: row.original.id,
-                      point: locationPoint,
-                    })
+            <div className="flex items-center justify-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Actions for ${row.original.employeeName}`}
+                      title="Actions"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
                   }
-                >
-                  <MapPin className="size-4" />
-                </Button>
-              ) : null}
-              {showManualStatusAction ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Update attendance"
-                  title="Update attendance"
-                  onClick={() => setStatusTargets([row.original])}
-                >
-                  <Pencil className="size-4 text-violet-600" />
-                </Button>
-              ) : null}
-              {teamRegularizationMode && canApproveCorrections && pending ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Accept regularization"
-                    title="Accept"
-                    disabled={isReviewing}
-                    onClick={() =>
-                      void handleCorrectionReview(row.original.correctionId!, true)
-                    }
-                  >
-                    <CheckCircle2 className="size-4 text-emerald-600" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Reject regularization"
-                    title="Reject"
-                    disabled={isReviewing}
-                    onClick={() =>
-                      void handleCorrectionReview(row.original.correctionId!, false)
-                    }
-                  >
-                    <XCircle className="size-4 text-red-500" />
-                  </Button>
-                </>
-              ) : null}
-              {canDelete ? (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Delete attendance"
-                    title="Delete"
-                    onClick={() => {
-                      if (isVirtualAttendanceId(row.original.id)) {
-                        toast.message("No attendance record to delete yet.");
-                        return;
+                />
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => openAttendanceRecord(row.original)}>
+                    <Eye className="size-4" />
+                    View
+                  </DropdownMenuItem>
+                  {hasLocation ? (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setLocationTarget({
+                          attendanceId: row.original.id,
+                          point: locationPoint,
+                        })
                       }
-                      setDeleteTarget(row.original);
-                    }}
-                  >
-                  <Trash2 className="size-4 text-red-500" />
-                </Button>
-              ) : null}
+                    >
+                      <MapPin className="size-4 text-violet-700" />
+                      {locationTitle}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {showManualStatusAction ? (
+                    <DropdownMenuItem onClick={() => setStatusTargets([row.original])}>
+                      <Pencil className="size-4 text-violet-600" />
+                      Update attendance
+                    </DropdownMenuItem>
+                  ) : null}
+                  {showCorrectionReview ? (
+                    <>
+                      <DropdownMenuItem
+                        disabled={isReviewing}
+                        onClick={() =>
+                          void handleCorrectionReview(row.original.correctionId!, true)
+                        }
+                      >
+                        <CheckCircle2 className="size-4 text-emerald-600" />
+                        Accept regularization
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={isReviewing}
+                        onClick={() =>
+                          void handleCorrectionReview(row.original.correctionId!, false)
+                        }
+                      >
+                        <XCircle className="size-4 text-red-500" />
+                        Reject regularization
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                  {canDelete ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => {
+                          if (isVirtualAttendanceId(row.original.id)) {
+                            toast.message("No attendance record to delete yet.");
+                            return;
+                          }
+                          setDeleteTarget(row.original);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           );
         },
@@ -943,58 +957,65 @@ export function AttendanceTable({
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <p className="text-sm font-medium text-foreground/80">
-          Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-          {Math.min(page * pageSize, rowTotal)} of {rowTotal}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-input bg-white px-4 py-2.5 dark:bg-input">
+        <p className="text-sm text-muted-foreground">
+          Showing{" "}
+          <span className="font-semibold text-foreground">
+            {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
+            {Math.min(page * pageSize, rowTotal)}
+          </span>{" "}
+          of <span className="font-semibold text-foreground">{rowTotal}</span>{" "}
+          {rowTotal === 1 ? "record" : "records"}
           {isEmployeeHistoryView ? " for selected employee and date range" : ""}
         </p>
-        {totalPages > 1 ? (
-          <div className="flex max-w-full flex-wrap items-center gap-1.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 px-2.5"
-              disabled={page <= 1 || isPending}
-              onClick={() => updateParams({ page: String(page - 1) })}
-            >
-              Previous
-            </Button>
-            {attendancePageNumbers(page, totalPages).map((item, index) =>
-              item === "ellipsis" ? (
-                <span
-                  key={`ellipsis-${index}`}
-                  className="px-1 text-sm text-muted-foreground"
-                >
-                  …
-                </span>
-              ) : (
-                <Button
-                  key={item}
-                  type="button"
-                  variant={item === page ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 min-w-8 px-2"
-                  disabled={isPending || item === page}
-                  onClick={() => updateParams({ page: String(item) })}
-                >
-                  {item}
-                </Button>
-              ),
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 px-2.5"
-              disabled={page >= totalPages || isPending}
-              onClick={() => updateParams({ page: String(page + 1) })}
-            >
-              Next
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex max-w-full flex-wrap items-center gap-1.5">
+          <span className="mr-2 text-sm text-muted-foreground">
+            Page <span className="font-semibold text-foreground">{page}</span> of{" "}
+            <span className="font-semibold text-foreground">{totalPages}</span>
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5"
+            disabled={page <= 1 || isPending}
+            onClick={() => updateParams({ page: String(page - 1) })}
+          >
+            Previous
+          </Button>
+          {attendancePageNumbers(page, totalPages).map((item, index) =>
+            item === "ellipsis" ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="px-1 text-sm text-muted-foreground"
+              >
+                …
+              </span>
+            ) : (
+              <Button
+                key={item}
+                type="button"
+                variant={item === page ? "default" : "outline"}
+                size="sm"
+                className={cn("h-8 min-w-8 px-2", item === page && "disabled:opacity-100")}
+                disabled={isPending || item === page}
+                onClick={() => updateParams({ page: String(item) })}
+              >
+                {item}
+              </Button>
+            ),
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5"
+            disabled={page >= totalPages || isPending}
+            onClick={() => updateParams({ page: String(page + 1) })}
+          >
+            Next
+          </Button>
+        </div>
       </div>
 
       {teamRegularizationMode ? (
