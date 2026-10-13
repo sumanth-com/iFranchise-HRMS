@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getSignedUrlAction } from "@/lib/employees/actions";
+import {
+  getSignedProfileImageUrl,
+  peekSignedProfileImageUrl,
+} from "@/lib/employees/profile-image-url-client";
 import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 
 type EmployeeAvatarProps = {
@@ -23,7 +26,9 @@ export function EmployeeAvatar({
   signedUrl,
   className,
 }: EmployeeAvatarProps) {
-  const [imageUrl, setImageUrl] = useState<string | null>(signedUrl ?? null);
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    signedUrl ?? peekSignedProfileImageUrl(profileImagePath),
+  );
 
   useEffect(() => {
     if (signedUrl) {
@@ -36,11 +41,15 @@ export function EmployeeAvatar({
       return;
     }
 
-    void getSignedUrlAction("profileImages", profileImagePath).then((result) => {
-      if (result.success) {
-        setImageUrl(result.data);
+    let cancelled = false;
+    void getSignedProfileImageUrl(profileImagePath).then((url) => {
+      if (!cancelled && url) {
+        setImageUrl(url);
       }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [profileImagePath, signedUrl]);
 
   useEffect(() => {

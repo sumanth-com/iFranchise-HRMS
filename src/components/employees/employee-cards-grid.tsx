@@ -15,8 +15,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { formatDesignationDisplay } from "@/lib/employees/designation-display";
-import { getSignedUrlAction } from "@/lib/employees/actions";
 import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
+import {
+  getSignedProfileImageUrl,
+  peekSignedProfileImageUrl,
+} from "@/lib/employees/profile-image-url-client";
 import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 import { cn } from "@/lib/utils";
 import type { EmployeeListItem } from "@/types/employee";
@@ -24,7 +27,7 @@ import type { EmployeeListItem } from "@/types/employee";
 function CardPhoto({ employee }: { employee: EmployeeListItem }) {
   const assetPhoto = getDirectoryAssetPhoto(employee);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
-    employee.profileImageSignedUrl ?? null,
+    employee.profileImageSignedUrl ?? peekSignedProfileImageUrl(employee.profileImagePath),
   );
   const [assetFailed, setAssetFailed] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
@@ -44,9 +47,9 @@ function CardPhoto({ employee }: { employee: EmployeeListItem }) {
     }
 
     let cancelled = false;
-    void getSignedUrlAction("profileImages", employee.profileImagePath).then((result) => {
-      if (!cancelled && result.success) {
-        setResolvedAvatarUrl(result.data);
+    void getSignedProfileImageUrl(employee.profileImagePath).then((url) => {
+      if (!cancelled && url) {
+        setResolvedAvatarUrl(url);
       }
     });
 

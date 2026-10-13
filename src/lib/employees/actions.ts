@@ -89,6 +89,7 @@ import { loadInviteableRoles, getInviteableRoleByCode } from "@/lib/auth/iam-rol
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
+import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import {
   employeeInviteSchema,
   employeeSelfPreferencesSchema,
@@ -672,6 +673,48 @@ export async function getSignedUrlAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to sign URL",
+    };
+  }
+}
+
+const PROFILE_IMAGE_SIGN_BATCH_LIMIT = 200;
+
+/**
+ * Batch form of `getSignedUrlAction("profileImages", path)` for avatar grids:
+ * one auth/profile check and one storage call instead of one queued action per card.
+ * Same permission and per-path organization check; paths that fail are omitted.
+ */
+export async function getSignedProfileImageUrlsAction(
+  paths: string[],
+): Promise<EmployeeActionResult<Record<string, string>>> {
+  try {
+    const profile = await requireServerPermission("employee.view");
+    const allowed = [...new Set(paths)]
+      .slice(0, PROFILE_IMAGE_SIGN_BATCH_LIMIT)
+      .filter((path) => {
+        if (typeof path !== "string") return false;
+        try {
+          assertOrganizationStoragePath(path, profile.employee.organizationId);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+    if (allowed.length === 0) return { success: true, data: {} };
+
+    const supabase = await getAuthenticatedSupabase();
+    const signed = await createSignedStorageUrls(
+      supabase,
+      EMPLOYEE_STORAGE_BUCKETS.profileImages,
+      allowed,
+    );
+
+    return { success: true, data: Object.fromEntries(signed) };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to sign URLs",
     };
   }
 }

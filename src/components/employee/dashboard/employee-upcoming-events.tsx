@@ -23,7 +23,10 @@ import {
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
 import { birthdayCardMessage } from "@/lib/employee/birthday-utils";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
-import { getSignedUrlAction } from "@/lib/employees/actions";
+import {
+  getSignedProfileImageUrl,
+  peekSignedProfileImageUrl,
+} from "@/lib/employees/profile-image-url-client";
 import { listEmployeeAnnouncementsAction } from "@/lib/organization/actions/company-announcement-actions";
 import {
   announcementViewStorageKey,
@@ -120,7 +123,9 @@ function CelebrationBirthdayPhoto({
     [firstName, lastName],
   );
   const assetPhoto = useMemo(() => getDirectoryAssetPhoto(person), [person]);
-  const [imageUrl, setImageUrl] = useState<string | null>(signedUrl ?? null);
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    signedUrl ?? peekSignedProfileImageUrl(profileImagePath),
+  );
   const [assetFailed, setAssetFailed] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
 
@@ -138,15 +143,15 @@ function CelebrationBirthdayPhoto({
       return;
     }
 
-    void getSignedUrlAction("profileImages", profileImagePath)
-      .then((result) => {
-        if (result.success) {
-          setImageUrl(result.data);
-        }
-      })
-      .catch(() => {
-        // Non-critical avatar fetch — keep initials fallback.
-      });
+    let cancelled = false;
+    void getSignedProfileImageUrl(profileImagePath).then((url) => {
+      if (!cancelled && url) {
+        setImageUrl(url);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [profileImagePath, signedUrl]);
 
   const showUpload = Boolean(imageUrl) && !remoteFailed;

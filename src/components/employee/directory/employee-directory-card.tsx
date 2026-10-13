@@ -14,7 +14,10 @@ import { Button } from "@/components/common/button";
 import { ProfilePhotoFallback } from "@/components/employees/profile-photo-fallback";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
-import { getSignedUrlAction } from "@/lib/employees/actions";
+import {
+  getSignedProfileImageUrl,
+  peekSignedProfileImageUrl,
+} from "@/lib/employees/profile-image-url-client";
 import { cn } from "@/lib/utils";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 
@@ -51,7 +54,7 @@ function CardPhoto({
 }) {
   const assetPhoto = getDirectoryAssetPhoto(person);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
-    person.avatarUrl ?? null,
+    person.avatarUrl ?? peekSignedProfileImageUrl(person.profileImagePath),
   );
   const [assetFailed, setAssetFailed] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
@@ -71,9 +74,9 @@ function CardPhoto({
     }
 
     let cancelled = false;
-    void getSignedUrlAction("profileImages", person.profileImagePath).then((result) => {
-      if (!cancelled && result.success) {
-        setResolvedAvatarUrl(result.data);
+    void getSignedProfileImageUrl(person.profileImagePath).then((url) => {
+      if (!cancelled && url) {
+        setResolvedAvatarUrl(url);
       }
     });
 
@@ -138,7 +141,7 @@ function CardPhoto({
 function ReadOnlyCardPhoto({ person }: { person: DirectoryCardPerson }) {
   const assetPhoto = getDirectoryAssetPhoto(person);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
-    person.avatarUrl ?? null,
+    person.avatarUrl ?? peekSignedProfileImageUrl(person.profileImagePath),
   );
   const [assetFailed, setAssetFailed] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
@@ -158,9 +161,9 @@ function ReadOnlyCardPhoto({ person }: { person: DirectoryCardPerson }) {
     }
 
     let cancelled = false;
-    void getSignedUrlAction("profileImages", person.profileImagePath).then((result) => {
-      if (!cancelled && result.success) {
-        setResolvedAvatarUrl(result.data);
+    void getSignedProfileImageUrl(person.profileImagePath).then((url) => {
+      if (!cancelled && url) {
+        setResolvedAvatarUrl(url);
       }
     });
 

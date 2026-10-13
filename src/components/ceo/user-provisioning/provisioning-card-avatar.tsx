@@ -5,7 +5,10 @@ import Image from "next/image";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
-import { getSignedUrlAction } from "@/lib/employees/actions";
+import {
+  getSignedProfileImageUrl,
+  peekSignedProfileImageUrl,
+} from "@/lib/employees/profile-image-url-client";
 import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 import type { CeoProvisioningUser } from "@/types/ceo-user-provisioning";
 import { cn } from "@/lib/utils";
@@ -23,7 +26,9 @@ export function ProvisioningCardAvatar({
     lastName: user.lastName,
     fullName: user.fullName,
   });
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(() =>
+    peekSignedProfileImageUrl(user.profileImagePath),
+  );
   const [assetFailed, setAssetFailed] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
 
@@ -37,9 +42,9 @@ export function ProvisioningCardAvatar({
     }
 
     let cancelled = false;
-    void getSignedUrlAction("profileImages", user.profileImagePath).then((result) => {
-      if (!cancelled && result.success) {
-        setResolvedUrl(result.data);
+    void getSignedProfileImageUrl(user.profileImagePath).then((url) => {
+      if (!cancelled && url) {
+        setResolvedUrl(url);
       }
     });
 
