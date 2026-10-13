@@ -4,30 +4,43 @@ const BALA_GANESH_IMAGE = "/images/holidays/bala-ganesh.png";
 /** Colorful square portrait; cache-bust when asset is replaced in-place. */
 const GANDHI_JAYANTI_IMAGE = "/images/holidays/gandhi.jpg?v=2";
 
-function DussheraBowIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden
-      className={cn("size-full text-orange-600", className)}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M7 5.5c3.5-3 7.5-3 11 0" />
-      <path d="M7 18.5c3.5 3 7.5 3 11 0" />
-      <path d="M18 5.5v13" />
-      <path d="M4.5 12h9.5" />
-      <path d="M14 12l4.5-3v6L14 12Z" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
+const FEST_IMAGE_DIR = "/images/holidays/fest";
 
 function matchesHoliday(name: string, ...keys: string[]) {
   const key = name.toLowerCase();
   return keys.some((token) => key.includes(token));
+}
+
+/** "holi" is also a prefix of "holiday", so it must match as a whole word. */
+function isHoli(name: string) {
+  return /\bholi\b/i.test(name);
+}
+
+/**
+ * Festival artwork, checked in order. Eid runs before Rama so "Ramadan" is not
+ * read as Rama Navami, and Ugadi runs before New Year ("Telugu New Year").
+ */
+const FESTIVAL_IMAGES: Array<{ keys: string[]; file: string }> = [
+  { keys: ["dusshera", "dussehra", "dasara", "vijayadashami", "navratri", "durga"], file: "durga-maa.jpg" },
+  { keys: ["diwali", "deepavali"], file: "deepavali.jpg" },
+  { keys: ["sankranti", "pongal"], file: "sankranti.jpg" },
+  { keys: ["ugadi", "gudi padwa"], file: "ugadi.jpg" },
+  { keys: ["shivaratri", "sivaratri", "shivratri"], file: "shiva.jpg" },
+  { keys: ["muharram", "moharrum", "moharram", "ashura"], file: "muharram.jpg" },
+  { keys: ["eid", "ramzan", "ramadan", "bakrid", "milad"], file: "eid.jpg" },
+  { keys: ["rama navami", "ram navami", "srirama", "sri rama"], file: "rama.jpg" },
+  { keys: ["janmashtami", "krishnaashtami", "krishnashtami", "krishna"], file: "krishna.jpg" },
+  { keys: ["christmas"], file: "christmas.jpg" },
+  { keys: ["good friday", "easter"], file: "good-friday.jpg" },
+  { keys: ["independence", "republic"], file: "india-national.jpg" },
+  { keys: ["may day", "labour", "labor"], file: "may-day.jpg" },
+  { keys: ["new year"], file: "new-year.jpg" },
+];
+
+function festivalImage(name: string): string | null {
+  if (isHoli(name)) return `${FEST_IMAGE_DIR}/holi.jpg`;
+  const match = FESTIVAL_IMAGES.find((entry) => matchesHoliday(name, ...entry.keys));
+  return match ? `${FEST_IMAGE_DIR}/${match.file}` : null;
 }
 
 /** Maps a holiday to a festive glyph so each row reads at a glance. */
@@ -118,8 +131,11 @@ export function HolidayGlyph({
     );
   }
 
-  if (matchesHoliday(name, "dusshera", "dussehra", "vijayadashami", "dasara")) {
-    return <DussheraBowIcon className={className} />;
+  const festivalSrc = festivalImage(name);
+  if (festivalSrc) {
+    return (
+      <HolidayPhotoGlyph src={festivalSrc} frameClassName="bg-amber-50" className={className} />
+    );
   }
 
   return (

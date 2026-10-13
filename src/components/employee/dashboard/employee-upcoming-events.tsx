@@ -254,7 +254,7 @@ function HolidaySlide({
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center gap-0 overflow-visible rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-3 py-3 text-center ring-1 ring-violet-500/15 sm:px-4 sm:py-4">
-      <span className="mx-auto aspect-square w-[min(100%,6.75rem)] max-h-[6.75rem] min-h-[4.25rem] shrink-0 sm:w-[min(100%,7.5rem)] sm:max-h-[7.5rem]">
+      <span className="mx-auto aspect-square w-[min(100%,8rem)] max-h-[8rem] min-h-[4.25rem] shrink-0 sm:w-[min(100%,10rem)] sm:max-h-[10rem]">
         <HolidayGlyph
           name={event.title}
           className="size-full max-h-full max-w-full object-contain"
