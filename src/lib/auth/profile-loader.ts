@@ -12,6 +12,7 @@ import { getOrganizationLogoSignedUrl } from "@/lib/organization/services/org-lo
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import { isEmployeeAppVisible } from "@/lib/employees/app-hidden";
+import { isPendingInviteSetupEmployee } from "@/lib/auth/invite-setup";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import { createSignedStorageUrlIfExists } from "@/lib/storage/signed-url";
 
@@ -216,11 +217,10 @@ export const loadUserProfile = cache(async function loadUserProfile(
     return { success: false, error: "EMPLOYEE_INACTIVE" };
   }
 
-  const isInviteSetupEmployee =
-    employeeRow.employment_status === "draft" &&
-    (employeeRow.account_status === "invited" ||
-      employeeRow.account_status === "invitation_pending" ||
-      employeeRow.account_status === "invitation_accepted");
+  const isInviteSetupEmployee = isPendingInviteSetupEmployee({
+    employmentStatus: employeeRow.employment_status,
+    accountStatus: employeeRow.account_status,
+  });
 
   if (
     !isInviteSetupEmployee &&

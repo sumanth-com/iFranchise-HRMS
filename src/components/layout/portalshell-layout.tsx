@@ -8,6 +8,7 @@ import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
 import { TabletAccessDenied } from "@/components/layout/tablet-access-denied";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { isPendingInviteSetupEmployee } from "@/lib/auth/invite-setup";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
 import { PORTAL_PERMISSIONS, type PortalKey } from "@/lib/auth/portals";
 import { isTabletHrmsAllowed } from "@/lib/device-access/access";
@@ -83,6 +84,12 @@ async function ResolvedPortalShell({
       await supabase.auth.signOut();
     }
     redirect(`${AUTH_ROUTES.login}?error=${profileResult.error}`);
+  }
+
+  // Invite-link sessions are admitted only to finish password setup; activation
+  // (draft → active employment) happens on the first password login.
+  if (isPendingInviteSetupEmployee(profileResult.profile.employee)) {
+    redirect(`${AUTH_ROUTES.resetPassword}?invite=1`);
   }
 
   const requiredPortalPermission =
