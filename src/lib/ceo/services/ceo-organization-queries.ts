@@ -159,6 +159,7 @@ export async function getCeoOrgFilterLookups(
           .select("id, first_name, last_name, employee_code, employment_status, department_id")
           .eq("organization_id", organizationId)
           .is("deleted_at", null)
+          .neq("employment_status", "draft")
           .order("first_name"),
       ),
       fromHrms(supabase, "departments")

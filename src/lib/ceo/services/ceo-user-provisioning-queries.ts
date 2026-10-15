@@ -102,21 +102,46 @@ function deriveInvitationStatus(row: LooseRow): ProvisioningInvitationStatus {
 }
 
 /**
- * Heal stale invitation_pending rows when Auth already has a successful sign-in.
+ * Heal stale invitation_pending rows when the user has actually signed in to the portal.
  * Status badges then reflect actual portal access without hardcoding people.
+ *
+ * Auth `last_sign_in_at` alone is not proof of portal login: opening the invite link
+ * and the password-setup verification both create Auth sessions. Only users with an
+ * HRMS login session (written by the password login flow) are healed, and draft
+ * employment is never paired with an active account (login rejects that combination).
  */
 async function reconcilePortalLoginFromAuth(
   admin: ReturnType<typeof createAdminClient>,
   organizationId: string,
   users: NormalizedExecutiveUser[],
 ): Promise<NormalizedExecutiveUser[]> {
-  const candidates = users.filter(
+  const pendingCandidates = users.filter(
     (user) =>
       user.userId &&
       !user.firstLoginAt &&
       (user.accountStatus === "invitation_pending" ||
         user.accountStatus === "invitation_accepted" ||
         user.accountStatus === "invited"),
+  );
+  if (pendingCandidates.length === 0) return users;
+
+  const { data: sessionRows, error: sessionError } = await admin
+    .schema("hrms")
+    .from("user_login_sessions")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .in(
+      "user_id",
+      pendingCandidates.map((user) => user.userId!),
+    )
+    .is("deleted_at", null);
+  if (sessionError) return users;
+
+  const usersWithPortalLogin = new Set(
+    ((sessionRows ?? []) as LooseRow[]).map((row) => String(row.user_id)),
+  );
+  const candidates = pendingCandidates.filter((user) =>
+    usersWithPortalLogin.has(user.userId!),
   );
   if (candidates.length === 0) return users;
 
@@ -129,7 +154,7 @@ async function reconcilePortalLoginFromAuth(
         if (error || !data.user?.last_sign_in_at) return;
 
         const firstLoginAt = data.user.last_sign_in_at;
-        const { error: updateError } = await admin
+        const { data: updatedRows, error: updateError } = await admin
           .schema("hrms")
           .from("employees")
           .update({
@@ -141,9 +166,11 @@ async function reconcilePortalLoginFromAuth(
           })
           .eq("id", user.employeeId)
           .eq("organization_id", organizationId)
-          .is("deleted_at", null);
+          .neq("employment_status", "draft")
+          .is("deleted_at", null)
+          .select("id");
 
-        if (updateError) return;
+        if (updateError || !updatedRows?.length) return;
         healedByEmployeeId.set(user.employeeId, {
           firstLoginAt,
           accountStatus: "active",

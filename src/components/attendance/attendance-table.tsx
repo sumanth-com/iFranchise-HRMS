@@ -77,6 +77,7 @@ import {
 } from "@/lib/attendance/manual-status";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import { formatHoursLabel } from "@/lib/employee/attendance-format";
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import type {
@@ -464,7 +465,13 @@ export function AttendanceTable({
         // No fixed width: takes the space left after the other columns.
         meta: { align: "left" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => {
-          const designation = row.original.designationTitle ?? "—";
+          const designation = formatDesignationDisplay(row.original.designationTitle, {
+            person: {
+              employeeCode: row.original.employeeCode,
+              firstName: row.original.employeeName,
+            },
+            fallback: "—",
+          });
           return (
             <span className="block break-words leading-snug">{designation}</span>
           );

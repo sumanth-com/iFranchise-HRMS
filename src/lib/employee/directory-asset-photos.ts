@@ -5,6 +5,7 @@ import anmolPrasad from "@/assets/Anmol Prasad.png";
 import dikshaChoudhary from "@/assets/Dikhsha Choudhary.png";
 import ektaPattanaik from "@/assets/Ekta.jpeg";
 import himaniBhargava from "@/assets/Himani.jpeg";
+import lohitKumar from "@/assets/Lohit.PNG";
 import omRamtekkar from "@/assets/Om.jpeg";
 import prajwalPhoto from "@/assets/Prajwal Photo.jpeg";
 import samitAli from "@/assets/Samit Ali.jpg";
@@ -27,6 +28,7 @@ const DIRECTORY_ASSET_PHOTOS: Record<string, StaticImageData> = {
   "himani bhargava": himaniBhargava,
   "himani tapadiya": himaniBhargava,
   himani: himaniBhargava,
+  "lohit kumar": lohitKumar,
   om: omRamtekkar,
   "om anil ramtekkar": omRamtekkar,
   "om ramtekkar": omRamtekkar,
@@ -76,6 +78,7 @@ const DIRECTORY_ASSET_PHOTOS_BY_CODE: Record<string, StaticImageData> = {
   IF2026009: sumanthReddy,
   "IF-PENDING-SA": sumanthReddy,
   IF2026010: swethaChintada,
+  IF2026024: lohitKumar,
 };
 
 function normalizePersonKey(value: string) {

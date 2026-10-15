@@ -212,6 +212,7 @@ export async function getCeoAttendanceFilterLookups(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .neq("employment_status", "draft")
       .order("first_name"),
     fromHrms(supabase, "departments")
       .select("id, name")
