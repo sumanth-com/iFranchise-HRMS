@@ -1,7 +1,10 @@
 "use client";
 
 import { HrTeamLeaveView } from "@/components/leave/hr-team-leave-view";
-import { fetchTeamLeaveRequestsForHrTableAction } from "@/lib/manager/actions/manager-leave-actions";
+import {
+  fetchTeamLeaveRequestsForHrTableAction,
+  fetchTeamLeaveSummaryAction,
+} from "@/lib/manager/actions/manager-leave-actions";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import type { LeaveListItem, LeaveSummary } from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
@@ -16,6 +19,15 @@ function toLeaveSummary(summary: TeamLeaveSummary): LeaveSummary {
     balanceUtilizationPercent: summary.balanceUtilizationPercent,
     upcomingPlannedLeaves: summary.upcomingPlannedLeaves,
   };
+}
+
+async function fetchManagerTeamLeaveSummary(): Promise<LeaveSummary | null> {
+  try {
+    const summary = await fetchTeamLeaveSummaryAction();
+    return toLeaveSummary(summary);
+  } catch {
+    return null;
+  }
 }
 
 type ManagerTeamLeaveViewProps = {
@@ -87,6 +99,7 @@ export function ManagerTeamLeaveView({
       canDelete={false}
       listBasePath={MANAGER_ROUTES.leaveTeam}
       fetchRecords={fetchTeamLeaveRequestsForHrTableAction}
+      fetchSummary={fetchManagerTeamLeaveSummary}
       title="Team Leave"
       description="Review team leave, approve or reject requests assigned to you, and check coverage."
     />

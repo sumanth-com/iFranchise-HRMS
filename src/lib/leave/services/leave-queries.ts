@@ -32,6 +32,7 @@ import {
   HR_LEAVE_APPROVER_ROLE_CODES,
   canActorDecideLeaveRequest,
   isCeoLeaveApprover,
+  isEligibleActiveCeoLeaveApproverEmployee,
   isHrLeaveActor,
 } from "@/lib/leave/services/leave-approval-auth";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
@@ -607,9 +608,13 @@ export async function listLeaveRequests(
         : null;
 
       const approvals = approvalsByLeaveId.get(row.id) ?? [];
-      const pendingApproval = approvals
-        .filter((a) => a.approval_status === "pending")
-        .sort((a, b) => a.approval_level - b.approval_level)[0];
+      const pendingSteps = approvals.filter((a) => a.approval_status === "pending");
+      const ownPending = pendingSteps.find(
+        (a) => a.approver_employee_id === profile.employee.id,
+      );
+      const pendingApproval =
+        ownPending ??
+        [...pendingSteps].sort((a, b) => a.approval_level - b.approval_level)[0];
 
       const pendingApproverEmployeeId = pendingApproval?.approver_employee_id ?? null;
       const executiveApplicant = !approvals.some(
@@ -1847,7 +1852,9 @@ export {
   CEO_LEAVE_APPROVER_ROLE_CODES,
   HR_LEAVE_APPROVER_ROLE_CODES,
   canActorDecideLeaveRequest,
+  canManagerActOnTeamLeaveApproval,
   isCeoLeaveApprover,
+  isEligibleActiveCeoLeaveApproverEmployee,
   isHrLeaveActor,
 } from "@/lib/leave/services/leave-approval-auth";
 
@@ -2174,7 +2181,7 @@ async function filterActiveCeoEmployeeIds(
   const { data, error } = await admin
     .schema("hrms")
     .from("employees")
-    .select("id, employment_status, status")
+    .select("id, employment_status, status, email, app_hidden_at, deleted_at")
     .eq("organization_id", organizationId)
     .in("id", ceoIds)
     .is("deleted_at", null);
@@ -2182,11 +2189,7 @@ async function filterActiveCeoEmployeeIds(
   if (error) throw new Error(error.message);
 
   return (data ?? [])
-    .filter(
-      (row) =>
-        row.status === "active" &&
-        ["active", "probation"].includes(row.employment_status),
-    )
+    .filter((row) => isEligibleActiveCeoLeaveApproverEmployee(row))
     .map((row) => row.id);
 }
 

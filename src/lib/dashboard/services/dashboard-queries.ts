@@ -245,7 +245,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   ] = await Promise.all([
     getAttendanceSummary(supabase, profile),
     getLeaveSummary(supabase, profile, undefined, undefined, {
-      excludeHrApplicants: true,
+      excludeHrApplicants: false,
     }),
     getPayrollSummary(supabase, profile),
     getRecruitmentSummary(supabase, profile),

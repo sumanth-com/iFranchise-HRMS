@@ -64,7 +64,9 @@ export async function LeaveHubSection({
     reportingManagerId: raw.reportingManagerId,
     employeeId: raw.employeeId,
     summaryFilter,
-    excludeHrApplicants: true,
+    // Include CEO-routed executive applicants so HR can first-wins act in
+    // Team Leave; CEO Approvals stays a parallel authorized queue.
+    excludeHrApplicants: false,
   });
 
   const canApply = hasPermission(profile.permissionCodes, "leave.create");
@@ -149,7 +151,7 @@ export async function LeaveHubSection({
       : Promise.resolve(null),
     loadTeamSection
       ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year, {
-          excludeHrApplicants: true,
+          excludeHrApplicants: false,
           // Summary cards do not display utilization — skip full leave_balances scan.
           skipBalanceUtilization: true,
         }).catch((error) => {

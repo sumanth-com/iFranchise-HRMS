@@ -58,6 +58,8 @@ type HrTeamLeaveViewProps = {
   fetchRecords?: (
     params: LeaveListParams,
   ) => Promise<LeaveActionResult<LeaveListResult>>;
+  /** When set (e.g. Manager Team Leave), refresh summary cards after approve/reject. */
+  fetchSummary?: () => Promise<LeaveSummary | null>;
 };
 
 export function HrTeamLeaveView({
@@ -92,6 +94,7 @@ export function HrTeamLeaveView({
   policyHref,
   listBasePath,
   fetchRecords,
+  fetchSummary,
 }: HrTeamLeaveViewProps) {
   const [summaryState, setSummaryState] = useState(summary);
   const [summaryFilter, setSummaryFilter] = useState<LeaveSummaryFilterKey | undefined>(
@@ -105,10 +108,14 @@ export function HrTeamLeaveView({
   }, [summary]);
 
   const refreshSummary = useCallback(async () => {
-    if (fetchRecords) return;
-    const result = await getLeaveSummaryAction();
+    if (fetchSummary) {
+      const data = await fetchSummary();
+      if (data) setSummaryState(data);
+      return;
+    }
+    const result = await getLeaveSummaryAction(month, year);
     if (result.success) setSummaryState(result.data);
-  }, [fetchRecords]);
+  }, [fetchSummary, month, year]);
 
   const applySummaryFilter = useCallback((key: LeaveSummaryFilterKey) => {
     setSummaryFilter((current) => (current === key ? undefined : key));

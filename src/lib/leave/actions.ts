@@ -349,8 +349,9 @@ export async function fetchLeaveRequestsAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = leaveListParamsSchema.parse({
       ...params,
-      // HR Team Leave must never list HR applicants (CEO-only queue).
-      excludeHrApplicants: params.excludeHrApplicants ?? true,
+      // Team Leave lists executive applicants too — HR may first-wins decide
+      // CEO-routed leave; CEO Approvals remains the parallel queue.
+      excludeHrApplicants: params.excludeHrApplicants ?? false,
     });
     const data = await listLeaveRequests(supabase, profile, parsed);
     return { success: true, data };
@@ -465,12 +466,15 @@ export async function getLeaveCalendarAction(
   }
 }
 
-export async function getLeaveSummaryAction(): Promise<LeaveActionResult<LeaveSummary>> {
+export async function getLeaveSummaryAction(
+  month?: number,
+  year?: number,
+): Promise<LeaveActionResult<LeaveSummary>> {
   try {
     const profile = await requireServerPermission("leave.view");
     const supabase = await getAuthenticatedSupabase();
-    const data = await getLeaveSummary(supabase, profile, undefined, undefined, {
-      excludeHrApplicants: true,
+    const data = await getLeaveSummary(supabase, profile, month, year, {
+      excludeHrApplicants: false,
     });
     return { success: true, data };
   } catch (error) {

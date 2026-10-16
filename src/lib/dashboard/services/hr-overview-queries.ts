@@ -115,7 +115,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   ] = await Promise.all([
     getAttendanceSummary(supabase, profile),
     getLeaveSummary(supabase, profile, undefined, undefined, {
-      excludeHrApplicants: true,
+      excludeHrApplicants: false,
       skipBalanceUtilization: true,
     }),
     listHolidays(supabase, organizationId, { year: todayDate.getFullYear() }),

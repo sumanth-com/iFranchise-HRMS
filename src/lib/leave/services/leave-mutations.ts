@@ -929,9 +929,13 @@ async function assertCanActOnLeaveApproval(
     throw new Error("You are not authorized to act on this leave request");
   }
 
-  if (executiveApplicant && !isCeoLeaveApprover(profile)) {
+  if (
+    executiveApplicant &&
+    !isCeoLeaveApprover(profile) &&
+    !isHrLeaveActor(profile)
+  ) {
     throw new Error(
-      "Only the CEO can approve or reject HR and Manager leave requests",
+      "Only CEO or HR can approve or reject executive leave requests",
     );
   }
 

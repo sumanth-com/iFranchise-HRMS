@@ -9,6 +9,7 @@ import {
   getEmployeeRoleCodesByEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
+import { canManagerActOnTeamLeaveApproval } from "@/lib/leave/services/leave-approval-auth";
 import { classifyCalendarDay, DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import {
@@ -20,15 +21,17 @@ import {
 import { getTeamFilterLookups } from "@/lib/manager/services/team-queries";
 import { teamLeaveListParamsSchema } from "@/lib/validations/manager-leave";
 import type { UserProfile } from "@/types/auth";
+import { resolveManagerLeaveWorkflowStatus } from "@/lib/manager/services/team-leave-workflow";
 import type { LeaveStatus } from "@/types/leave";
 import type {
-  ManagerLeaveWorkflowStatus,
   ManagerTeamLeavePageData,
   TeamLeaveConflict,
   TeamLeaveListParams,
   TeamLeaveListResult,
   TeamLeaveSummary,
 } from "@/types/manager-leave";
+
+export { resolveManagerLeaveWorkflowStatus } from "@/lib/manager/services/team-leave-workflow";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
@@ -72,28 +75,6 @@ const CRITICAL_ROLE_PATTERN =
   /\b(manager|lead|head|director|supervisor|chief|vp|president)\b/i;
 
 const MIN_DEPARTMENT_STAFFING = 1;
-
-export function resolveManagerLeaveWorkflowStatus(
-  leaveStatus: LeaveStatus,
-  approvals: Array<{ approvalLevel: number; approvalStatus: string }>,
-): ManagerLeaveWorkflowStatus {
-  if (leaveStatus === "approved") return "completed";
-  if (leaveStatus === "rejected") {
-    const managerStep = approvals.find((step) => step.approvalLevel === 1);
-    if (managerStep?.approvalStatus === "rejected") return "rejected_by_manager";
-    return "rejected_by_manager";
-  }
-
-  const managerStep = approvals.find((step) => step.approvalLevel === 1);
-  const hrStep = approvals.find((step) => step.approvalLevel === 2);
-
-  if (managerStep?.approvalStatus === "approved") {
-    if (hrStep && hrStep.approvalStatus === "pending") return "sent_to_hr";
-    return "approved_by_manager";
-  }
-
-  return "pending";
-}
 
 async function loadTeamOverlappingLeaves(
   supabase: AuthSupabaseClient,
@@ -494,9 +475,17 @@ export async function listTeamLeaveRequests(
         approver_employee_id: string;
         employees: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
       }>;
-      const pendingApproval = approvals
-        .filter((step) => step.approval_status === "pending")
-        .sort((a, b) => a.approval_level - b.approval_level)[0];
+      const pendingSteps = approvals.filter(
+        (step) => step.approval_status === "pending",
+      );
+      // Prefer this manager's own step so Approve stays available when HR's
+      // sibling level-1 row sorts first (same model as getPendingLeaveApprovalForActor).
+      const ownPending = pendingSteps.find(
+        (step) => step.approver_employee_id === profile.employee.id,
+      );
+      const pendingApproval =
+        ownPending ??
+        [...pendingSteps].sort((a, b) => a.approval_level - b.approval_level)[0];
       const currentApprover = pendingApproval
         ? unwrap(pendingApproval.employees)
         : null;
@@ -560,14 +549,18 @@ export async function listTeamLeaveRequests(
           : null,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId: pendingApproval?.approver_employee_id ?? null,
-        canActOnApproval:
-          !executiveApplicant &&
-          pendingApproval?.approver_employee_id === profile.employee.id &&
-          row.leave_status === "pending",
-        canActOnRejection:
-          !executiveApplicant &&
-          pendingApproval?.approver_employee_id === profile.employee.id &&
-          row.leave_status === "pending",
+        canActOnApproval: canManagerActOnTeamLeaveApproval({
+          profile,
+          leaveStatus: row.leave_status,
+          executiveApplicant,
+          hasOwnPendingStep: Boolean(ownPending),
+        }),
+        canActOnRejection: canManagerActOnTeamLeaveApproval({
+          profile,
+          leaveStatus: row.leave_status,
+          executiveApplicant,
+          hasOwnPendingStep: Boolean(ownPending),
+        }),
         workflowStatus,
         hasConflicts: conflicts.some((item) => item.severity === "warning"),
       };

@@ -407,7 +407,17 @@ export function LeaveTable({
               const isPendingStatus = row.leaveStatus === "pending";
               const isHrReviewPending =
                 Boolean(row.hrReviewRequired) && !row.hrDecision;
-              return isPendingStatus && !isHrReviewPending;
+              if (!isPendingStatus || isHrReviewPending) return false;
+              // List mapping sets canAct* for portal queues. Both false means
+              // this actor cannot decide (e.g. CEO-routed executive leave for
+              // a non-CEO manager) — keep them out of bulk selection.
+              if (
+                row.canActOnApproval === false &&
+                row.canActOnRejection === false
+              ) {
+                return false;
+              }
+              return true;
             })
             .map((row) => row.id)
         : [],
@@ -435,7 +445,13 @@ export function LeaveTable({
                 const isHrReviewPending =
                   Boolean(row.original.hrReviewRequired) &&
                   !row.original.hrDecision;
-                const selectable = isPendingStatus && !isHrReviewPending;
+                const selectable =
+                  isPendingStatus &&
+                  !isHrReviewPending &&
+                  !(
+                    row.original.canActOnApproval === false &&
+                    row.original.canActOnRejection === false
+                  );
                 if (!selectable) return null;
                 return (
                   <ApprovalSelectCheckbox
@@ -525,10 +541,23 @@ export function LeaveTable({
         header: "",
         cell: ({ row }) => {
           const isPendingStatus = row.original.leaveStatus === "pending";
-          const isHrReviewPending = Boolean(row.original.hrReviewRequired) && !row.original.hrDecision;
+          const isHrReviewPending =
+            Boolean(row.original.hrReviewRequired) && !row.original.hrDecision;
           const isCancellable = ["pending", "approved"].includes(
             row.original.leaveStatus,
           );
+          const showApprove =
+            !embedded &&
+            canApprove &&
+            isPendingStatus &&
+            !isHrReviewPending &&
+            row.original.canActOnApproval !== false;
+          const showReject =
+            !embedded &&
+            canReject &&
+            isPendingStatus &&
+            !isHrReviewPending &&
+            row.original.canActOnRejection !== false;
 
           return (
             <div className="flex items-center gap-1">
@@ -541,7 +570,7 @@ export function LeaveTable({
               >
                 <Eye className="size-4" />
               </Button>
-              {!embedded && canApprove && isPendingStatus && !isHrReviewPending ? (
+              {showApprove ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -552,7 +581,7 @@ export function LeaveTable({
                   <CheckCircle2 className="size-4 text-emerald-600" />
                 </Button>
               ) : null}
-              {!embedded && canReject && isPendingStatus && !isHrReviewPending ? (
+              {showReject ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
