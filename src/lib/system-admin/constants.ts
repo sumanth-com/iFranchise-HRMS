@@ -66,7 +66,6 @@ export const SUPER_ADMIN_GOALS_SUB_NAV = [
   { title: "KPIs", href: `${SYSTEM_ADMIN_ROUTES.goals}/kpis` },
   { title: "Feedback", href: `${SYSTEM_ADMIN_ROUTES.goals}/feedback` },
   { title: "1:1 Meetings", href: `${SYSTEM_ADMIN_ROUTES.goals}/one-on-ones` },
-  { title: "Promotions", href: `${SYSTEM_ADMIN_ROUTES.goals}/promotions` },
 ] as const;
 
 export const PORTAL_SWITCH_LINKS = [

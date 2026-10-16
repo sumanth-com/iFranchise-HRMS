@@ -130,7 +130,8 @@ function buildBreadcrumbItems(
         kpis: "KPIs",
         feedback: "Feedback",
         "one-on-ones": "1:1 Meetings",
-        promotions: "Promotions",
+        promotions: "Probation & Confirmation",
+        probation: "Probation & Confirmation",
         center: "Notification Center",
         history: "History",
         permissions: "Permissions",
@@ -325,6 +326,7 @@ function buildBreadcrumbItems(
         reimbursements: "Reimbursements",
         payslips: "Payslips",
         "employee-accounts": "Employee Accounts",
+        probation: "Probation & Confirmation",
         settings: "Settings",
       };
 
@@ -579,7 +581,8 @@ function buildBreadcrumbItems(
         kpis: "KPIs",
         feedback: "Feedback",
         "one-on-ones": "1:1 Meetings",
-        promotions: "Promotions",
+        promotions: "Probation & Confirmation",
+        probation: "Probation & Confirmation",
       };
       items.push({
         label: goalLabels[segments[2]] ?? formatSegment(segments[2]),
@@ -599,7 +602,8 @@ function buildBreadcrumbItems(
         kpis: "KPIs",
         feedback: "Feedback",
         "one-on-ones": "1:1 Meetings",
-        promotions: "Promotions",
+        promotions: "Probation & Confirmation",
+        probation: "Probation & Confirmation",
         jobs: "Job Openings",
         candidates: "Candidates",
         offers: "Offers",
@@ -665,6 +669,7 @@ function buildBreadcrumbItems(
         reimbursements: "Reimbursements",
         payslips: "Payslips",
         "employee-accounts": "Employee Accounts",
+        probation: "Probation & Confirmation",
         settings: "Settings",
       };
 
@@ -812,6 +817,7 @@ function buildBreadcrumbItems(
         reimbursements: "Reimbursements",
         payslips: "Payslips",
         "employee-accounts": "Employee Accounts",
+        probation: "Probation & Confirmation",
         settings: "Settings",
       };
 

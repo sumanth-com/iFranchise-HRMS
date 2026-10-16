@@ -97,6 +97,19 @@ export type PayrollBreakdown = {
     lopDeductionAmount?: number;
   };
   notes?: string[];
+  /**
+   * Mid-month salary change segments (effective-dated structures).
+   * When present, Team Payroll / payslip gross uses the same day-weighted blend.
+   */
+  salarySegments?: Array<{
+    salaryStructureId: string;
+    startDate: string;
+    endDate: string;
+    calendarDays: number;
+    monthlyGrossSalary: number;
+    dailyRate: number;
+    segmentGross: number;
+  }>;
   /** Category rollup for the single Reimbursement earning line (display detail only). */
   reimbursementBreakdown?: Array<{ category: string; amount: number }>;
   hrAdjustments?: HrPayrollAdjustments;

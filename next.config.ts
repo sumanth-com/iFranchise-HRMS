@@ -119,18 +119,9 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
-    return [
+    const headers = [
       {
         source: "/images/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-      {
-        source: "/_next/static/:path*",
         headers: [
           {
             key: "Cache-Control",
@@ -143,6 +134,23 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
     ];
+
+    // Never mark /_next/static as immutable in development: unhashed route
+    // chunks (e.g. performance/layout.js) would pin stale nav/UI for a year.
+    // Production builds use content-hashed filenames, so long-lived caching is safe.
+    if (process.env.NODE_ENV === "production") {
+      headers.splice(1, 0, {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      });
+    }
+
+    return headers;
   },
 };
 

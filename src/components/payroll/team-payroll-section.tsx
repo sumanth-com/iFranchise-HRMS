@@ -2,13 +2,17 @@ import { BonusTable } from "@/components/payroll/bonus-management";
 import { EmployeeAccountsTable } from "@/components/payroll/employee-accounts-table";
 import { PayrollRunForm } from "@/components/payroll/payroll-run-form";
 import type { CompanyPayrollInitialPanel } from "@/components/payroll/payroll-run-form";
-import { PayrollSettingsForm } from "@/components/payroll/payroll-settings-form";
 import { PayslipHistoryView } from "@/components/payroll/payslip-history-view";
+import { ProbationConfirmationView } from "@/components/performance/probation-confirmation-view";
 import { ReimbursementTable } from "@/components/payroll/reimbursement-management";
 import { SalaryStructureTable } from "@/components/payroll/salary-structure-table";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { fetchPayrollSettingsAction } from "@/lib/payroll/actions";
 import {
+  canManageEmploymentConfirmations,
+  listProbationCandidates,
+} from "@/lib/employees/services/employment-confirmation-queries";
+import {
+  canAccessPayrollProbation,
   canApproveBonus,
   canApproveReimbursement,
   canCreateBonus,
@@ -16,9 +20,11 @@ import {
   canEditSalary,
   canRunPayroll,
   payrollTeamSectionPath,
+  SELF_PAYROLL_ROUTES,
   TEAM_PAYROLL_SECTIONS,
   type TeamPayrollSection,
 } from "@/lib/payroll/constants";
+import { getPerformanceLookups } from "@/lib/performance/services/performance-queries";
 import type { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
@@ -326,16 +332,28 @@ export async function TeamPayrollSection({
     );
   }
 
-  if (section === TEAM_PAYROLL_SECTIONS.settings) {
-    const record = await fetchPayrollSettingsAction();
-    const canEdit = hasAnyPermission(profile.permissionCodes, [
-      "settings.edit",
-      "settings.manage",
-      "payroll.edit",
-      "payroll.approve",
+  if (section === TEAM_PAYROLL_SECTIONS.probation) {
+    if (!canAccessPayrollProbation(profile)) {
+      return null;
+    }
+    const [candidates, lookups] = await Promise.all([
+      listProbationCandidates(supabase, profile),
+      getPerformanceLookups(supabase, profile.employee.organizationId),
     ]);
+    return (
+      <ProbationConfirmationView
+        candidates={candidates}
+        designations={lookups.designations}
+        canManage={canManageEmploymentConfirmations(profile.permissionCodes)}
+        compactHeader
+        policyHref={SELF_PAYROLL_ROUTES.policy}
+      />
+    );
+  }
 
-    return <PayrollSettingsForm record={record} canEdit={canEdit} variant="team" />;
+  if (section === TEAM_PAYROLL_SECTIONS.settings) {
+    // Settings is not available on HR/CEO/Accountant Team Payroll hubs.
+    return null;
   }
 
   return null;

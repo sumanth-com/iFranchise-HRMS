@@ -1,10 +1,8 @@
-import { EmployeePromotionsView } from "@/components/employee/goals/employee-promotions-view";
-import { fetchMyPromotionsAction } from "@/lib/employee/actions/employee-performance-actions";
-import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
+import { redirect } from "next/navigation";
 
-export default async function SuperAdminPromotionsPage() {
-  await requireSuperAdminProfile();
-  const promotions = await fetchMyPromotionsAction();
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 
-  return <EmployeePromotionsView promotions={promotions} />;
+/** Promotions self-service entry removed; keep URL bookmark-safe. */
+export default function SuperAdminGoalsPromotionsRedirectPage() {
+  redirect(SYSTEM_ADMIN_ROUTES.goals);
 }

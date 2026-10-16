@@ -211,7 +211,7 @@ export const EMPLOYEE_PORTAL_MANUAL: ManualSection[] = [
       "Your personal performance workspace: goals, KPIs, feedback, 1:1s, and promotion items.",
     useful: "Track your own goals and reviews in one place.",
     howTo:
-      "Open My Goals. Move between Goals, KPIs, Feedback, 1:1s, and Promotions. Update progress on items assigned to you.",
+      "Open My Goals. Move between Goals, KPIs, Feedback, and 1:1s. Update progress on items assigned to you.",
     features: [
       {
         name: "Goals & OKRs",
@@ -236,12 +236,6 @@ export const EMPLOYEE_PORTAL_MANUAL: ManualSection[] = [
         icon: "users-round",
         detail: "Your 1:1 notes, agendas, and follow-ups.",
         tip: "Capture action items so they are not lost.",
-      },
-      {
-        name: "Promotions",
-        icon: "trending",
-        detail: "Promotion-related records that involve you.",
-        tip: "This is your record — HR and managers own the process.",
       },
     ],
   },

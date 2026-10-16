@@ -17,11 +17,20 @@ import { cn } from "@/lib/utils";
 type PayrollSubNavProps = {
   basePath?: string;
   hiddenSections?: TeamPayrollSection[];
+  /**
+   * Settings is Super Admin / System Admin only. Opt-in from the server page
+   * after canAccessPayrollSettings — never default-show for HR/CEO layouts.
+   */
+  showSettings?: boolean;
+  /** Probation & Confirmation for HR / CEO (hidden for Accountant by default). */
+  showProbation?: boolean;
 };
 
 export function PayrollSubNav({
   basePath = SELF_PAYROLL_ROUTES.team,
   hiddenSections = [],
+  showSettings = false,
+  showProbation = true,
 }: PayrollSubNavProps) {
   const pathname = usePathname();
   const useTeamPayrollLabel = usesTeamPayrollRunLabel(basePath);
@@ -31,9 +40,13 @@ export function PayrollSubNav({
       ? TEAM_PAYROLL_SECTIONS.run
       : parseTeamPayrollSection(pathname.slice(basePath.length + 1).split("/")[0])
     : TEAM_PAYROLL_SECTIONS.run;
-  const items = PAYROLL_SUB_NAV.filter(
-    (item) => !hiddenSections.includes(item.section as TeamPayrollSection),
-  );
+  const items = PAYROLL_SUB_NAV.filter((item) => {
+    const section = item.section as TeamPayrollSection;
+    if (hiddenSections.includes(section)) return false;
+    if (section === TEAM_PAYROLL_SECTIONS.settings && !showSettings) return false;
+    if (section === TEAM_PAYROLL_SECTIONS.probation && !showProbation) return false;
+    return true;
+  });
 
   return (
     <div className="flex justify-center">

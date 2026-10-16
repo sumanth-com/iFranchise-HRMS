@@ -28,7 +28,7 @@ export default async function PayrollManagementPolicyPage() {
   const canEdit = canEditPayrollPolicy(profile);
   const backHref = payrollHubUrl({
     tab: "team",
-    section: TEAM_PAYROLL_SECTIONS.settings,
+    section: TEAM_PAYROLL_SECTIONS.run,
   });
 
   const [employee, document] = await Promise.all([

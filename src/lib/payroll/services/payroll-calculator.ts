@@ -1,3 +1,5 @@
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+
 import type {
   HrPayrollAdjustments,
   PayrollBreakdown,
@@ -33,6 +35,20 @@ export type SalaryStructureRow = {
   gross_salary: number | string;
   net_salary: number | string;
   components: Record<string, unknown> | null;
+  /** Inclusive effective window for mid-month blends. */
+  effective_from?: string | null;
+  effective_to?: string | null;
+};
+
+export type SalaryStructureSegment = {
+  salaryStructureId: string;
+  startDate: string;
+  endDate: string;
+  calendarDays: number;
+  monthlyGrossSalary: number;
+  dailyRate: number;
+  segmentGross: number;
+  structure: SalaryStructureRow;
 };
 
 export type AttendanceSummary = {
@@ -81,6 +97,12 @@ export type PayrollCalculationInput = {
   month: number;
   year: number;
   salaryStructure: SalaryStructureRow | null;
+  /**
+   * All salary structures overlapping the payroll month (ordered any way).
+   * When more than one covers the applicable period, gross is day-weighted
+   * using EXCEL_PAYROLL_DAY_DENOMINATOR (monthly ÷ 30 per segment).
+   */
+  salaryStructures?: SalaryStructureRow[] | null;
   attendance: AttendanceSummary;
   leaveLopDays?: number;
   leaveSummary?: LeaveMonthSummary;
@@ -324,6 +346,118 @@ export function resolvePayrollWorkingDays(
  */
 export const EXCEL_PAYROLL_DAY_DENOMINATOR = 30;
 
+function inclusiveCalendarDays(startDate: string, endDate: string): number {
+  if (startDate > endDate) return 0;
+  const start = parseISO(startDate.slice(0, 10));
+  const end = parseISO(endDate.slice(0, 10));
+  return differenceInCalendarDays(end, start) + 1;
+}
+
+function structureCoversDay(
+  structure: SalaryStructureRow,
+  day: string,
+): boolean {
+  const from = (structure.effective_from ?? "").slice(0, 10);
+  const to = structure.effective_to?.slice(0, 10) ?? null;
+  if (!from) return true;
+  if (from > day) return false;
+  if (to != null && to < day) return false;
+  return true;
+}
+
+/**
+ * Build day-weighted salary segments for an applicable payroll period.
+ * Daily rate per segment = monthly gross ÷ 30 (Excel policy).
+ */
+export function buildSalaryStructureSegments(
+  structures: SalaryStructureRow[],
+  periodStart: string,
+  periodEnd: string,
+): SalaryStructureSegment[] {
+  if (periodStart > periodEnd || structures.length === 0) return [];
+
+  const dated = structures
+    .filter((row) => row.effective_from)
+    .slice()
+    .sort((a, b) =>
+      String(a.effective_from).slice(0, 10).localeCompare(String(b.effective_from).slice(0, 10)),
+    );
+
+  const pool = dated.length > 0 ? dated : structures;
+  const boundaries = new Set<string>([periodStart.slice(0, 10)]);
+  for (const row of pool) {
+    const from = row.effective_from?.slice(0, 10);
+    if (from && from > periodStart && from <= periodEnd) {
+      boundaries.add(from);
+    }
+    const to = row.effective_to?.slice(0, 10);
+    if (to && to >= periodStart && to < periodEnd) {
+      const next = format(addDays(parseISO(to), 1), "yyyy-MM-dd");
+      if (next <= periodEnd) boundaries.add(next);
+    }
+  }
+  const starts = Array.from(boundaries).sort();
+  const segments: SalaryStructureSegment[] = [];
+
+  for (let i = 0; i < starts.length; i += 1) {
+    const startDate = starts[i]!;
+    const endDate =
+      i + 1 < starts.length
+        ? format(addDays(parseISO(starts[i + 1]!), -1), "yyyy-MM-dd")
+        : periodEnd.slice(0, 10);
+    if (startDate > endDate) continue;
+
+    const active =
+      pool
+        .filter((row) => structureCoversDay(row, startDate))
+        .sort((a, b) =>
+          String(b.effective_from ?? "").localeCompare(String(a.effective_from ?? "")),
+        )[0] ?? null;
+    if (!active) continue;
+
+    const split = resolveSalaryBreakdownFromStructure(active);
+    const fromComponents = split.basic + split.hra + split.lta + split.special;
+    // Prefer stored gross when present (canonical).
+    const monthly = roundCurrency(
+      num(active.gross_salary) > 0 ? num(active.gross_salary) : fromComponents,
+    );
+    const calendarDays = inclusiveCalendarDays(startDate, endDate);
+    const dailyRate = roundCurrency(monthly / EXCEL_PAYROLL_DAY_DENOMINATOR);
+    const segmentGross = roundCurrency(
+      (monthly / EXCEL_PAYROLL_DAY_DENOMINATOR) * calendarDays,
+    );
+
+    segments.push({
+      salaryStructureId: active.id,
+      startDate,
+      endDate,
+      calendarDays,
+      monthlyGrossSalary: monthly,
+      dailyRate,
+      segmentGross,
+      structure: active,
+    });
+  }
+
+  // Merge adjacent identical structures
+  const merged: SalaryStructureSegment[] = [];
+  for (const segment of segments) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.salaryStructureId === segment.salaryStructureId) {
+      prev.endDate = segment.endDate;
+      prev.calendarDays += segment.calendarDays;
+      prev.segmentGross = roundCurrency(prev.segmentGross + segment.segmentGross);
+    } else {
+      merged.push({ ...segment });
+    }
+  }
+  return merged;
+}
+
+export function formatSalarySegmentNote(segment: SalaryStructureSegment): string {
+  return `${segment.startDate}–${segment.endDate}: ${formatCurrency(segment.monthlyGrossSalary)}/mo × ${segment.calendarDays} day(s) @ ${formatCurrency(segment.dailyRate)}/day = ${formatCurrency(segment.segmentGross)}`;
+}
+
 /** Karnataka PT slabs used by the Excel September payroll sheet (Feb adjustment from policy). */
 export function resolveProfessionalTaxForMonthlySalary(
   monthlyGrossSalary: number,
@@ -518,7 +652,7 @@ function sumNonReimbursementLines(
 export function calculateEmployeePayroll(
   input: PayrollCalculationInput,
 ): PayrollCalculationResult {
-  const { month, year, salaryStructure, attendance, bonuses, reimbursements } = input;
+  const { month, year, attendance, bonuses, reimbursements } = input;
   const leave: LeaveMonthSummary = input.leaveSummary ?? {
     lopDays: input.leaveLopDays ?? 0,
     paidLeaveDays: attendance.onLeaveDays,
@@ -551,6 +685,28 @@ export function calculateEmployeePayroll(
       joiningDate: input.joiningDate,
     },
   );
+
+  const structurePool = (() => {
+    const fromList = (input.salaryStructures ?? []).filter(Boolean);
+    if (fromList.length > 0) return fromList;
+    return input.salaryStructure ? [input.salaryStructure] : [];
+  })();
+  const salarySegments =
+    period.kind === "future" || period.periodStart > period.periodEnd
+      ? []
+      : buildSalaryStructureSegments(
+          structurePool,
+          period.periodStart,
+          period.periodEnd,
+        );
+  const midMonthBlend = salarySegments.length > 1;
+  const salaryStructure =
+    (midMonthBlend
+      ? salarySegments[salarySegments.length - 1]?.structure
+      : null) ??
+    input.salaryStructure ??
+    salarySegments[0]?.structure ??
+    null;
 
   const bonusEarnings = bonuses
     .map((bonus) => ({
@@ -641,17 +797,36 @@ export function calculateEmployeePayroll(
   const structureOtherDeduction = components.other ?? 0;
 
   // Daily rate is always monthly salary / 30.
-  // Gross starts from the full monthly salary. Only unpaid LOP days that have
-  // already occurred reduce it. Elapsed calendar days do not.
-  const rawPerDay = workingDaysForRate > 0 ? salaryGross / workingDaysForRate : 0;
-  const perDay = roundCurrency(rawPerDay);
+  // Single structure: gross starts from the full monthly salary; only unpaid LOP
+  // days reduce it. Mid-month structure change: day-weighted segments using the
+  // same ÷30 daily rate (e.g. 1–13 @ probation + 14–31 @ full-time).
   const salaryWindowClosed =
     period.kind === "future" || period.periodStart > period.periodEnd;
+  const blendedGrossBeforeLop = midMonthBlend
+    ? roundCurrency(
+        salarySegments.reduce((sum, segment) => sum + segment.segmentGross, 0),
+      )
+    : salaryGross;
+  const totalSegmentDays = midMonthBlend
+    ? salarySegments.reduce((sum, segment) => sum + segment.calendarDays, 0)
+    : workingDaysForRate;
+  const rawPerDay =
+    midMonthBlend
+      ? totalSegmentDays > 0
+        ? blendedGrossBeforeLop / totalSegmentDays
+        : 0
+      : workingDaysForRate > 0
+        ? salaryGross / workingDaysForRate
+        : 0;
+  const perDay = roundCurrency(rawPerDay);
   const lopDeduction = salaryWindowClosed ? 0 : roundCurrency(rawPerDay * lopDays);
   const payableGross = salaryWindowClosed
     ? 0
-    : roundCurrency(Math.max(0, salaryGross - rawPerDay * lopDays));
-  const prorateFactor = salaryGross > 0 ? payableGross / salaryGross : 0;
+    : roundCurrency(Math.max(0, blendedGrossBeforeLop - rawPerDay * lopDays));
+  // Scale latest-structure earning lines to the payable (blended) gross.
+  const earningsScaleGross = midMonthBlend ? salaryGross : salaryGross;
+  const prorateFactor =
+    earningsScaleGross > 0 ? payableGross / earningsScaleGross : 0;
   const proratedBasic = proratePayrollComponentAmount(basic, prorateFactor);
   const proratedHra = proratePayrollComponentAmount(hra, prorateFactor);
   const proratedLta = proratePayrollComponentAmount(lta, prorateFactor);
@@ -784,7 +959,7 @@ export function calculateEmployeePayroll(
         period,
         {
           dailyRate: perDay,
-          monthlyGrossSalary: salaryGross,
+          monthlyGrossSalary: midMonthBlend ? blendedGrossBeforeLop : salaryGross,
           lopDeductionAmount: lopDeduction,
         },
       ),
@@ -809,8 +984,16 @@ export function calculateEmployeePayroll(
       payrollLifecycle: { itemStatus: lifecycleStatus },
       reimbursementBreakdown:
         reimbursementBreakdown.length > 0 ? reimbursementBreakdown : undefined,
+      salarySegments: midMonthBlend
+        ? salarySegments.map(({ structure: _structure, ...rest }) => rest)
+        : undefined,
       notes: [
-        `Daily rate ${formatCurrency(roundCurrency(perDay))} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}). Gross is full monthly salary minus ${lopDays} unpaid day(s).`,
+        midMonthBlend
+          ? `Mid-month salary change (daily rate = monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}): ${salarySegments.map(formatSalarySegmentNote).join("; ")}.`
+          : `Daily rate ${formatCurrency(roundCurrency(perDay))} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}). Gross is full monthly salary minus ${lopDays} unpaid day(s).`,
+        midMonthBlend
+          ? `Blended salary before LOP ${formatCurrency(blendedGrossBeforeLop)}; payable after ${lopDays} unpaid day(s) ${formatCurrency(payableGross)}.`
+          : null,
         lopDays > 0
           ? `LOP/Absent excluded from paid days (${formatCurrency(roundCurrency(lopDeduction))} at daily rate for ${lopDays} day(s)).`
           : null,

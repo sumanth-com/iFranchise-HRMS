@@ -52,6 +52,8 @@ type CeoProvisioningPeopleProps = {
   isRefreshing?: boolean;
   busyEmployeeId?: string | null;
   showFilters?: boolean;
+  /** Main list = active/provisioning; former = deactivated only (parent-scoped). */
+  listScope?: "workforce" | "former";
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
   onOpenBulkAssign?: () => void;
 };
@@ -71,7 +73,8 @@ function matchesSearch(user: CeoProvisioningUser, query: string) {
     .includes(term);
 }
 
-function isDeactivatedUser(user: CeoProvisioningUser) {
+/** Source of truth for former/deactivated cards — account + invitation status only. */
+export function isDeactivatedProvisioningUser(user: CeoProvisioningUser) {
   return (
     user.invitationStatus === "inactive" ||
     user.invitationStatus === "revoked" ||
@@ -83,7 +86,7 @@ function isDeactivatedUser(user: CeoProvisioningUser) {
 
 function matchesStatusFilter(user: CeoProvisioningUser, statusFilter: string) {
   if (statusFilter === "all") return true;
-  if (statusFilter === "deactivated") return isDeactivatedUser(user);
+  if (statusFilter === "deactivated") return isDeactivatedProvisioningUser(user);
   if (statusFilter === "pending" || statusFilter === "opened") {
     // "opened" kept only for legacy filter URLs — maps to PENDING.
     return (
@@ -339,11 +342,13 @@ export function CeoProvisioningPeople({
   isRefreshing,
   busyEmployeeId,
   showFilters = false,
+  listScope = "workforce",
   onAction,
   onOpenBulkAssign,
 }: CeoProvisioningPeopleProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const isFormerScope = listScope === "former";
 
   const fetchSearchSuggestions = useCallback(
     async (query: string) =>
@@ -359,17 +364,29 @@ export function CeoProvisioningPeople({
     );
   }, [users, showFilters, searchQuery, statusFilter]);
 
+  const statusFilterItems = isFormerScope
+    ? [{ value: "all", label: "All statuses" }]
+    : [
+        { value: "all", label: "All statuses" },
+        { value: "pending", label: "Pending" },
+        { value: "active", label: "Active" },
+      ];
+
   return (
     <section className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <Users className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">Portal Users</h2>
+          <h2 className="text-sm font-semibold">
+            {isFormerScope ? "Former Employees" : "Portal Users"}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            All employees with portal access status and provisioning details.
+            {isFormerScope
+              ? "Deactivated and suspended accounts. Reactivate from the card menu when needed."
+              : "Active employees and users currently being provisioned."}
           </p>
         </div>
-        {onOpenBulkAssign ? (
+        {onOpenBulkAssign && !isFormerScope ? (
           <Button
             type="button"
             variant="outline"
@@ -389,18 +406,15 @@ export function CeoProvisioningPeople({
               onChange={(search) => setSearchQuery(search ?? "")}
               onFetchSuggestions={fetchSearchSuggestions}
             />
-            <FilterSelect
-              className="w-full min-w-[10rem] shrink-0 sm:w-[140px]"
-              items={[
-                { value: "all", label: "All statuses" },
-                { value: "pending", label: "Pending" },
-                { value: "active", label: "Active" },
-                { value: "deactivated", label: "Deactivated" },
-              ]}
-              value={statusFilter}
-              placeholder="All statuses"
-              onValueChange={setStatusFilter}
-            />
+            {!isFormerScope ? (
+              <FilterSelect
+                className="w-full min-w-[10rem] shrink-0 sm:w-[140px]"
+                items={statusFilterItems}
+                value={statusFilter}
+                placeholder="All statuses"
+                onValueChange={setStatusFilter}
+              />
+            ) : null}
             <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold dark:bg-input">
               {filteredUsers.length} people
             </span>
@@ -413,9 +427,13 @@ export function CeoProvisioningPeople({
 
       {filteredUsers.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          {showFilters && (searchQuery || statusFilter !== "all")
-            ? "No employees match your search or filters."
-            : "No employees found. Use “Invite User” to get started."}
+          {isFormerScope
+            ? showFilters && searchQuery
+              ? "No former employees match your search."
+              : "No former or deactivated employees found."
+            : showFilters && (searchQuery || statusFilter !== "all")
+              ? "No employees match your search or filters."
+              : "No employees found. Use “Invite User” to get started."}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

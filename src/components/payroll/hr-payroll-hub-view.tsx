@@ -58,6 +58,10 @@ type Props = {
   children?: ReactNode;
   teamBasePath?: string;
   hiddenSections?: TeamPayrollSection[];
+  /** Super Admin / System Admin only — Team Payroll Settings tab. */
+  showSettings?: boolean;
+  /** HR / CEO — Probation & Confirmation tab. */
+  showProbation?: boolean;
 };
 
 const SECTION_HELP: Record<
@@ -243,7 +247,27 @@ const SECTION_HELP: Record<
       {
         label: "Who should change this",
         detail:
-          "Only update settings when Finance and HR agree — changes can affect how future payroll runs and payslip dates are presented.",
+          "Super Admin / System Admin only. HR and CEO use Probation & Confirmation for employment changes.",
+      },
+    ],
+  },
+  probation: {
+    title: "About Probation & Confirmation",
+    points: [
+      {
+        label: "What this page is for",
+        detail:
+          "Review employees approaching or completing probation and confirm them to full-time with a new designation and salary.",
+      },
+      {
+        label: "Effective date",
+        detail:
+          "Designation and salary apply from the effective date you set. The original joining date and historical salary structures stay unchanged.",
+      },
+      {
+        label: "Payroll impact",
+        detail:
+          "Mid-month confirmations prorate that month (daily rate = monthly ÷ 30). Only unlocked payroll runs are recalculated.",
       },
     ],
   },
@@ -256,6 +280,8 @@ export function HrPayrollHubView({
   children,
   teamBasePath = SELF_PAYROLL_ROUTES.team,
   hiddenSections = [],
+  showSettings = false,
+  showProbation = true,
 }: Props) {
   const pathname = usePathname();
   const useTeamPayrollLabel = usesTeamPayrollRunLabel(teamBasePath);
@@ -302,7 +328,12 @@ export function HrPayrollHubView({
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       <div className="space-y-3">
         {isTeamView ? (
-          <PayrollSubNav basePath={teamBasePath} hiddenSections={hiddenSections} />
+          <PayrollSubNav
+            basePath={teamBasePath}
+            hiddenSections={hiddenSections}
+            showSettings={showSettings}
+            showProbation={showProbation}
+          />
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -325,17 +356,20 @@ export function HrPayrollHubView({
           </div>
           {isTeamView ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
-                nativeButton={false}
-                render={<Link href={PAYROLL_ROUTES.policy} />}
-              >
-                <FileText className="size-4" />
-                Payroll Policy
-              </Button>
+              {/* Probation page owns Policy on the employee-dropdown row. */}
+              {teamPayrollSection !== TEAM_PAYROLL_SECTIONS.probation ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
+                  nativeButton={false}
+                  render={<Link href={PAYROLL_ROUTES.policy} />}
+                >
+                  <FileText className="size-4" />
+                  Payroll Policy
+                </Button>
+              ) : null}
               <TeamPayrollHeaderActionsOutlet />
             </div>
           ) : (
@@ -366,11 +400,15 @@ export function HrPayrollHubView({
           )}
         </div>
 
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          {isTeamView
+        {(() => {
+          const description = isTeamView
             ? teamPayrollSectionDescription(teamPayrollSection)
-            : "View payslips, download salary documents, and track your compensation history."}
-        </p>
+            : "View payslips, download salary documents, and track your compensation history.";
+          if (!description.trim()) return null;
+          return (
+            <p className="max-w-3xl text-sm text-muted-foreground">{description}</p>
+          );
+        })()}
       </div>
 
       {isTeamView ? (

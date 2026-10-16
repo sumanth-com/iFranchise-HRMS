@@ -451,8 +451,8 @@ export const HR_PORTAL_MANUAL: ManualSection[] = [
       {
         name: "Payroll settings",
         icon: "sliders",
-        detail: "Payroll configuration and policy notes for company processing.",
-        tip: "Change settings carefully — they affect future runs.",
+        detail: "Payroll cycle and schedule settings (Super Admin / System Admin only).",
+        tip: "HR and CEO cannot change Team Payroll settings — ask a Super Admin.",
       },
     ],
   },
@@ -511,10 +511,10 @@ export const HR_PORTAL_MANUAL: ManualSection[] = [
     title: "Performance",
     icon: "target",
     summary:
-      "Company performance — Goals & OKRs, KPIs, Feedback, 1:1 Meetings, and Promotions.",
+      "Company performance — Goals & OKRs, KPIs, Feedback, 1:1 Meetings, and Probation & Confirmation.",
     useful: "HR and leadership use this to run performance cycles for employees.",
     howTo:
-      "Open Performance. Switch Goals, KPIs, Feedback, 1:1s, and Promotions. Your personal goals remain under My Goals.",
+      "Open Performance. Switch Goals, KPIs, Feedback, 1:1s, and Probation & Confirmation. Your personal goals remain under My Goals.",
     features: [
       {
         name: "Goals & OKRs",
@@ -541,10 +541,10 @@ export const HR_PORTAL_MANUAL: ManualSection[] = [
         tip: "Carry open actions into the next meeting.",
       },
       {
-        name: "Promotions",
+        name: "Probation & Confirmation",
         icon: "trending",
-        detail: "Promotion cases and related records.",
-        tip: "Coordinate with payroll and employees after a decision.",
+        detail: "Confirm probationers to full-time with effective-dated salary and designation.",
+        tip: "Set the effective date carefully — payroll prorates mid-month changes.",
       },
     ],
   },

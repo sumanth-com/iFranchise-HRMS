@@ -7,6 +7,7 @@ import { TeamPayrollSection } from "@/components/payroll/team-payroll-section";
 import { legacyHubTabRedirectUrl } from "@/lib/dashboard/hub-paths";
 import { getEmployeePayrollData } from "@/lib/employee/services/employee-payroll-queries";
 import {
+  canAccessPayrollProbation,
   SELF_PAYROLL_ROUTES,
   TEAM_PAYROLL_SECTIONS,
   type TeamPayrollSection as TeamPayrollSectionKey,
@@ -97,6 +98,16 @@ async function TeamPayrollSectionGate({
   teamSection: TeamPayrollSectionKey;
 }) {
   const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
+  // HR Team Payroll never hosts Settings — Super Admin uses /dashboard/system/payroll/settings.
+  if (teamSection === TEAM_PAYROLL_SECTIONS.settings) {
+    redirect(`${SELF_PAYROLL_ROUTES.team}/${TEAM_PAYROLL_SECTIONS.run}`);
+  }
+  if (
+    teamSection === TEAM_PAYROLL_SECTIONS.probation &&
+    !canAccessPayrollProbation(profile)
+  ) {
+    redirect(`${SELF_PAYROLL_ROUTES.team}/${TEAM_PAYROLL_SECTIONS.run}`);
+  }
   return (
     <TeamPayrollSection section={teamSection} rawSearchParams={searchParams} profile={profile} />
   );
@@ -112,13 +123,23 @@ export async function PayrollTeamPage({
   });
   if (legacy) redirect(legacy);
 
+  const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
   const resolvedSection = teamSection ?? TEAM_PAYROLL_SECTIONS.run;
+  if (resolvedSection === TEAM_PAYROLL_SECTIONS.settings) {
+    redirect(`${SELF_PAYROLL_ROUTES.team}/${TEAM_PAYROLL_SECTIONS.run}`);
+  }
+  const allowProbation = canAccessPayrollProbation(profile);
+  const hiddenSections: TeamPayrollSectionKey[] = [TEAM_PAYROLL_SECTIONS.settings];
+  if (!allowProbation) hiddenSections.push(TEAM_PAYROLL_SECTIONS.probation);
 
   return (
     <HrPayrollHubView
       initialSection="team"
       canViewTeam
       selfPayroll={EMPTY_TEAM_SELF_PAYROLL}
+      showSettings={false}
+      showProbation={allowProbation}
+      hiddenSections={hiddenSections}
     >
       <Suspense fallback={<TeamPayrollDataSkeleton />}>
         <TeamPayrollSectionGate searchParams={raw} teamSection={resolvedSection} />

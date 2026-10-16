@@ -25,8 +25,11 @@ export default async function AccountantPayrollSectionPage({
   const { section } = await params;
   const raw = await searchParams;
 
-  // Settings edits stay with HR; Employee Accounts remains available for accountants.
-  if (section === TEAM_PAYROLL_SECTIONS.settings) {
+  // Settings and Probation stay with HR/CEO; Employee Accounts remains available.
+  if (
+    section === TEAM_PAYROLL_SECTIONS.settings ||
+    section === TEAM_PAYROLL_SECTIONS.probation
+  ) {
     redirect(`${ACCOUNTANT_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.run}`);
   }
 
@@ -38,7 +41,12 @@ export default async function AccountantPayrollSectionPage({
       canViewTeam
       selfPayroll={EMPTY_TEAM_SELF_PAYROLL}
       teamBasePath={ACCOUNTANT_ROUTES.payroll}
-      hiddenSections={[TEAM_PAYROLL_SECTIONS.settings]}
+      showSettings={false}
+      showProbation={false}
+      hiddenSections={[
+        TEAM_PAYROLL_SECTIONS.settings,
+        TEAM_PAYROLL_SECTIONS.probation,
+      ]}
     >
       <Suspense fallback={<TeamPayrollContentSkeleton />}>
         <TeamPayrollSection

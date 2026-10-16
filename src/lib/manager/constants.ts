@@ -69,7 +69,6 @@ export const MANAGER_GOALS_SUB_NAV = [
   { title: "KPIs", href: `${MANAGER_ROUTES.goals}/kpis` },
   { title: "Feedback", href: `${MANAGER_ROUTES.goals}/feedback` },
   { title: "1:1 Meetings", href: `${MANAGER_ROUTES.goals}/one-on-ones` },
-  { title: "Promotions", href: `${MANAGER_ROUTES.goals}/promotions` },
 ] as const;
 
 export const MANAGER_REPORTS_SUB_NAV = [

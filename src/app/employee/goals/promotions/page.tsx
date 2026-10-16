@@ -1,11 +1,8 @@
-import { EmployeePromotionsView } from "@/components/employee/goals/employee-promotions-view";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { fetchMyPromotionsAction } from "@/lib/employee/actions/employee-performance-actions";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { redirect } from "next/navigation";
 
-export default async function EmployeePromotionsPage() {
-  await requireServerAnyPermission([PORTAL_PERMISSIONS.employee]);
-  const promotions = await fetchMyPromotionsAction();
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 
-  return <EmployeePromotionsView promotions={promotions} />;
+/** Promotions self-service entry removed; keep URL bookmark-safe. */
+export default function EmployeePromotionsRedirectPage() {
+  redirect(EMPLOYEE_ROUTES.goals);
 }

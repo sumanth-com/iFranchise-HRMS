@@ -47,6 +47,8 @@ export type LeaveEmployeePolicyState = {
   employmentTypeCode?: string | null;
   isFullTime?: boolean;
   leaveEligibilityBand?: LeaveEligibilityBand;
+  /** Recorded HR probation end date when available. */
+  probationEndDate?: string | null;
 };
 
 export type LeavePolicyNoticeHours = {
@@ -92,7 +94,10 @@ export type LeaveProbationSnapshot = {
 };
 
 export function getProbationSnapshot(
-  employee: Pick<LeaveEmployeePolicyState, "joiningDate" | "employmentStatus">,
+  employee: Pick<LeaveEmployeePolicyState, "joiningDate" | "employmentStatus"> & {
+    /** Recorded HR probation end; overrides org-wide duration when present. */
+    probationEndDate?: string | null;
+  },
   asOf: string,
   rules: LeaveProbationRules = DEFAULT_LEAVE_PROBATION_RULES,
 ): LeaveProbationSnapshot {
@@ -105,7 +110,13 @@ export function getProbationSnapshot(
   }
 
   const joining = parseISO(employee.joiningDate);
-  const endsOn = format(addMonths(joining, rules.durationMonths), "yyyy-MM-dd");
+  const recordedEnd =
+    typeof employee.probationEndDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(employee.probationEndDate.slice(0, 10))
+      ? employee.probationEndDate.slice(0, 10)
+      : null;
+  const endsOn =
+    recordedEnd ?? format(addMonths(joining, rules.durationMonths), "yyyy-MM-dd");
   const stillInWindow = asOf < endsOn;
   const confirmed = employee.employmentStatus === "active";
   const onProbation =

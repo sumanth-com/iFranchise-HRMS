@@ -26,6 +26,7 @@ export const PERFORMANCE_ROUTES = {
   feedback: "/dashboard/performance/feedback",
   oneOnOnes: "/dashboard/performance/one-on-ones",
   promotions: "/dashboard/performance/promotions",
+  probation: "/dashboard/performance/probation",
   history: "/dashboard/performance/history",
   settings: "/dashboard/performance/settings",
 } as const;
@@ -235,7 +236,6 @@ export const PERFORMANCE_SUB_NAV = [
   { title: "KPIs", href: PERFORMANCE_ROUTES.kpis },
   { title: "Feedback", href: PERFORMANCE_ROUTES.feedback },
   { title: "1:1 Meetings", href: PERFORMANCE_ROUTES.oneOnOnes },
-  { title: "Promotions", href: PERFORMANCE_ROUTES.promotions },
 ] as const;
 
 export const EMPLOYEE_PERFORMANCE_SUB_NAV = [
@@ -243,5 +243,4 @@ export const EMPLOYEE_PERFORMANCE_SUB_NAV = [
   { title: "KPIs", href: `${EMPLOYEE_ROUTES.goals}/kpis` },
   { title: "Feedback", href: `${EMPLOYEE_ROUTES.goals}/feedback` },
   { title: "1:1 Meetings", href: `${EMPLOYEE_ROUTES.goals}/one-on-ones` },
-  { title: "Promotions", href: `${EMPLOYEE_ROUTES.goals}/promotions` },
 ] as const;

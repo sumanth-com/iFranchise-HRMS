@@ -1,7 +1,7 @@
 "use client";
 
-import { UserRoundPlus } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { UserRoundMinus, UserRoundPlus } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -21,7 +21,10 @@ import {
 } from "@/components/ceo/user-provisioning/ceo-provisioning-confirm-dialog";
 import { CeoProvisioningDrawer } from "@/components/ceo/user-provisioning/ceo-provisioning-drawer";
 import { CeoProvisioningFilters } from "@/components/ceo/user-provisioning/ceo-provisioning-filters";
-import { CeoProvisioningPeople } from "@/components/ceo/user-provisioning/ceo-provisioning-people";
+import {
+  CeoProvisioningPeople,
+  isDeactivatedProvisioningUser,
+} from "@/components/ceo/user-provisioning/ceo-provisioning-people";
 import { CeoProvisioningSummaryCards } from "@/components/ceo/user-provisioning/ceo-provisioning-summary";
 import { Button } from "@/components/common/button";
 import {
@@ -98,6 +101,15 @@ export function CeoUserProvisioningView({
   const [reportingContactsUser, setReportingContactsUser] =
     useState<CeoProvisioningUser | null>(null);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [showFormerEmployees, setShowFormerEmployees] = useState(false);
+
+  const scopedUsers = useMemo(() => {
+    const rows = users?.data ?? [];
+    if (showFormerEmployees) {
+      return rows.filter(isDeactivatedProvisioningUser);
+    }
+    return rows.filter((user) => !isDeactivatedProvisioningUser(user));
+  }, [users, showFormerEmployees]);
 
   const refreshModuleData = useCallback(
     async (next: CeoProvisioningListParams, options?: { showRefreshing?: boolean }) => {
@@ -229,17 +241,28 @@ export function CeoUserProvisioningView({
             description={headerDescription}
           />
         )}
-        <Button
-          type="button"
-          className="gap-1.5"
-          onClick={() => {
-            setInviteOpen(true);
-          }}
-          disabled={!inviteServiceReady}
-        >
-          <UserRoundPlus className="size-4" />
-          Invite User
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant={showFormerEmployees ? "default" : "outline"}
+            className="gap-1.5"
+            onClick={() => setShowFormerEmployees((prev) => !prev)}
+          >
+            <UserRoundMinus className="size-4" />
+            {showFormerEmployees ? "Portal Users" : "Former Employees"}
+          </Button>
+          <Button
+            type="button"
+            className="gap-1.5"
+            onClick={() => {
+              setInviteOpen(true);
+            }}
+            disabled={!inviteServiceReady || showFormerEmployees}
+          >
+            <UserRoundPlus className="size-4" />
+            Invite User
+          </Button>
+        </div>
       </div>
 
       <CeoProvisioningSummaryCards summary={summary} />
@@ -254,12 +277,16 @@ export function CeoUserProvisioningView({
       ) : null}
 
       <CeoProvisioningPeople
-        users={users?.data ?? []}
+        key={showFormerEmployees ? "former" : "workforce"}
+        users={scopedUsers}
         isRefreshing={isRefreshing}
         busyEmployeeId={busyEmployeeId}
         showFilters={variant === "hr"}
+        listScope={showFormerEmployees ? "former" : "workforce"}
         onAction={requestAction}
-        onOpenBulkAssign={() => setBulkAssignOpen(true)}
+        onOpenBulkAssign={
+          showFormerEmployees ? undefined : () => setBulkAssignOpen(true)
+        }
       />
 
       <CeoInviteUserDialog
@@ -312,7 +339,7 @@ export function CeoUserProvisioningView({
 
       <CeoProvisioningBulkAssignDialog
         open={bulkAssignOpen}
-        users={users?.data ?? []}
+        users={scopedUsers}
         lookups={lookups}
         onOpenChange={setBulkAssignOpen}
         onSaved={(message) => {

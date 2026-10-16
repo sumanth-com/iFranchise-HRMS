@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
+  requireAuthenticatedProfile,
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
@@ -86,6 +87,7 @@ import {
   sendEmployeePayslipSchema,
 } from "@/lib/validations/payroll";
 import {
+  hasPayrollSettingsCapability,
   REIMBURSEMENT_STORAGE_BUCKET,
   payrollTeamSectionPath,
   PAYROLL_ROUTES,
@@ -1081,6 +1083,10 @@ export async function fetchSalaryRevisionsAction(
 
 export async function fetchPayrollSettingsAction(): Promise<PayrollSettingsRecord> {
   const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
+  // Capability only — Team Payroll Settings tab is portal-gated separately.
+  if (!hasPayrollSettingsCapability(profile)) {
+    throw new Error("Payroll settings are restricted to Super Admin.");
+  }
   const supabase = await getAuthenticatedSupabase();
   return getPayrollSettings(supabase, profile.employee.organizationId);
 }
@@ -1089,11 +1095,13 @@ export async function savePayrollSettingsAction(
   input: unknown,
 ): Promise<PayrollActionResult<PayrollSettingsRecord>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "settings.edit",
-      "settings.manage",
-      "payroll.edit",
-    ]);
+    const profile = await requireAuthenticatedProfile();
+    if (!hasPayrollSettingsCapability(profile)) {
+      return {
+        success: false,
+        message: "Payroll settings are restricted to Super Admin.",
+      };
+    }
     const supabase = await getAuthenticatedSupabase();
     const parsed = payrollSettingsSchema.parse(input);
     const data = await savePayrollSettings(supabase, profile, parsed);

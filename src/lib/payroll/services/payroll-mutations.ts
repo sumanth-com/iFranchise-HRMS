@@ -533,13 +533,14 @@ async function resolvePayslipSalaryComponents(
   return (structure?.components as Record<string, unknown> | null) ?? null;
 }
 
-async function getEffectiveSalaryStructure(
+async function getSalaryStructuresForMonth(
   supabase: AuthSupabaseClient,
   employeeId: string,
   month: number,
   year: number,
-) {
+): Promise<SalaryStructureRow[]> {
   const { endDate } = getMonthDateRange(month, year);
+  const monthDate = getPayrollMonthDate(month, year);
   const { data, error } = await supabase
     .schema("hrms")
     .from("salary_structures")
@@ -547,13 +548,23 @@ async function getEffectiveSalaryStructure(
     .eq("employee_id", employeeId)
     .lte("effective_from", endDate)
     .is("deleted_at", null)
-    .or(`effective_to.is.null,effective_to.gte.${getPayrollMonthDate(month, year)}`)
-    .order("effective_from", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .or(`effective_to.is.null,effective_to.gte.${monthDate}`)
+    .order("effective_from", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return data;
+  return (data ?? [])
+    .map((row) => toSalaryStructureRow(row as Record<string, unknown>))
+    .filter((row): row is SalaryStructureRow => Boolean(row));
+}
+
+async function getEffectiveSalaryStructure(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  month: number,
+  year: number,
+) {
+  const structures = await getSalaryStructuresForMonth(supabase, employeeId, month, year);
+  return structures.length > 0 ? structures[structures.length - 1] : null;
 }
 
 function sandwichDatesFromBreakdown(breakdown: unknown): string[] {
@@ -963,6 +974,8 @@ function toSalaryStructureRow(row: Record<string, unknown> | null): SalaryStruct
     gross_salary: row.gross_salary as number | string,
     net_salary: row.net_salary as number | string,
     components: (row.components as Record<string, unknown> | null) ?? null,
+    effective_from: row.effective_from ? String(row.effective_from).slice(0, 10) : null,
+    effective_to: row.effective_to ? String(row.effective_to).slice(0, 10) : null,
   };
 }
 
@@ -1000,6 +1013,7 @@ async function loadPayrollPeriodFacts(
 ) {
   const admin = createAdminClient();
   const structuresByEmployee = new Map<string, SalaryStructureRow>();
+  const allStructuresByEmployee = new Map<string, SalaryStructureRow[]>();
   const attendanceByEmployee = new Map<string, AttendanceSummary>();
   const leaveByEmployee = new Map<string, LeaveMonthSummary>();
   const attendanceRowsByEmployee = new Map<string, PayrollAttendanceDayRow[]>();
@@ -1015,11 +1029,13 @@ async function loadPayrollPeriodFacts(
     attendanceRowsByEmployee.set(id, []);
     bonusesByEmployee.set(id, []);
     reimbursementsByEmployee.set(id, []);
+    allStructuresByEmployee.set(id, []);
   }
 
   if (employeeIds.length === 0) {
     return {
       structuresByEmployee,
+      allStructuresByEmployee,
       attendanceByEmployee,
       leaveByEmployee,
       bonusesByEmployee,
@@ -1112,10 +1128,15 @@ async function loadPayrollPeriodFacts(
     for (const row of structuresResult.data ?? []) {
       const employeeId = String(row.employee_id);
       const from = String(row.effective_from ?? "");
+      const mapped = toSalaryStructureRow(row as Record<string, unknown>);
+      if (mapped) {
+        const list = allStructuresByEmployee.get(employeeId) ?? [];
+        list.push(mapped);
+        allStructuresByEmployee.set(employeeId, list);
+      }
       const previous = structureRank.get(employeeId);
       if (!previous || from > previous) {
         structureRank.set(employeeId, from);
-        const mapped = toSalaryStructureRow(row as Record<string, unknown>);
         if (mapped) structuresByEmployee.set(employeeId, mapped);
       }
     }
@@ -1289,6 +1310,7 @@ async function loadPayrollPeriodFacts(
 
   return {
     structuresByEmployee,
+    allStructuresByEmployee,
     attendanceByEmployee,
     leaveByEmployee,
     bonusesByEmployee,
@@ -1490,9 +1512,9 @@ async function refreshEmployeePayrollItemForMonth(
     asOfDate,
   );
 
-  const [salaryStructure, attendanceFacts, bonuses, reimbursements] =
+  const [salaryStructures, attendanceFacts, bonuses, reimbursements] =
     await Promise.all([
-      getEffectiveSalaryStructure(admin, employeeId, month, year),
+      getSalaryStructuresForMonth(admin, employeeId, month, year),
       getAttendanceSummary(admin, employeeId, month, year, { asOfDate }),
       getPayableBonuses(admin, employeeId, [getPayrollMonthDate(month, year)], {
         includeAttached: true,
@@ -1503,6 +1525,8 @@ async function refreshEmployeePayrollItemForMonth(
       }),
     ]);
   const { attendance, leaveSummary } = attendanceFacts;
+  const salaryStructure =
+    salaryStructures.length > 0 ? salaryStructures[salaryStructures.length - 1]! : null;
 
   const { data: existingItem } = await admin
     .schema("hrms")
@@ -1523,7 +1547,8 @@ async function refreshEmployeePayrollItemForMonth(
   const calc = calculateEmployeePayroll({
     month,
     year,
-    salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
+    salaryStructure,
+    salaryStructures,
     attendance,
     leaveSummary,
     bonuses,
@@ -1701,6 +1726,7 @@ export async function buildPayrollPreview(
       employee.departments as { name: string } | { name: string }[] | null,
     );
     const salaryStructure = facts.structuresByEmployee.get(employee.id) ?? null;
+    const salaryStructures = facts.allStructuresByEmployee.get(employee.id) ?? [];
     const attendance = facts.attendanceByEmployee.get(employee.id) ?? emptyAttendanceSummary();
     const leaveSummary = facts.leaveByEmployee.get(employee.id) ?? {
       lopDays: 0,
@@ -1713,6 +1739,7 @@ export async function buildPayrollPreview(
       month,
       year,
       salaryStructure,
+      salaryStructures,
       attendance,
       leaveSummary,
       bonuses,
@@ -1824,9 +1851,9 @@ export async function getEmployeeRunBreakdown(
     asOfDate,
   );
 
-  const [salaryStructure, attendanceFacts, bonuses, reimbursements] =
+  const [salaryStructures, attendanceFacts, bonuses, reimbursements] =
     await Promise.all([
-      getEffectiveSalaryStructure(supabase, employeeId, month, year),
+      getSalaryStructuresForMonth(supabase, employeeId, month, year),
       getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
       getPayableBonuses(
         supabase,
@@ -1845,11 +1872,14 @@ export async function getEmployeeRunBreakdown(
       ),
     ]);
   const { attendance, leaveSummary } = attendanceFacts;
+  const salaryStructure =
+    salaryStructures.length > 0 ? salaryStructures[salaryStructures.length - 1]! : null;
 
   const calc = calculateEmployeePayroll({
     month,
     year,
-    salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
+    salaryStructure,
+    salaryStructures,
     attendance,
     leaveSummary,
     bonuses,
@@ -3848,9 +3878,9 @@ export async function refreshDraftPayrollItemsForEmployee(
       asOfDate,
     );
 
-    const [salaryStructure, attendanceFacts, bonuses, reimbursements] =
+    const [salaryStructures, attendanceFacts, bonuses, reimbursements] =
       await Promise.all([
-        getEffectiveSalaryStructure(supabase, employeeId, month, year),
+        getSalaryStructuresForMonth(supabase, employeeId, month, year),
         getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
         getPayableBonuses(supabase, employeeId, [getPayrollMonthDate(month, year)], {
           includeAttached: true,
@@ -3860,6 +3890,8 @@ export async function refreshDraftPayrollItemsForEmployee(
         }),
       ]);
     const { attendance, leaveSummary } = attendanceFacts;
+    const salaryStructure =
+      salaryStructures.length > 0 ? salaryStructures[salaryStructures.length - 1]! : null;
 
     const { data: existingItem } = await supabase
       .schema("hrms")
@@ -3880,7 +3912,8 @@ export async function refreshDraftPayrollItemsForEmployee(
     const calc = calculateEmployeePayroll({
       month,
       year,
-      salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
+      salaryStructure,
+      salaryStructures,
       attendance,
       leaveSummary,
       bonuses,
@@ -4697,10 +4730,12 @@ export async function syncActiveEmployeesIntoPayrollRun(
   const insertRows: Array<Record<string, unknown>> = [];
   for (const employee of missing) {
     const salaryStructure = facts.structuresByEmployee.get(employee.id) ?? null;
+    const salaryStructures = facts.allStructuresByEmployee.get(employee.id) ?? [];
     const calc = calculateEmployeePayroll({
       month,
       year,
       salaryStructure,
+      salaryStructures,
       attendance: facts.attendanceByEmployee.get(employee.id) ?? emptyAttendanceSummary(),
       leaveSummary: facts.leaveByEmployee.get(employee.id) ?? { lopDays: 0, paidLeaveDays: 0 },
       bonuses: facts.bonusesByEmployee.get(employee.id) ?? [],

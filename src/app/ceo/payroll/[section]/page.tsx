@@ -33,7 +33,11 @@ export default async function CeoPayrollSectionPage({
   }
 
   const teamSection = parseTeamPayrollSection(section);
-  const viewProfile = toViewOnlyProfile(profile);
+  // Probation confirmation needs write actions; other payroll tabs stay view-only.
+  const sectionProfile =
+    teamSection === TEAM_PAYROLL_SECTIONS.probation
+      ? profile
+      : toViewOnlyProfile(profile);
 
   return (
     <HrPayrollHubView
@@ -41,13 +45,15 @@ export default async function CeoPayrollSectionPage({
       canViewTeam
       selfPayroll={EMPTY_TEAM_SELF_PAYROLL}
       teamBasePath={CEO_ROUTES.payroll}
+      showProbation
+      showSettings={false}
       hiddenSections={[TEAM_PAYROLL_SECTIONS.settings]}
     >
       <Suspense fallback={<TeamPayrollContentSkeleton />}>
         <TeamPayrollSection
           section={teamSection}
           rawSearchParams={raw}
-          profile={viewProfile}
+          profile={sectionProfile}
           teamBasePath={CEO_ROUTES.payroll}
           canRunPayrollOverride
           canApproveReimbursementOverride={

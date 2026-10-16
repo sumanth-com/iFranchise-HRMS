@@ -228,11 +228,14 @@ export async function loadLeaveEmployeePolicyState(
   balanceYear = getCurrentBalanceYear(),
   organizationId?: string,
 ): Promise<LeaveEmployeePolicyState> {
-  const [employeeResult, profileResult, balancesResult] = await Promise.all([
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [employeeResult, profileResult, balancesResult, salaryResult] = await Promise.all([
     supabase
       .schema("hrms")
       .from("employees")
-      .select("id, date_of_joining, employment_status, organization_id, employment_types:employment_type_id (code, is_full_time)")
+      .select(
+        "id, date_of_joining, probation_end_date, employment_status, organization_id, employment_types:employment_type_id (code, is_full_time)",
+      )
       .eq("id", employeeId)
       .maybeSingle(),
     supabase
@@ -248,13 +251,40 @@ export async function loadLeaveEmployeePolicyState(
       .eq("employee_id", employeeId)
       .eq("balance_year", balanceYear)
       .is("deleted_at", null),
+    supabase
+      .schema("hrms")
+      .from("salary_structures")
+      .select("components, effective_from")
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .lte("effective_from", todayIso)
+      .or(`effective_to.is.null,effective_to.gte.${todayIso}`)
+      .order("effective_from", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
-  if (employeeResult.error) throw new Error(employeeResult.error.message);
+  // Soft-fallback when employees.probation_end_date is not migrated yet.
+  let employeeRow = employeeResult.data;
+  let employeeError = employeeResult.error;
+  if (employeeError && /probation_end_date/i.test(String(employeeError.message ?? ""))) {
+    const retry = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        "id, date_of_joining, employment_status, organization_id, employment_types:employment_type_id (code, is_full_time)",
+      )
+      .eq("id", employeeId)
+      .maybeSingle();
+    employeeRow = retry.data as typeof employeeRow;
+    employeeError = retry.error;
+  }
+
+  if (employeeError) throw new Error(employeeError.message);
   if (profileResult.error) throw new Error(profileResult.error.message);
   if (balancesResult.error) throw new Error(balancesResult.error.message);
-  if (!employeeResult.data) throw new Error("Employee not found");
-  if (organizationId && employeeResult.data.organization_id !== organizationId) {
+  if (!employeeRow) throw new Error("Employee not found");
+  if (organizationId && employeeRow.organization_id !== organizationId) {
     throw new Error("Employee not found");
   }
 
@@ -288,22 +318,35 @@ export async function loadLeaveEmployeePolicyState(
       (usedAndPendingByType[code] ?? 0) + Number(row.total_days);
   }
 
-  const employmentType = unwrapEmploymentType(employeeResult.data.employment_types);
+  const employmentType = unwrapEmploymentType(employeeRow.employment_types);
   const leaveEligibilityBand = resolveLeaveEligibilityBand({
-    employmentStatus: employeeResult.data.employment_status,
+    employmentStatus: employeeRow.employment_status,
     employmentTypeCode: employmentType?.code ?? null,
     isFullTime: employmentType?.isFullTime ?? null,
   });
 
+  const components = (salaryResult.data?.components as Record<string, unknown> | null) ?? null;
+  const componentsEnd =
+    typeof components?.probation_end_date === "string"
+      ? String(components.probation_end_date).slice(0, 10)
+      : null;
+  const employeeEnd =
+    employeeRow &&
+    "probation_end_date" in employeeRow &&
+    employeeRow.probation_end_date
+      ? String(employeeRow.probation_end_date).slice(0, 10)
+      : null;
+
   return {
     employeeId,
-    joiningDate: employeeResult.data.date_of_joining,
-    employmentStatus: employeeResult.data.employment_status,
+    joiningDate: employeeRow.date_of_joining,
+    employmentStatus: employeeRow.employment_status,
     gender: profileResult.data?.gender ?? null,
     usedAndPendingByType,
     employmentTypeCode: employmentType?.code ?? null,
     isFullTime: employmentType?.isFullTime ?? true,
     leaveEligibilityBand,
+    probationEndDate: employeeEnd ?? componentsEnd,
   };
 }
 

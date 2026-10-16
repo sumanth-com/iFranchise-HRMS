@@ -1,10 +1,8 @@
-import { EmployeePromotionsView } from "@/components/employee/goals/employee-promotions-view";
-import { fetchMyPromotionsAction } from "@/lib/employee/actions/employee-performance-actions";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { redirect } from "next/navigation";
 
-export default async function MyPromotionsPage() {
-  await requireServerPermission("performance.view");
-  const promotions = await fetchMyPromotionsAction();
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 
-  return <EmployeePromotionsView promotions={promotions} />;
+/** Promotions self-service entry removed; keep URL bookmark-safe. */
+export default function HrMyGoalsPromotionsRedirectPage() {
+  redirect(HR_HUB_ROUTES.myGoals);
 }

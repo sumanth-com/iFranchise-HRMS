@@ -1,6 +1,9 @@
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { hasAnyPermission } from "@/lib/permissions/utils";
+import { hasAnyPermission, hasPermission } from "@/lib/permissions/utils";
 import { hubListUrl } from "@/lib/dashboard/hub-paths";
+import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
+import { isSuperAdmin } from "@/lib/system-admin/is-super-admin";
+import type { UserProfile } from "@/types/auth";
 import type {
   BonusStatus,
   BonusType,
@@ -44,6 +47,7 @@ export const TEAM_PAYROLL_SECTIONS = {
   payslips: "payslips",
   settings: "settings",
   "employee-accounts": "employee-accounts",
+  probation: "probation",
 } as const;
 
 export type TeamPayrollSection = keyof typeof TEAM_PAYROLL_SECTIONS;
@@ -366,6 +370,80 @@ export function canEditPayroll(codes: string[]) {
   return hasAnyPermission(codes, PAYROLL_EDIT);
 }
 
+/**
+ * Capability to manage payroll settings (role/permission).
+ * Does not by itself authorize the Team Payroll Settings tab in HR/CEO portals.
+ */
+export function hasPayrollSettingsCapability(
+  profile: Pick<UserProfile, "roles" | "permissionCodes">,
+): boolean {
+  return (
+    isSuperAdmin(profile) ||
+    hasPermission(profile.permissionCodes, SYSTEM_ADMIN_PERMISSION)
+  );
+}
+
+export type PayrollSettingsPortalContext = {
+  /** Prefer explicit portal when known. */
+  portal?: "system" | "hr" | "ceo" | "manager" | "accountant" | "employee" | null;
+  /** Pathname used to infer portal when `portal` is omitted. */
+  pathname?: string | null;
+};
+
+export function inferPayrollPortalFromPath(
+  pathname: string | null | undefined,
+): PayrollSettingsPortalContext["portal"] {
+  if (!pathname) return null;
+  if (
+    pathname === "/dashboard/system" ||
+    pathname.startsWith("/dashboard/system/")
+  ) {
+    return "system";
+  }
+  if (pathname.startsWith("/ceo")) return "ceo";
+  if (pathname.startsWith("/manager")) return "manager";
+  if (pathname.startsWith("/accountant")) return "accountant";
+  if (pathname.startsWith("/employee")) return "employee";
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return "hr";
+  return null;
+}
+
+/**
+ * Team Payroll → Settings tab / HR team settings routes.
+ * Requires Super Admin capability AND Super Admin/System Admin portal context.
+ * `system.admin.access` alone must not surface Settings in HR/CEO/etc portals.
+ */
+export function canAccessPayrollSettings(
+  profile: Pick<UserProfile, "roles" | "permissionCodes">,
+  context?: PayrollSettingsPortalContext,
+): boolean {
+  if (!hasPayrollSettingsCapability(profile)) return false;
+  const portal = context?.portal ?? inferPayrollPortalFromPath(context?.pathname);
+  return portal === "system";
+}
+
+/** Team Payroll hub under HR/CEO/Accountant must never show Settings. */
+export function canShowTeamPayrollSettingsTab(
+  profile: Pick<UserProfile, "roles" | "permissionCodes">,
+  teamBasePath: string,
+): boolean {
+  return canAccessPayrollSettings(profile, { pathname: teamBasePath });
+}
+
+/** Team Payroll → Probation & Confirmation: HR / CEO / System Admin. */
+export function canAccessPayrollProbation(
+  profile: Pick<UserProfile, "permissionCodes">,
+): boolean {
+  return hasAnyPermission(profile.permissionCodes, [
+    "employee.view",
+    "employee.edit",
+    "performance.view",
+    "payroll.view",
+    PORTAL_PERMISSIONS.ceo,
+    SYSTEM_ADMIN_PERMISSION,
+  ]);
+}
+
 export function canRunPayroll(codes: string[]) {
   return hasAnyPermission(codes, PAYROLL_RUN);
 }
@@ -440,6 +518,7 @@ export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, strin
     "Maintain employee identity and salary bank account details used for payroll and payslips.",
   settings:
     "Payroll cycle, processing schedule, salary credit day, and payslip availability for your organization.",
+  probation: "",
 };
 
 export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {
@@ -450,6 +529,7 @@ export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {
   payslips: "Payslips",
   "employee-accounts": "Employee Accounts",
   settings: "Settings",
+  probation: "Probation & Confirmation",
 };
 
 export function teamPayrollSectionTitle(section: TeamPayrollSection): string {
@@ -500,7 +580,12 @@ export const PAYROLL_SUB_NAV = [
     title: TEAM_PAYROLL_SECTION_TITLES["employee-accounts"],
     section: TEAM_PAYROLL_SECTIONS["employee-accounts"],
   },
-  { title: TEAM_PAYROLL_SECTION_TITLES.settings, section: TEAM_PAYROLL_SECTIONS.settings },
+  {
+    title: TEAM_PAYROLL_SECTION_TITLES.probation,
+    section: TEAM_PAYROLL_SECTIONS.probation,
+  },
+  // Settings is intentionally omitted from Team Payroll sub-nav.
+  // It lives only under Super Admin: /dashboard/system/payroll/settings
 ].map((item) => ({
   title: item.title,
   section: item.section,
