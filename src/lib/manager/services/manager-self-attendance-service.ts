@@ -774,6 +774,7 @@ function buildHistoryRows(input: {
       attendanceDate: date,
       attendanceStatus: status,
       statusNotes: attendance?.notes ?? null,
+      leaveTypeName,
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
       workHours: attendance

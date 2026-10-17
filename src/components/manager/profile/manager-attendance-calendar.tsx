@@ -40,7 +40,7 @@ const PILL_STYLES: Record<string, string> = {
   half_day: "bg-orange-500 text-white",
   casual_leave: "bg-violet-500 text-white",
   earned_leave: "bg-indigo-500 text-white",
-  lop: "bg-rose-500 text-white",
+  lop: "bg-zinc-900 text-white",
   absent: "bg-red-500 text-white",
   holiday: "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:text-slate-200",
   on_request: "bg-amber-400 text-white",
@@ -52,7 +52,7 @@ const TOOLTIP_STYLES: Record<string, string> = {
   half_day: "border-orange-500/30 bg-orange-500 text-white",
   casual_leave: "border-violet-500/30 bg-violet-500 text-white",
   earned_leave: "border-indigo-500/30 bg-indigo-500 text-white",
-  lop: "border-rose-500/30 bg-rose-500 text-white",
+  lop: "border-zinc-900/40 bg-zinc-900 text-white",
   absent: "border-red-600/30 bg-red-600 text-white",
   holiday: "border-border bg-muted-foreground text-white",
   on_request: "border-amber-500/30 bg-amber-500 text-white",
@@ -66,7 +66,7 @@ const LEGEND = [
   { key: "absent", label: "Absent", className: "bg-red-500" },
   { key: "casual_leave", label: "Casual Leave", className: "bg-violet-500" },
   { key: "earned_leave", label: "Earned Leave", className: "bg-indigo-500" },
-  { key: "lop", label: "LOP", className: "bg-rose-500" },
+  { key: "lop", label: "LOP", className: "bg-zinc-900" },
   { key: "holiday", label: "Holiday", className: "bg-muted/80 dark:bg-white/15" },
 ];
 
@@ -89,7 +89,11 @@ function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
     return { label: day.isToday ? "On Request · Today" : "On Request", tone: "on_request" };
   }
   if (day.status) {
-    const display = resolveAttendanceUiDisplay(day.status, day.statusNotes);
+    const display = resolveAttendanceUiDisplay(
+      day.status,
+      day.statusNotes,
+      day.leaveTypeName,
+    );
     return {
       label: day.isToday ? `${display.label} · Today` : display.label,
       tone: display.key,
@@ -99,7 +103,12 @@ function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
     return { label: day.holidayName, tone: "holiday" };
   }
   if (day.leaveTypeName) {
-    return { label: day.leaveTypeName, tone: "casual_leave" };
+    const display = resolveAttendanceUiDisplay(
+      "on_leave",
+      null,
+      day.leaveTypeName,
+    );
+    return { label: display.label, tone: display.key };
   }
   if (day.isToday) {
     return { label: "Today", tone: "today" };
@@ -313,7 +322,11 @@ export function ManagerAttendanceCalendar({
             const isSelected = selectedDate === live.date;
             const uiStatus =
               live.status && live.status !== "on_request" && live.status !== "upcoming"
-                ? resolveAttendanceUiDisplay(live.status, live.statusNotes)
+                ? resolveAttendanceUiDisplay(
+                    live.status,
+                    live.statusNotes,
+                    live.leaveTypeName,
+                  )
                 : null;
             const isHolidayOrWeekend =
               uiStatus?.key === "holiday" ||
@@ -351,7 +364,7 @@ export function ManagerAttendanceCalendar({
                     "ring-red-600",
                   live.isToday &&
                     uiStatus?.key === "lop" &&
-                    "ring-rose-600",
+                    "ring-zinc-900",
                   live.isToday &&
                     (uiStatus?.key === "casual_leave" ||
                       uiStatus?.key === "earned_leave") &&

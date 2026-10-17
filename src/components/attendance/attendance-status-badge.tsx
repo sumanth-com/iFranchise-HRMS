@@ -20,7 +20,7 @@ const STATUS_STYLES: Record<AttendanceUiDisplayStatus | "upcoming" | "on_request
   earned_leave:
     "bg-indigo-500/15 text-indigo-800 ring-1 ring-inset ring-indigo-500/25 dark:bg-indigo-500/20 dark:text-indigo-200 dark:ring-indigo-400/35",
   lop:
-    "bg-rose-500/15 text-rose-900 ring-1 ring-inset ring-rose-500/25 dark:bg-rose-500/20 dark:text-rose-100 dark:ring-rose-400/35",
+    "bg-zinc-900/15 text-zinc-900 ring-1 ring-inset ring-zinc-900/30 dark:bg-zinc-100/15 dark:text-zinc-100 dark:ring-zinc-100/25",
   holiday:
     "bg-slate-500/15 text-slate-700 ring-1 ring-inset ring-slate-500/20 dark:bg-slate-400/15 dark:text-slate-100 dark:ring-slate-300/25",
   upcoming:
@@ -33,12 +33,15 @@ type AttendanceStatusBadgeProps = {
   status: AttendanceDisplayStatus | string | null | undefined;
   /** Raw attendance notes (`src:CL|…`) — used to distinguish CL / EL / LOP / H. */
   notes?: string | null;
+  /** Leave type name/code when status is derived from a leave record. */
+  leaveTypeHint?: string | null;
   className?: string;
 };
 
 export function AttendanceStatusBadge({
   status,
   notes,
+  leaveTypeHint,
   className,
 }: AttendanceStatusBadgeProps) {
   if (!status || status === "upcoming" || status === "-") {
@@ -59,7 +62,7 @@ export function AttendanceStatusBadge({
     );
   }
 
-  const display = resolveAttendanceUiDisplay(status, notes);
+  const display = resolveAttendanceUiDisplay(status, notes, leaveTypeHint);
 
   return (
     <span
@@ -78,11 +81,19 @@ export function AttendanceStatusBadge({
 export function AttendanceHistoryStatusCell({
   status,
   notes,
+  leaveTypeHint,
   className,
 }: AttendanceStatusBadgeProps) {
   if (!status || status === "upcoming" || status === "-") {
     return <span className={cn("text-muted-foreground font-medium", className)}>—</span>;
   }
 
-  return <AttendanceStatusBadge status={status} notes={notes} className={className} />;
+  return (
+    <AttendanceStatusBadge
+      status={status}
+      notes={notes}
+      leaveTypeHint={leaveTypeHint}
+      className={className}
+    />
+  );
 }

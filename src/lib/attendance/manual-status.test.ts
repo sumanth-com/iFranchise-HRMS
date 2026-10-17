@@ -28,6 +28,29 @@ describe("attendance status display", () => {
     assert.equal(resolveAttendanceUiDisplay("on_leave", null).label, "Casual Leave");
   });
 
+  it("never displays LOP as Casual Leave", () => {
+    assert.equal(
+      resolveAttendanceUiDisplay("on_leave", "src:LOP|manual-hr-status").label,
+      "LOP",
+    );
+    assert.equal(
+      resolveAttendanceUiDisplay("on_leave", null, "LOP").label,
+      "LOP",
+    );
+    assert.equal(
+      resolveAttendanceUiDisplay("on_leave", null, "Loss of Pay").key,
+      "lop",
+    );
+    assert.equal(
+      resolveAttendanceUiDisplay("absent", null, "LOP").label,
+      "LOP",
+    );
+    assert.equal(
+      resolveAttendanceUiDisplay("absent", "src:A", "LOP").label,
+      "Absent",
+    );
+  });
+
   it("never collapses LOP into Absent", () => {
     assert.equal(
       resolveAttendanceUiDisplay("absent", "src:LOP|manual-hr-status").label,

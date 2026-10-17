@@ -57,7 +57,8 @@ export const LEAVE_CALENDAR_LEGEND = {
   weekend: { label: "Weekly holiday", className: "bg-muted-foreground/40" },
   halfDay: { label: "Half day", className: "bg-orange-500" },
   sandwich: { label: "Sandwich", className: "bg-sky-500" },
-  lop: { label: "LOP", className: "bg-slate-500" },
+  casualLeave: { label: "Casual Leave", className: "bg-violet-500" },
+  lop: { label: "LOP", className: "bg-zinc-900" },
 } as const;
 
 export const APPROVAL_LEVEL_LABELS: Record<number, string> = {

@@ -89,6 +89,8 @@ export type ManagerAttendanceHistoryRow = {
   attendanceStatus: AttendanceDisplayStatus;
   /** Raw notes for sheet-aligned status display (CL/EL/LOP/H). */
   statusNotes: string | null;
+  /** Leave type name when the day is covered by a leave request. */
+  leaveTypeName?: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
   workHours: number;

@@ -12,12 +12,15 @@ import { useMemo } from "react";
 import { LeaveCalendarView } from "@/components/leave/leave-calendar-view";
 import { Button } from "@/components/common/button";
 import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
+import {
+  leaveCalendarMarkLabel,
+  leaveCalendarPillClass,
+} from "@/lib/leave/leave-calendar-display";
 import { expandDateRange } from "@/lib/leave/services/leave-utils";
 import { classifyCalendarDay, DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import type {
   LeaveCalendarEntry,
   LeaveHolidayEntry,
-  LeaveStatus,
 } from "@/types/leave";
 import { cn } from "@/lib/utils";
 
@@ -33,14 +36,6 @@ type ManagerLeaveCalendarProps = {
   onMonthChange: (month: number, year: number) => void;
   weekStart?: string;
   onWeekChange?: (weekStart: string) => void;
-};
-
-const LEAVE_STATUS_COLORS: Record<LeaveStatus, string> = {
-  approved: LEAVE_CALENDAR_LEGEND.approved.className,
-  pending: LEAVE_CALENDAR_LEGEND.pending.className,
-  rejected: "bg-destructive/60",
-  cancelled: "bg-muted-foreground/30",
-  withdrawn: "bg-violet-500/60",
 };
 
 export function ManagerLeaveCalendar({
@@ -170,20 +165,23 @@ export function ManagerLeaveCalendar({
                     ) : null}
                   </div>
                   <div className="space-y-1">
-                    {dayLeaves.map((leave) => (
+                    {dayLeaves.map((leave) => {
+                      const markLabel = leaveCalendarMarkLabel(leave, day.date);
+                      return (
                       <div
                         key={`${day.date}-${leave.id}`}
                         className={cn(
                           "truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white",
                           leave.isHalfDay
                             ? LEAVE_CALENDAR_LEGEND.halfDay.className
-                            : LEAVE_STATUS_COLORS[leave.leaveStatus],
+                            : leaveCalendarPillClass(leave, day.date),
                         )}
-                        title={`${leave.employeeName} · ${leave.leaveTypeName}`}
+                        title={`${leave.employeeName} · ${markLabel}`}
                       >
                         {leave.employeeName}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );

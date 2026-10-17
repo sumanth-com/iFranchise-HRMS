@@ -73,13 +73,39 @@ export function isHolidayAttendanceNotes(notes: string | null | undefined): bool
 }
 
 /**
+ * Map a recorded leave type name/code (from leave requests) onto UI display keys.
+ * Used when attendance status is `on_leave` but notes lack an explicit `src:` marker.
+ */
+export function attendanceUiKeyFromLeaveTypeHint(
+  hint: string | null | undefined,
+): AttendanceUiDisplayStatus | null {
+  const raw = String(hint ?? "").trim();
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (upper === "LOP" || upper === "LOSS OF PAY" || /^LOP\b/.test(upper)) {
+    return "lop";
+  }
+  if (upper === "EL" || /earned\s*leave/i.test(raw)) {
+    return "earned_leave";
+  }
+  if (upper === "CL" || /casual\s*leave/i.test(raw)) {
+    return "casual_leave";
+  }
+  return null;
+}
+
+/**
  * Resolve the UI status/label from stored status + notes.
  * Never collapses CL/EL into "On Leave" or LOP into "Absent".
  * Late stays Late (check-in after grace); half_day still displays as Present.
+ *
+ * Optional `leaveTypeHint` (leave type name/code from the leave record) is used
+ * only when notes do not already identify CL / EL / LOP.
  */
 export function resolveAttendanceUiDisplay(
   status: string | null | undefined,
   notes?: string | null,
+  leaveTypeHint?: string | null,
 ): { key: AttendanceUiDisplayStatus; label: string } {
   const normalized = String(status ?? "");
 
@@ -92,8 +118,20 @@ export function resolveAttendanceUiDisplay(
   }
 
   if (normalized === "on_leave") {
-    if (leaveTypeCodeFromAttendanceNotes(notes) === "EL") {
+    // Sheet LOP must never render as Casual Leave.
+    if (isLopAttendanceNotes(notes)) {
+      return { key: "lop", label: ATTENDANCE_UI_DISPLAY_LABELS.lop };
+    }
+    const code = leaveTypeCodeFromAttendanceNotes(notes);
+    if (code === "EL") {
       return { key: "earned_leave", label: ATTENDANCE_UI_DISPLAY_LABELS.earned_leave };
+    }
+    if (code === "CL") {
+      return { key: "casual_leave", label: ATTENDANCE_UI_DISPLAY_LABELS.casual_leave };
+    }
+    const fromHint = attendanceUiKeyFromLeaveTypeHint(leaveTypeHint);
+    if (fromHint === "lop" || fromHint === "earned_leave" || fromHint === "casual_leave") {
+      return { key: fromHint, label: ATTENDANCE_UI_DISPLAY_LABELS[fromHint] };
     }
     return { key: "casual_leave", label: ATTENDANCE_UI_DISPLAY_LABELS.casual_leave };
   }
@@ -105,6 +143,13 @@ export function resolveAttendanceUiDisplay(
     }
     if (isLopAttendanceNotes(notes)) {
       return { key: "lop", label: ATTENDANCE_UI_DISPLAY_LABELS.lop };
+    }
+    // Leave-type hint only when notes do not already assert a sheet source code.
+    if (!/\bsrc:/i.test(String(notes ?? ""))) {
+      const fromHint = attendanceUiKeyFromLeaveTypeHint(leaveTypeHint);
+      if (fromHint === "lop") {
+        return { key: "lop", label: ATTENDANCE_UI_DISPLAY_LABELS.lop };
+      }
     }
     return { key: "absent", label: ATTENDANCE_UI_DISPLAY_LABELS.absent };
   }

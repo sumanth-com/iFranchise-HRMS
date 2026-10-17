@@ -22,7 +22,10 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
-import { calendarMarkForAllocation } from "@/lib/leave/services/leave-policy-engine";
+import {
+  leaveCalendarMarkLabel,
+  leaveCalendarPillClass,
+} from "@/lib/leave/leave-calendar-display";
 import { expandDateRange } from "@/lib/leave/services/leave-utils";
 import {
   calculateLeaveDuration,
@@ -33,7 +36,6 @@ import {
 import type {
   LeaveCalendarEntry,
   LeaveHolidayEntry,
-  LeaveStatus,
 } from "@/types/leave";
 import { cn } from "@/lib/utils";
 
@@ -77,14 +79,6 @@ const WEEKDAY_LABELS = [
   "Friday",
   "Saturday",
 ];
-
-const LEAVE_STATUS_COLORS: Record<LeaveStatus, string> = {
-  approved: LEAVE_CALENDAR_LEGEND.approved.className,
-  pending: LEAVE_CALENDAR_LEGEND.pending.className,
-  rejected: "bg-destructive/60",
-  cancelled: "bg-muted-foreground/30",
-  withdrawn: "bg-violet-500/60",
-};
 
 function buildCalendarDays(month: number, year: number): DayCell[] {
   const monthStart = startOfMonth(new Date(year, month - 1, 1));
@@ -226,26 +220,11 @@ export function LeaveCalendarView({
   }, [holidays]);
 
   function leaveMarkLabel(leave: LeaveCalendarEntry, date: string) {
-    const allocation = leave.dayAllocations?.find((item) => item.date === date);
-    if (allocation) {
-      if (leave.hrReviewRequired && leave.leaveStatus === "pending" && !leave.hrDecision) {
-        return "HR Review";
-      }
-      if (leave.hrDecision === "special") return "Special Leave";
-      const mark = calendarMarkForAllocation(allocation.kind, leave.leaveTypeCode);
-      if (mark) return mark;
-    }
-    const type = leave.leaveTypeName?.trim();
-    if (type && /optional/i.test(type)) return "Optional Holiday";
-    if (type) return type;
-    return compact ? "Leave" : leave.employeeName;
+    return leaveCalendarMarkLabel(leave, date, { compact });
   }
 
   function leavePillTone(leave: LeaveCalendarEntry, date: string) {
-    const allocation = leave.dayAllocations?.find((item) => item.date === date);
-    if (allocation?.kind === "lop") return "bg-slate-500";
-    // Paid sandwich days are covered by the selected leave balance — same tone as paid leave.
-    return LEAVE_STATUS_COLORS[leave.leaveStatus];
+    return leaveCalendarPillClass(leave, date);
   }
 
   function leaveCellHighlight(dayLeaves: LeaveCalendarEntry[]) {

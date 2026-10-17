@@ -221,7 +221,11 @@ export function ManagerProfileHistoryTable({
                   {format(parseISO(row.attendanceDate), "dd MMM yyyy")}
                 </td>
                 <td className="px-4 py-3">
-                  <AttendanceHistoryStatusCell status={row.attendanceStatus} notes={row.statusNotes} />
+                  <AttendanceHistoryStatusCell
+                    status={row.attendanceStatus}
+                    notes={row.statusNotes}
+                    leaveTypeHint={row.leaveTypeName}
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {formatAttendanceTime(row.checkInAt)}
@@ -336,7 +340,11 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <AttendanceHistoryStatusCell status={row.attendanceStatus} notes={row.statusNotes} />
+        <AttendanceHistoryStatusCell
+          status={row.attendanceStatus}
+          notes={row.statusNotes}
+          leaveTypeHint={row.leaveTypeName}
+        />
         {isComplete ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
             <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500 text-white">
