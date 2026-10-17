@@ -59,6 +59,10 @@ import {
 import { requiresCeoRegularizationApproval } from "@/lib/approvals/executive-request-routing";
 import { parseWorkingConfiguration } from "@/lib/company-settings/services/company-settings-parsers";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
+import {
+  leaveDayDisplayNameForDate,
+  type LeaveDayAllocationDisplay,
+} from "@/lib/leave/leave-calendar-display";
 import { expandDateRange, getMonthDateRange } from "@/lib/leave/services/leave-utils";
 import { classifyCalendarDay } from "@/lib/leave/services/leave-calendar-engine";
 import type {
@@ -413,7 +417,7 @@ async function loadMonthLeaves(
     .schema("hrms")
     .from("leave_requests")
     .select(
-      "id, start_date, end_date, leave_status, leave_types:leave_type_id (name)",
+      "id, start_date, end_date, leave_status, duration_breakdown, leave_types:leave_type_id (name, code)",
     )
     .eq("employee_id", employeeId)
     .eq("leave_status", "approved")
@@ -423,6 +427,55 @@ async function loadMonthLeaves(
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/** Prefer stored day allocations so attendance pills match leave-calendar CL vs LOP marks. */
+function dayAllocationsFromLeaveBreakdown(
+  durationBreakdown: unknown,
+): LeaveDayAllocationDisplay[] {
+  const stored = durationBreakdown as {
+    dayAllocations?: LeaveDayAllocationDisplay[];
+  } | null;
+  if (!Array.isArray(stored?.dayAllocations)) return [];
+  return stored.dayAllocations.filter(
+    (day) =>
+      day &&
+      typeof day.date === "string" &&
+      (day.kind === "paid" ||
+        day.kind === "lop" ||
+        day.kind === "sandwich" ||
+        day.kind === "none"),
+  );
+}
+
+function buildLeaveDisplayByDate(
+  leaves: Awaited<ReturnType<typeof loadMonthLeaves>>,
+): Map<string, string> {
+  const leaveByDate = new Map<string, string>();
+  for (const leave of leaves) {
+    const leaveType = unwrap(
+      leave.leave_types as
+        | { name: string; code?: string | null }
+        | { name: string; code?: string | null }[]
+        | null,
+    );
+    const leaveTypeName = leaveType?.name ?? "Leave";
+    const leaveTypeCode = leaveType?.code ?? null;
+    const dayAllocations = dayAllocationsFromLeaveBreakdown(leave.duration_breakdown);
+
+    expandDateRange(leave.start_date, leave.end_date).forEach((date) => {
+      leaveByDate.set(
+        date,
+        leaveDayDisplayNameForDate({
+          date,
+          leaveTypeCode,
+          leaveTypeName,
+          dayAllocations,
+        }),
+      );
+    });
+  }
+  return leaveByDate;
 }
 
 async function loadMonthHolidays(
@@ -957,15 +1010,7 @@ export async function getManagerProfilePageData(
   const holidayByDate = new Map(
     holidays.map((row) => [row.holiday_date as string, row.name as string]),
   );
-  const leaveByDate = new Map<string, string>();
-  for (const leave of leaves) {
-    const leaveType = unwrap(
-      leave.leave_types as { name: string } | { name: string }[] | null,
-    );
-    expandDateRange(leave.start_date, leave.end_date).forEach((date) => {
-      leaveByDate.set(date, leaveType?.name ?? "Leave");
-    });
-  }
+  const leaveByDate = buildLeaveDisplayByDate(leaves);
 
   const correctionsByAttendanceId = new Map<string, CorrectionRow>();
   for (const correction of corrections) {

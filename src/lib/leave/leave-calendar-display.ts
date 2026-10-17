@@ -6,6 +6,12 @@ import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
 import { calendarMarkForAllocation } from "@/lib/leave/services/leave-policy-engine";
 import type { LeaveCalendarEntry, LeaveStatus } from "@/types/leave";
 
+export type LeaveDayAllocationDisplay = {
+  date: string;
+  kind: "paid" | "lop" | "sandwich" | "none";
+  counted: number;
+};
+
 const LEAVE_STATUS_COLORS: Record<LeaveStatus, string> = {
   approved: LEAVE_CALENDAR_LEGEND.approved.className,
   pending: LEAVE_CALENDAR_LEGEND.pending.className,
@@ -38,6 +44,24 @@ function isEarnedLeaveType(leave: LeaveCalendarEntry): boolean {
   const code = String(leave.leaveTypeCode ?? "").toUpperCase();
   if (code === "EL") return true;
   return /earned\s*leave/i.test(leave.leaveTypeName?.trim() ?? "");
+}
+
+/**
+ * Per-day display name for attendance calendar leave hints.
+ * Uses recorded day allocations so sandwich LOP days show as `LOP`, not the parent leave type.
+ */
+export function leaveDayDisplayNameForDate(input: {
+  date: string;
+  leaveTypeCode?: string | null;
+  leaveTypeName?: string | null;
+  dayAllocations?: LeaveDayAllocationDisplay[] | null;
+}): string {
+  const fallback = input.leaveTypeName?.trim() || "Leave";
+  const allocation = input.dayAllocations?.find((item) => item.date === input.date);
+  if (!allocation || allocation.kind === "none") return fallback;
+  return (
+    calendarMarkForAllocation(allocation.kind, input.leaveTypeCode) ?? fallback
+  );
 }
 
 /** Label for a leave mark on a specific calendar date. */
