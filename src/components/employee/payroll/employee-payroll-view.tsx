@@ -346,7 +346,7 @@ export function EmployeePayrollView({
           title="Payment Timeline"
           description={
             data.latestTimeline
-              ? undefined
+              ? "Updates on the 2nd of every month, then HR review and payslip send."
               : "Timeline updates when payroll is published."
           }
         >

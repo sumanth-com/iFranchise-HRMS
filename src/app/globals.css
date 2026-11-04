@@ -1412,6 +1412,28 @@ html:not(.dark) .dashboard-surface:hover {
   }
 }
 
+@keyframes payment-timeline-stage-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes payment-timeline-check {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes payment-timeline-flow {
   0% {
     transform: translateY(-120%);
@@ -1460,6 +1482,14 @@ html:not(.dark) .dashboard-surface:hover {
   }
 }
 
+.payment-timeline-stage {
+  animation: payment-timeline-stage-enter 0.45s ease-out both;
+}
+
+.payment-timeline-check {
+  animation: payment-timeline-check 0.32s ease-out both;
+}
+
 .payment-timeline-flow {
   background: linear-gradient(
     180deg,
@@ -1485,6 +1515,8 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .payment-timeline-stage,
+  .payment-timeline-check,
   .payment-timeline-flow,
   .payment-timeline-fill,
   .payment-timeline-node-active,

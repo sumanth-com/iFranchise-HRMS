@@ -336,23 +336,34 @@ export function HrPayrollHubView({
           />
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {sectionTitle}
-            </h1>
-            {localizedSectionHelp ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-8 text-muted-foreground hover:text-foreground"
-                aria-label={`About ${sectionTitle}`}
-                onClick={() => setHelpOpen(true)}
-              >
-                <CircleHelp className="size-4" />
-              </Button>
-            ) : null}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {sectionTitle}
+              </h1>
+              {localizedSectionHelp ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-8 text-muted-foreground hover:text-foreground"
+                  aria-label={`About ${sectionTitle}`}
+                  onClick={() => setHelpOpen(true)}
+                >
+                  <CircleHelp className="size-4" />
+                </Button>
+              ) : null}
+            </div>
+            {(() => {
+              const description = isTeamView
+                ? teamPayrollSectionDescription(teamPayrollSection)
+                : "View payslips, download salary documents, and track your compensation history.";
+              if (!description.trim()) return null;
+              return (
+                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p>
+              );
+            })()}
           </div>
           {isTeamView ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -399,16 +410,6 @@ export function HrPayrollHubView({
             </div>
           )}
         </div>
-
-        {(() => {
-          const description = isTeamView
-            ? teamPayrollSectionDescription(teamPayrollSection)
-            : "View payslips, download salary documents, and track your compensation history.";
-          if (!description.trim()) return null;
-          return (
-            <p className="max-w-3xl text-sm text-muted-foreground">{description}</p>
-          );
-        })()}
       </div>
 
       {isTeamView ? (

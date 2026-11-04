@@ -17,8 +17,13 @@ export default async function SuperAdminPayrollPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            View payslips, download salary documents, and track your compensation history.
+          </p>
+        </div>
         <Button
           type="button"
           variant="outline"

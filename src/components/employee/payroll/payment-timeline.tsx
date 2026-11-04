@@ -10,10 +10,21 @@ type PaymentTimelineProps = {
   stages: EmployeePayrollTimelineStage[];
 };
 
-function fmtStageTime(value: string | null, done: boolean, active: boolean): string {
+function fmtStageTime(
+  value: string | null,
+  done: boolean,
+  active: boolean,
+  precision: EmployeePayrollTimelineStage["precision"],
+): string {
   if (value) {
     try {
-      return format(parseISO(value.length === 10 ? `${value}T12:00:00.000Z` : value), "dd MMM yyyy, h:mm a");
+      const dateOnly = precision === "date" || value.length === 10;
+      if (dateOnly) {
+        const ymd = value.slice(0, 10);
+        const [year, month, day] = ymd.split("-").map(Number);
+        return format(new Date(year, month - 1, day), "dd MMM yyyy");
+      }
+      return format(parseISO(value), "dd MMM yyyy, h:mm a");
     } catch {
       return done ? "Completed" : "Pending";
     }
@@ -39,11 +50,15 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
         const lineActive = isDone && !nextStage?.done && index + 1 === activeIndex;
 
         return (
-          <li key={stage.key} className={cn("relative flex gap-4", !isLast && "min-h-0 flex-1")}>
+          <li
+            key={stage.key}
+            className={cn("payment-timeline-stage relative flex gap-4", !isLast && "min-h-0 flex-1")}
+            style={{ animationDelay: `${index * 90}ms` }}
+          >
             <div className="flex w-6 shrink-0 flex-col items-center">
               <span
                 className={cn(
-                  "relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-500",
+                  "relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-[border-color,background-color,box-shadow,transform] duration-500",
                   isDone &&
                     "border-emerald-500 bg-emerald-500 text-white shadow-[0_0_0_4px_rgba(16,185,129,0.12)]",
                   isActive &&
@@ -52,7 +67,7 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
                 )}
               >
                 {isDone ? (
-                  <Check className="size-3.5 stroke-[3]" aria-hidden />
+                  <Check className="size-3.5 stroke-[3] payment-timeline-check" aria-hidden />
                 ) : isActive ? (
                   <span className="size-2 rounded-full bg-emerald-500 payment-timeline-node-dot" />
                 ) : (
@@ -70,7 +85,10 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
                   aria-hidden
                 >
                   {lineComplete ? (
-                    <span className="payment-timeline-fill absolute inset-0 origin-top bg-emerald-500" />
+                    <span
+                      className="payment-timeline-fill absolute inset-0 origin-top bg-emerald-500"
+                      style={{ animationDelay: `${index * 90 + 120}ms` }}
+                    />
                   ) : null}
                   {lineActive ? (
                     <>
@@ -101,7 +119,7 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
                     : "text-muted-foreground",
                 )}
               >
-                {fmtStageTime(stage.at, stage.done, isActive)}
+                {fmtStageTime(stage.at, stage.done, isActive, stage.precision)}
               </p>
             </div>
           </li>

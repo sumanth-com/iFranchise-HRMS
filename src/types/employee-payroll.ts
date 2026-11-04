@@ -32,11 +32,12 @@ export type EmployeeSalaryStructure = {
 };
 
 export type EmployeePayrollTimelineStage = {
-  key: "generated" | "hr_approved" | "released" | "credited";
+  key: "credited" | "generated" | "hr_approved" | "released";
   label: string;
   description: string;
   at: string | null;
   done: boolean;
+  precision?: "date" | "datetime";
 };
 
 export type EmployeePayrollTimeline = {

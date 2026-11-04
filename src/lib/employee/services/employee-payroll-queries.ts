@@ -5,6 +5,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   paymentStatusLabel,
 } from "@/lib/payroll/services/payslip-history-queries";
+import { buildEmployeePaymentTimeline } from "@/lib/employee/services/employee-payment-timeline";
 import {
   PAYSLIP_PUBLISH_DAY,
   canAccessPayslipDuringReview,
@@ -26,7 +27,6 @@ import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
   EmployeePayrollDisplaySummary,
-  EmployeePayrollTimeline,
   EmployeeSalaryStructure,
 } from "@/types/employee-payroll";
 import type {
@@ -171,13 +171,6 @@ function buildPublishedPayslipDisplaySummary(
   };
 }
 
-const TIMELINE_STATUS_ORDER: PayrollStatus[] = [
-  "draft",
-  "processing",
-  "processed",
-  "approved",
-  "paid",
-];
 
 function effectivePayslipReleaseAt(
   emailSentAt: string | null,
@@ -226,60 +219,6 @@ function dedupePayslipsByMonth(items: PayslipListItem[]): PayslipListItem[] {
   );
 }
 
-function buildTimeline(input: {
-  payroll: {
-    payroll_status: PayrollStatus;
-    created_at: string | null;
-    processed_at: string | null;
-    approved_at: string | null;
-  };
-  emailSentAt: string | null;
-  publishedAt: string;
-  salaryCreditDate: string;
-  payrollLifecycle?: PayrollBreakdown["payrollLifecycle"];
-}): EmployeePayrollTimeline {
-  const status = input.payroll.payroll_status;
-  const rank = TIMELINE_STATUS_ORDER.indexOf(status);
-  const releaseAt = resolveEmployeePayslipReleaseAt({
-    emailSentAt: input.emailSentAt,
-    payrollLifecycle: input.payrollLifecycle,
-  });
-  const payslipReleased = Boolean(releaseAt);
-
-  return {
-    status,
-    stages: [
-      {
-        key: "generated",
-        label: "Payroll Generated",
-        description: "Payroll calculation created by HR.",
-        at: input.payroll.processed_at ?? input.payroll.created_at,
-        done: rank >= TIMELINE_STATUS_ORDER.indexOf("processed"),
-      },
-      {
-        key: "hr_approved",
-        label: "Payroll Reviewed",
-        description: "Payroll reviewed and approved.",
-        at: input.payroll.approved_at,
-        done: rank >= TIMELINE_STATUS_ORDER.indexOf("approved"),
-      },
-      {
-        key: "released",
-        label: "Payslip Sent",
-        description: "Payslip successfully published/sent to the employee.",
-        at: releaseAt ?? (payslipReleased ? input.publishedAt : null),
-        done: payslipReleased,
-      },
-      {
-        key: "credited",
-        label: "Salary Credited",
-        description: "Salary payment marked as credited.",
-        at: status === "paid" ? input.salaryCreditDate : null,
-        done: status === "paid",
-      },
-    ],
-  };
-}
 
 export const getEmployeePayrollData = cache(async function getEmployeePayrollData(
   supabase: AuthSupabaseClient,
@@ -782,7 +721,7 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
       },
       scheduleOptions,
     );
-    return buildTimeline({
+    return buildEmployeePaymentTimeline({
       payroll: latestAccessible.payroll,
       emailSentAt: latestAccessible.row.email_sent_at,
       publishedAt: schedule.publishedAt,
