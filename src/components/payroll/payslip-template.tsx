@@ -17,6 +17,7 @@ import {
   getPayslipInfoRows,
   getPayslipNotes,
   getPayslipPaymentDetails,
+  getPayslipSalaryRevisionRows,
 } from "@/lib/payroll/services/payslip-document-helpers";
 import { resolvePayslipDisplayTotals } from "@/lib/payroll/services/payroll-utils";
 import { cn } from "@/lib/utils";
@@ -98,6 +99,7 @@ export function PayslipTemplate({
   const paymentDetails = getPayslipPaymentDetails(payslip);
   const notes = getPayslipNotes(payslip);
   const footer = getPayslipFooterLines(payslip);
+  const salaryRevisionRows = getPayslipSalaryRevisionRows(payslip);
 
   const { earnings, deductions, grossEarnings, totalDeductions, netPay } =
     resolvePayslipDisplayTotals({
@@ -218,6 +220,48 @@ export function PayslipTemplate({
             ))}
           </div>
         </section>
+
+        {salaryRevisionRows.length > 0 ? (
+          <section>
+            <h2
+              className="mb-3 text-sm font-bold"
+              style={{ color: PAYSLIP_DESIGN.sectionTitle }}
+            >
+              Salary revision this month
+            </h2>
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full table-fixed border-collapse text-sm">
+                <thead>
+                  <tr
+                    className="text-[10px] font-bold uppercase tracking-[0.12em] text-white"
+                    style={{ backgroundColor: PAYSLIP_DESIGN.purpleBand }}
+                  >
+                    <th className="px-3 py-2.5 text-left">Period</th>
+                    <th className="px-3 py-2.5 text-right">Monthly salary</th>
+                    <th className="px-3 py-2.5 text-right">Paid days</th>
+                    <th className="px-3 py-2.5 text-right">Amount (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salaryRevisionRows.map((row) => (
+                    <tr key={row.period} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-medium text-slate-800">{row.period}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-800">
+                        {formatAmountIndian(row.monthlySalary)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-800">
+                        {row.paidDays}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-800">
+                        {formatAmountIndian(row.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
 
         <section>
           <h2

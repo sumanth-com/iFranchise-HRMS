@@ -227,12 +227,12 @@ describe("official holiday attendance facts", () => {
       bonuses: [],
       reimbursements: [],
     });
-    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 13));
     assert.equal(result.totalDeductions, 200);
-    assert.equal(result.netSalary, 24_800);
+    assert.equal(result.netSalary, roundCurrency((25_000 / 30) * 13 - 200));
     assert.equal(
       resolveFinalPayableAmount(result.netSalary, result.breakdown, result.totalAllowances),
-      24_800,
+      roundCurrency((25_000 / 30) * 13 - 200),
     );
     assert.equal(EXCEL_PAYROLL_DAY_DENOMINATOR, 30);
   });
@@ -325,6 +325,34 @@ describe("official holiday attendance facts", () => {
     assert.equal(summary.holidayDays, 0);
   });
 
+  it("does not reclassify recorded Absent as Holiday on a Sunday or official holiday", () => {
+    const summary = {
+      ...emptySummary(),
+      presentDays: 10,
+      absentDays: 2,
+      holidayDays: 2,
+    };
+    const statusByDate = new Map<string, string>([
+      ["2026-10-04", "absent"],
+      ["2026-10-02", "absent"],
+      ["2026-10-11", "holiday"],
+    ]);
+    applyOfficialHolidaysToAttendanceSummary(summary, {
+      officialHolidayDates: ["2026-10-02"],
+      statusByDate,
+      periodStart: "2026-10-01",
+      periodEnd: "2026-10-31",
+    });
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate,
+      periodStart: "2026-10-01",
+      periodEnd: "2026-10-31",
+    });
+    assert.equal(statusByDate.get("2026-10-04"), "absent");
+    assert.equal(statusByDate.get("2026-10-02"), "absent");
+    assert.equal(summary.absentDays, 2);
+  });
+
   it("excludes LOP/Absent from paid days while keeping official H + CL/EL", () => {
     const attendance = {
       presentDays: 8,
@@ -367,7 +395,7 @@ describe("official holiday attendance facts", () => {
     assert.equal(EXCEL_PAYROLL_DAY_DENOMINATOR, 30);
     assert.equal(result.breakdown.attendance.paidDays, 10);
     assert.equal(result.breakdown.attendance.dailyRate, roundCurrency(25_000 / 30));
-    assert.equal(result.grossSalary, 25_000);
+    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 10));
     assert.equal(
       result.breakdown.deductions.find((d) => d.code === "pt")?.amount,
       200,

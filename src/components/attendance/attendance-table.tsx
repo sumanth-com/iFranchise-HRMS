@@ -508,12 +508,14 @@ export function AttendanceTable({
       {
         id: "attendanceStatus",
         header: "Status",
-        meta: { align: "center", width: "8%" } satisfies AttendanceColumnMeta,
+        meta: { align: "center", width: "12%" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <AttendanceStatusBadge
-            status={row.original.attendanceStatus}
-            notes={row.original.notes}
-          />
+          <div className="flex justify-center">
+            <AttendanceStatusBadge
+              status={row.original.attendanceStatus}
+              notes={row.original.notes}
+            />
+          </div>
         ),
       },
       {

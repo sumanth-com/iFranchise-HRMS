@@ -186,11 +186,11 @@ describe("payroll attendance ↔ leave sync", () => {
     assert.equal(result.breakdown.attendance.elDays, 1);
     assert.equal(result.breakdown.attendance.lopDays, 0);
     assert.equal(result.breakdown.attendance.paidDays, 25);
-    assert.equal(result.grossSalary, 25_000);
-    assert.equal(result.netSalary, 24_800);
+    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 25));
+    assert.equal(result.netSalary, roundCurrency((25_000 / 30) * 25 - 200));
     assert.equal(
       resolveFinalPayableAmount(result.netSalary, result.breakdown, result.totalAllowances),
-      24_800,
+      roundCurrency((25_000 / 30) * 25 - 200),
     );
   });
 
@@ -244,8 +244,8 @@ describe("payroll attendance ↔ leave sync", () => {
       totals.totalGross,
       roundCurrency(rows.reduce((sum, row) => sum + row.grossSalary, 0)),
     );
-    assert.equal(om.grossSalary, 25_000);
-    assert.equal(diksha.grossSalary, roundCurrency(50_000 - 50_000 / 30));
+    assert.equal(om.grossSalary, roundCurrency((25_000 / 30) * 25));
+    assert.equal(diksha.grossSalary, roundCurrency((50_000 / 30) * 24));
   });
 
   it("counts early logout as unpaid absence and three late markers as half-day LOP", () => {
@@ -272,8 +272,8 @@ describe("payroll attendance ↔ leave sync", () => {
     });
 
     assert.equal(result.breakdown.attendance.paidDays, 2.5);
-    assert.equal(result.breakdown.attendance.lopDays, 2);
-    assert.equal(result.grossSalary, 28_000);
+    assert.equal(result.breakdown.attendance.lopDays, 0);
+    assert.equal(result.grossSalary, roundCurrency((30_000 / 31) * 2.5));
     const displayed = [result, result].map((row) => {
       const amounts = mapPayrollDisplayAmounts({
         basicSalary: row.basicSalary,
@@ -331,7 +331,7 @@ describe("payroll attendance ↔ leave sync", () => {
     assert.equal(leave.elDays, 1);
     assert.equal(leave.lopDays, 1);
     assert.equal(result.breakdown.attendance.paidDays, 2);
-    assert.equal(result.grossSalary, 29_000);
+    assert.equal(result.grossSalary, roundCurrency((30_000 / 31) * 2));
     assert.equal(result.breakdown.attendance.lopDays, 1);
   });
 });

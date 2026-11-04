@@ -141,7 +141,7 @@ export function getPayslipAttendanceDisplay(payslip: PayslipDetail): {
     attendance?.workingDays && attendance.workingDays > 0
       ? attendance.workingDays
       : totalDaysInMonth;
-  const lopDays = attendance?.lopDays ?? attendance?.leaveLopDays ?? 0;
+  const lopDays = attendance?.leaveLopDays ?? attendance?.lopDays ?? 0;
   const paidDays = attendance
     ? paidDaysFromBreakdown(payslip.breakdown)
     : Math.max(0, workDays - lopDays);
@@ -244,14 +244,33 @@ export function getPayslipPaymentDetails(payslip: PayslipDetail): PayslipInfoCel
   ];
 }
 
+export function getPayslipSalaryRevisionRows(
+  payslip: PayslipDetail,
+): Array<{ period: string; monthlySalary: number; paidDays: number; amount: number }> {
+  const segments = payslip.breakdown?.salarySegments ?? [];
+  if (segments.length < 2) return [];
+  return segments.map((segment) => ({
+    period: `${fmtPayslipDate(segment.startDate)} – ${fmtPayslipDate(segment.endDate)}`,
+    monthlySalary: segment.monthlyGrossSalary,
+    paidDays: segment.paidDays ?? segment.calendarDays,
+    amount: segment.payableGross ?? segment.segmentGross,
+  }));
+}
+
 /** Standard notes shown on the formal payslip document. */
 export function getPayslipNotes(payslip: PayslipDetail): string[] {
   const contact = payslip.organization.email?.trim() || "hr@ifranchise.in";
+  const revision = getPayslipSalaryRevisionRows(payslip);
+  const revisionNote =
+    revision.length > 0
+      ? `Salary was revised during this month. Payable salary is calculated at the applicable monthly rate for each period, using calendar days in the month and paid days (Present + Holiday + CL + EL) only.`
+      : null;
   return [
+    revisionNote,
     "This is a system generated payslip and does not require a signature.",
     `In case of any discrepancy, please contact HR at ${contact} within 7 days.`,
     "Statutory deductions are applicable as per government regulations.",
-  ];
+  ].filter((note): note is string => Boolean(note));
 }
 
 /**

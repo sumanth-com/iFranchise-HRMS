@@ -80,6 +80,7 @@ import {
 import {
   applyOfficialHolidaysToAttendanceSummary,
   applySundayHolidaysToAttendanceSummary,
+  collectPaidPayrollDates,
 } from "@/lib/payroll/services/payroll-attendance-holidays";
 import {
   applyPayrollAttendanceDay,
@@ -719,6 +720,11 @@ async function getAttendanceSummary(
     periodStart: holidayPeriodStart,
     periodEnd: holidayCreditEnd,
   });
+  summary.paidDates = collectPaidPayrollDates(
+    statusByDate,
+    holidayPeriodStart,
+    holidayCreditEnd,
+  );
 
   applyPeriodSandwichLop(
     summary,
@@ -992,6 +998,7 @@ function emptyAttendanceSummary(): AttendanceSummary {
     overtimeHours: 0,
     lateDays: 0,
     sandwichLopDays: 0,
+    paidDates: [],
   };
 }
 
@@ -1300,6 +1307,11 @@ async function loadPayrollPeriodFacts(
       periodStart: holidayPeriodStart,
       periodEnd: holidayCreditEnd,
     });
+    summary.paidDates = collectPaidPayrollDates(
+      statusByEmployeeDate.get(employeeId) ?? new Map(),
+      holidayPeriodStart,
+      holidayCreditEnd,
+    );
     applyPeriodSandwichLop(
       summary,
       occupiedByEmployee.get(employeeId) ?? [],

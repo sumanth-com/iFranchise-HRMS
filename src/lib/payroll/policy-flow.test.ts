@@ -100,6 +100,8 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 2_000);
     assert.equal(payroll.breakdown.attendance.dailyRate, 1_000);
+    assert.equal(payroll.breakdown.attendance.lopDays, 2);
+    assert.equal(payroll.grossSalary, 30_000);
   });
 
   it("deducts exactly half the per-day amount for half-day LOP", () => {
@@ -131,7 +133,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     assert.equal(lop?.amount, 500);
   });
 
-  it("creates 0.5 LOP from three late entries", () => {
+  it("does not treat three late entries as LOP", () => {
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
@@ -144,8 +146,8 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
-    assert.equal(payroll.breakdown.attendance.lopDays, 0.5);
-    assert.equal(lop?.amount, 500);
+    assert.equal(payroll.breakdown.attendance.lopDays, 0);
+    assert.equal(lop, undefined);
   });
 
   it("sandwiches Sunday inside a continuous Sat–Mon absence and public holidays between leave days", () => {
@@ -176,10 +178,10 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
-    assert.equal(payroll.breakdown.attendance.lopDays, 3);
-    assert.equal(lop?.amount, 3_000);
-    assert.equal(payroll.grossSalary, 27_000);
-    assert.equal(payroll.netSalary, 26_800);
+    assert.equal(payroll.breakdown.attendance.lopDays, 0);
+    assert.equal(lop, undefined);
+    assert.equal(payroll.grossSalary, roundCurrency((30_000 / 30) * 28));
+    assert.equal(payroll.netSalary, roundCurrency((30_000 / 30) * 28 - 200));
   });
 
   it("does not double-count sandwich days already included in leave LOP", () => {
@@ -223,7 +225,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 450);
-    assert.equal(payroll.grossSalary, roundCurrency(13_500 - 13_500 / 30));
+    assert.equal(payroll.grossSalary, roundCurrency((13_500 / 30) * 25));
     assert.equal(payroll.netSalary, payroll.grossSalary); // below PT threshold
   });
 });

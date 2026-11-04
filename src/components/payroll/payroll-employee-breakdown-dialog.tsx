@@ -243,6 +243,33 @@ export function PayrollEmployeeBreakdownDialog({
                 </div>
               </section>
 
+              {employee.breakdown.salarySegments &&
+              employee.breakdown.salarySegments.length > 1 ? (
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Salary revision this month
+                  </h3>
+                  <div className="mt-2 space-y-2">
+                    {employee.breakdown.salarySegments.map((segment) => (
+                      <div
+                        key={`${segment.startDate}-${segment.salaryStructureId}`}
+                        className="rounded-lg border bg-muted/30 px-2.5 py-2 text-sm"
+                      >
+                        <p className="font-medium">
+                          {segment.startDate} – {segment.endDate}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {formatCurrency(segment.monthlyGrossSalary)}/mo ·{" "}
+                          {segment.paidDays ?? segment.calendarDays} paid day
+                          {(segment.paidDays ?? segment.calendarDays) === 1 ? "" : "s"} ·{" "}
+                          {formatCurrency(segment.payableGross ?? segment.segmentGross)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Leave Usage

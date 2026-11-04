@@ -5,6 +5,9 @@ import {
 } from "@/lib/attendance/manual-status";
 import type { AttendanceDisplayStatus } from "@/types/attendance";
 
+const PILL_LAYOUT =
+  "inline-flex h-6 max-w-full min-w-[2.75rem] items-center justify-center rounded-full px-2.5 text-[11px] font-semibold leading-none";
+
 /** Dark-friendly pills: tinted fill + high-contrast label (no light-on-light). */
 const STATUS_STYLES: Record<AttendanceUiDisplayStatus | "upcoming" | "on_request", string> = {
   present:
@@ -52,7 +55,7 @@ export function AttendanceStatusBadge({
     return (
       <span
         className={cn(
-          "inline-flex max-w-full items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide",
+          PILL_LAYOUT,
           STATUS_STYLES.on_request,
           className,
         )}
@@ -67,7 +70,7 @@ export function AttendanceStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide",
+        PILL_LAYOUT,
         STATUS_STYLES[display.key],
         className,
       )}

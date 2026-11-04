@@ -60,10 +60,9 @@ function creditHolidayDate(
     return;
   }
 
+  // Recorded Absent / LOP stays unpaid. Excel Total Working Days only counts
+  // P + H + CL + EL from the sheet — do not reclassify A as Holiday.
   if (status === "absent") {
-    summary.absentDays = Math.max(0, summary.absentDays - 1);
-    summary.holidayDays += 1;
-    statusByDate.set(date, "holiday");
     return;
   }
 
@@ -78,7 +77,7 @@ function creditHolidayDate(
  * - Missing row or week_off → holiday (+1 holiday; −1 week_off if reclassified)
  * - Already holiday → no change
  * - present / late / half_day / on_leave → leave as-is (already paid via that status)
- * - absent → reclassify to holiday (official holidays are never unpaid absence)
+ * - absent → leave as-is (unpaid; LOP/Absent are not paid holidays)
  *
  * Does not auto-credit optional holidays or Sundays (see applySundayHolidays…).
  */
@@ -151,6 +150,51 @@ export function shouldPreserveAttendanceOverOfficialHoliday(
     status === "late" ||
     status === "half_day" ||
     status === "on_leave" ||
+    status === "holiday" ||
+    status === "absent"
+  );
+}
+
+/** Inclusive yyyy-MM-dd dates in [periodStart, periodEnd]. */
+export function listIsoDatesInRange(periodStart: string, periodEnd: string): string[] {
+  const start = periodStart.slice(0, 10);
+  const end = periodEnd.slice(0, 10);
+  if (!start || !end || start > end) return [];
+
+  const [ys, ms, ds] = start.split("-").map(Number);
+  const [ye, me, de] = end.split("-").map(Number);
+  const cursor = new Date(Date.UTC(ys, ms - 1, ds));
+  const endMs = Date.UTC(ye, me - 1, de);
+  const dates: string[] = [];
+  while (cursor.getTime() <= endMs) {
+    const y = cursor.getUTCFullYear();
+    const m = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(cursor.getUTCDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${d}`);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+export function isPaidPayrollAttendanceStatus(
+  status: string | null | undefined,
+): boolean {
+  return (
+    status === "present" ||
+    status === "late" ||
+    status === "half_day" ||
+    status === "on_leave" ||
     status === "holiday"
+  );
+}
+
+/** Paid dates after holiday/Sunday overlay (Present, late, half-day, CL/EL, Holiday). */
+export function collectPaidPayrollDates(
+  statusByDate: AttendanceStatusByDate,
+  periodStart: string,
+  periodEnd: string,
+): string[] {
+  return listIsoDatesInRange(periodStart, periodEnd).filter((date) =>
+    isPaidPayrollAttendanceStatus(statusByDate.get(date)),
   );
 }

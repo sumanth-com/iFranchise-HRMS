@@ -49,6 +49,8 @@ export type SalaryStructureSegment = {
   dailyRate: number;
   segmentGross: number;
   structure: SalaryStructureRow;
+  paidDays?: number;
+  payableGross?: number;
 };
 
 export type AttendanceSummary = {
@@ -61,6 +63,8 @@ export type AttendanceSummary = {
   overtimeHours: number;
   lateDays: number;
   sandwichLopDays?: number;
+  /** Paid yyyy-MM-dd dates after holiday overlay; used to split mid-month salary. */
+  paidDates?: string[];
 };
 
 export type LeaveMonthSummary = {
@@ -100,7 +104,7 @@ export type PayrollCalculationInput = {
   /**
    * All salary structures overlapping the payroll month (ordered any way).
    * When more than one covers the applicable period, gross is day-weighted
-   * using EXCEL_PAYROLL_DAY_DENOMINATOR (monthly ÷ 30 per segment).
+   * using calendar days in the payroll month (monthly ÷ days-in-month per segment).
    */
   salaryStructures?: SalaryStructureRow[] | null;
   attendance: AttendanceSummary;
@@ -341,10 +345,14 @@ export function resolvePayrollWorkingDays(
 }
 
 /**
- * Excel / company payroll: daily rate denominator is always 30.
- * Never use calendar working days, weekdays-only, or eligible-day counts.
+ * Excel payroll daily-rate denominator is calendar days in the payroll month
+ * (30 in September, 31 in October). Kept as 30 only as a September-compatible alias.
  */
 export const EXCEL_PAYROLL_DAY_DENOMINATOR = 30;
+
+export function excelPayrollDayDenominator(month: number, year: number): number {
+  return calendarDaysInYearMonth(month, year);
+}
 
 function inclusiveCalendarDays(startDate: string, endDate: string): number {
   if (startDate > endDate) return 0;
@@ -365,16 +373,28 @@ function structureCoversDay(
   return true;
 }
 
+function dayDenominatorForPeriod(periodStart: string, periodEnd: string): number {
+  const end = periodEnd.slice(0, 10);
+  const year = Number(end.slice(0, 4));
+  const month = Number(end.slice(5, 7));
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1) {
+    return EXCEL_PAYROLL_DAY_DENOMINATOR;
+  }
+  return excelPayrollDayDenominator(month, year);
+}
+
 /**
  * Build day-weighted salary segments for an applicable payroll period.
- * Daily rate per segment = monthly gross ÷ 30 (Excel policy).
+ * Daily rate per segment = monthly gross ÷ calendar days in that month.
  */
 export function buildSalaryStructureSegments(
   structures: SalaryStructureRow[],
   periodStart: string,
   periodEnd: string,
+  dayDenominator?: number,
 ): SalaryStructureSegment[] {
   if (periodStart > periodEnd || structures.length === 0) return [];
+  const denominator = dayDenominator ?? dayDenominatorForPeriod(periodStart, periodEnd);
 
   const dated = structures
     .filter((row) => row.effective_from)
@@ -422,10 +442,8 @@ export function buildSalaryStructureSegments(
       num(active.gross_salary) > 0 ? num(active.gross_salary) : fromComponents,
     );
     const calendarDays = inclusiveCalendarDays(startDate, endDate);
-    const dailyRate = roundCurrency(monthly / EXCEL_PAYROLL_DAY_DENOMINATOR);
-    const segmentGross = roundCurrency(
-      (monthly / EXCEL_PAYROLL_DAY_DENOMINATOR) * calendarDays,
-    );
+    const dailyRate = roundCurrency(monthly / denominator);
+    const segmentGross = roundCurrency((monthly / denominator) * calendarDays);
 
     segments.push({
       salaryStructureId: active.id,
@@ -455,6 +473,11 @@ export function buildSalaryStructureSegments(
 }
 
 export function formatSalarySegmentNote(segment: SalaryStructureSegment): string {
+  const paid = segment.paidDays;
+  const payable = segment.payableGross;
+  if (paid != null && payable != null) {
+    return `${segment.startDate}–${segment.endDate}: ${formatCurrency(segment.monthlyGrossSalary)}/mo × ${paid} paid day(s) @ ${formatCurrency(segment.dailyRate)}/day = ${formatCurrency(payable)}`;
+  }
   return `${segment.startDate}–${segment.endDate}: ${formatCurrency(segment.monthlyGrossSalary)}/mo × ${segment.calendarDays} day(s) @ ${formatCurrency(segment.dailyRate)}/day = ${formatCurrency(segment.segmentGross)}`;
 }
 
@@ -467,7 +490,7 @@ export function resolveProfessionalTaxForMonthlySalary(
   return month === 2 ? 300 : 200;
 }
 
-/** Denominator for daily rate — always Salary / 30 (Excel source of truth). */
+/** Denominator for daily rate — Salary / calendar days in the payroll month. */
 function resolveDailyRateWorkingDays(
   month: number,
   year: number,
@@ -494,7 +517,7 @@ function resolveDailyRateWorkingDays(
     return 0;
   }
 
-  return EXCEL_PAYROLL_DAY_DENOMINATOR;
+  return excelPayrollDayDenominator(month, year);
 }
 
 /**
@@ -553,8 +576,8 @@ function prorateEarningsLines(
 }
 
 /**
- * Unpaid days for LOP display and salary deduction (leave LOP + unpaid Absent + half-day / late / sandwich).
- * CL/EL never count as unpaid. Gross is full monthly salary minus these unpaid days.
+ * Display LOP = recorded LOP leave only (src:LOP). Absent, half-day, late, and
+ * sandwich days are not LOP — they simply do not count as paid working days.
  */
 export function resolveLopDays(input: {
   attendance: AttendanceSummary;
@@ -563,27 +586,26 @@ export function resolveLopDays(input: {
   settings?: PayrollCalcSettings;
   lopDaysOverride?: number | null;
 }): number {
+  void input.attendance;
+  void input.paidLeaveDays;
   if (input.lopDaysOverride != null && Number.isFinite(input.lopDaysOverride)) {
     return Math.max(0, roundCurrency(input.lopDaysOverride));
   }
-
-  // Paid leave is intentionally ignored — CL/EL are paid working days.
-  void input.paidLeaveDays;
-  void input.settings?.paidLeaveDeduction;
-
-  const unpaidAbsence =
-    input.attendance.absentDays +
-    (input.settings?.halfDayDeduction === false ? 0 : input.attendance.halfDays * 0.5);
-  const latePenalty = lateEntryPenaltyDays(input.attendance.lateDays ?? 0);
-  const lop =
-    input.leaveLopDays +
-    unpaidAbsence +
-    latePenalty +
-    (input.attendance.sandwichLopDays ?? 0);
   if (input.settings?.lossOfPayDeduction === false) {
     return 0;
   }
-  return Math.max(0, roundCurrency(lop));
+  return Math.max(0, roundCurrency(input.leaveLopDays));
+}
+
+function countPaidDatesInRange(
+  dates: string[] | undefined,
+  startDate: string,
+  endDate: string,
+): number {
+  if (!dates?.length) return 0;
+  const start = startDate.slice(0, 10);
+  const end = endDate.slice(0, 10);
+  return dates.filter((date) => date >= start && date <= end).length;
 }
 
 function emptyAttendanceBreakdown(
@@ -665,7 +687,7 @@ export function calculateEmployeePayroll(
   const displayWorkingDays =
     period.kind === "future" || period.periodStart > period.periodEnd
       ? 0
-      : EXCEL_PAYROLL_DAY_DENOMINATOR;
+      : excelPayrollDayDenominator(month, year);
   const lopDays = resolveLopDays({
     attendance,
     leaveLopDays: leave.lopDays,
@@ -698,6 +720,7 @@ export function calculateEmployeePayroll(
           structurePool,
           period.periodStart,
           period.periodEnd,
+          displayWorkingDays,
         );
   const midMonthBlend = salarySegments.length > 1;
   const salaryStructure =
@@ -791,17 +814,45 @@ export function calculateEmployeePayroll(
   const professionalTax =
     statutory?.professionalTax === false
       ? 0
-      : resolveProfessionalTaxForMonthlySalary(salaryGross, month);
+      : resolveProfessionalTaxForMonthlySalary(
+          midMonthBlend &&
+            salarySegments[0] &&
+            salarySegments[0].monthlyGrossSalary < 25_000
+            ? salarySegments[0].monthlyGrossSalary
+            : salaryGross,
+          month,
+        );
   const structureTds =
     statutory?.incomeTax === false ? 0 : (components.incomeTax ?? 0);
   const structureOtherDeduction = components.other ?? 0;
 
-  // Daily rate is always monthly salary / 30.
-  // Single structure: gross starts from the full monthly salary; only unpaid LOP
-  // days reduce it. Mid-month structure change: day-weighted segments using the
-  // same ÷30 daily rate (e.g. 1–13 @ probation + 14–31 @ full-time).
+  // Daily rate = monthly salary ÷ calendar days in the month (Excel sheet).
+  // Payable gross = daily rate × paid days (Present + Holiday + CL + EL).
+  // Mid-month revision: each salary period uses its own monthly rate × paid days
+  // in that period (e.g. 1–13 @ probation, 14–31 @ full-time).
   const salaryWindowClosed =
     period.kind === "future" || period.periodStart > period.periodEnd;
+  const paidWorkingDays = salaryWindowClosed
+    ? 0
+    : computePresentPaidDays(attendance, leave, period);
+  const hasPaidDates = (attendance.paidDates?.length ?? 0) > 0;
+  let remainingPaidDays = paidWorkingDays;
+  if (midMonthBlend && !salaryWindowClosed) {
+    for (const segment of salarySegments) {
+      const paidInSegment = hasPaidDates
+        ? countPaidDatesInRange(attendance.paidDates, segment.startDate, segment.endDate)
+        : Math.min(segment.calendarDays, Math.max(0, remainingPaidDays));
+      if (!hasPaidDates) {
+        remainingPaidDays = Math.max(0, remainingPaidDays - paidInSegment);
+      }
+      segment.paidDays = paidInSegment;
+      segment.payableGross = roundCurrency(
+        workingDaysForRate > 0
+          ? (segment.monthlyGrossSalary / workingDaysForRate) * paidInSegment
+          : 0,
+      );
+    }
+  }
   const blendedGrossBeforeLop = midMonthBlend
     ? roundCurrency(
         salarySegments.reduce((sum, segment) => sum + segment.segmentGross, 0),
@@ -819,12 +870,24 @@ export function calculateEmployeePayroll(
         ? salaryGross / workingDaysForRate
         : 0;
   const perDay = roundCurrency(rawPerDay);
-  const lopDeduction = salaryWindowClosed ? 0 : roundCurrency(rawPerDay * lopDays);
+  const lopDeduction = salaryWindowClosed
+    ? 0
+    : roundCurrency(rawPerDay * lopDays);
   const payableGross = salaryWindowClosed
     ? 0
-    : roundCurrency(Math.max(0, blendedGrossBeforeLop - rawPerDay * lopDays));
-  // Scale latest-structure earning lines to the payable (blended) gross.
-  const earningsScaleGross = midMonthBlend ? salaryGross : salaryGross;
+    : midMonthBlend
+      ? roundCurrency(
+          salarySegments.reduce((sum, segment) => sum + (segment.payableGross ?? 0), 0),
+        )
+      : roundCurrency(
+          Math.max(
+            0,
+            workingDaysForRate > 0
+              ? (salaryGross / workingDaysForRate) * paidWorkingDays
+              : 0,
+          ),
+        );
+  const earningsScaleGross = salaryGross;
   const prorateFactor =
     earningsScaleGross > 0 ? payableGross / earningsScaleGross : 0;
   const proratedBasic = proratePayrollComponentAmount(basic, prorateFactor);
@@ -848,7 +911,16 @@ export function calculateEmployeePayroll(
   const additionalEarnings = Math.max(0, roundCurrency(adjustments.additionalEarnings ?? 0));
   const additionalDeductions = Math.max(0, roundCurrency(adjustments.additionalDeductions ?? 0));
 
-  const earnings = prorateEarningsLines(buildStandardEarningsLines(split), prorateFactor);
+  let earnings = midMonthBlend
+    ? salarySegments
+        .filter((segment) => (segment.payableGross ?? 0) > 0)
+        .map((segment, index) => ({
+          code: `salary_period_${index + 1}`,
+          label: `Salary (${format(parseISO(segment.startDate), "d MMM")}–${format(parseISO(segment.endDate), "d MMM")} at ${formatCurrency(segment.monthlyGrossSalary)}/mo)`,
+          amount: segment.payableGross ?? 0,
+          type: "earning" as const,
+        }))
+    : prorateEarningsLines(buildStandardEarningsLines(split), prorateFactor);
 
   earnings.push(...extraEarnings);
 
@@ -989,13 +1061,13 @@ export function calculateEmployeePayroll(
         : undefined,
       notes: [
         midMonthBlend
-          ? `Mid-month salary change (daily rate = monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}): ${salarySegments.map(formatSalarySegmentNote).join("; ")}.`
-          : `Daily rate ${formatCurrency(roundCurrency(perDay))} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}). Gross is full monthly salary minus ${lopDays} unpaid day(s).`,
+          ? `Mid-month salary revision (daily rate = monthly ÷ ${displayWorkingDays} calendar days): ${salarySegments.map(formatSalarySegmentNote).join("; ")}.`
+          : `Daily rate ${formatCurrency(roundCurrency(perDay))} (monthly ÷ ${displayWorkingDays} calendar days). Gross = daily rate × ${paidWorkingDays} paid day(s) (Present + Holiday + CL + EL).`,
         midMonthBlend
-          ? `Blended salary before LOP ${formatCurrency(blendedGrossBeforeLop)}; payable after ${lopDays} unpaid day(s) ${formatCurrency(payableGross)}.`
+          ? `Reference salary if every calendar day were paid ${formatCurrency(blendedGrossBeforeLop)}; payable for ${paidWorkingDays} paid day(s) ${formatCurrency(payableGross)}.`
           : null,
         lopDays > 0
-          ? `LOP/Absent excluded from paid days (${formatCurrency(roundCurrency(lopDeduction))} at daily rate for ${lopDays} day(s)).`
+          ? `Recorded LOP ${lopDays} day(s) is unpaid and excluded from paid days (${formatCurrency(roundCurrency(lopDeduction))} at the applicable daily rate). Absent days are also unpaid but are not LOP.`
           : null,
       ].filter(Boolean) as string[],
     },

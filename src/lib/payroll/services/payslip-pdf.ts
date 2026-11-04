@@ -18,6 +18,7 @@ import {
   getPayslipInfoRows,
   getPayslipNotes,
   getPayslipPaymentDetails,
+  getPayslipSalaryRevisionRows,
 } from "@/lib/payroll/services/payslip-document-helpers";
 import {
   loadPayslipEdgeWavePng,
@@ -400,6 +401,56 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   });
 
   y = infoBoxBottom - 20;
+
+  const salaryRevisionRows = getPayslipSalaryRevisionRows(payslip);
+  if (salaryRevisionRows.length > 0) {
+    y = sectionTitle(ctx, "Salary revision this month", y);
+    const revRowH = 18;
+    const revHeaderH = 20;
+    const revBoxH = revHeaderH + salaryRevisionRows.length * revRowH;
+    const revBottom = y + 8 - revBoxH;
+    ctx.page.drawRectangle({
+      x: MARGIN,
+      y: revBottom,
+      width: CONTENT_WIDTH,
+      height: revBoxH,
+      borderColor: BORDER,
+      borderWidth: 1,
+    });
+    ctx.page.drawRectangle({
+      x: MARGIN,
+      y: y + 8 - revHeaderH,
+      width: CONTENT_WIDTH,
+      height: revHeaderH,
+      color: BRAND_BAND,
+    });
+    const revCols = [0, 0.34, 0.58, 0.76].map((part) => MARGIN + CONTENT_WIDTH * part);
+    drawText(ctx, "PERIOD", revCols[0]! + 8, y + 2, { size: 7, bold: true, color: WHITE });
+    drawRight(ctx, "MONTHLY SALARY", revCols[2]! - 8, y + 2, { size: 7, bold: true, color: WHITE });
+    drawRight(ctx, "PAID DAYS", revCols[3]! - 8, y + 2, { size: 7, bold: true, color: WHITE });
+    drawRight(ctx, "AMOUNT (Rs.)", MARGIN + CONTENT_WIDTH - 8, y + 2, {
+      size: 7,
+      bold: true,
+      color: WHITE,
+    });
+    salaryRevisionRows.forEach((row, index) => {
+      const rowTop = y + 8 - revHeaderH - index * revRowH;
+      drawText(ctx, row.period, revCols[0]! + 8, rowTop - 13, { size: 8, color: TEXT });
+      drawRight(ctx, formatAmountIndian(row.monthlySalary), revCols[2]! - 8, rowTop - 13, {
+        size: 8,
+        color: TEXT,
+      });
+      drawRight(ctx, String(row.paidDays), revCols[3]! - 8, rowTop - 13, {
+        size: 8,
+        color: TEXT,
+      });
+      drawRight(ctx, formatAmountIndian(row.amount), MARGIN + CONTENT_WIDTH - 8, rowTop - 13, {
+        size: 8,
+        color: TEXT,
+      });
+    });
+    y = revBottom - 20;
+  }
 
   // ── Earnings and deductions ─────────────────────────────────────────
   y = sectionTitle(ctx, "Earnings and deductions", y);

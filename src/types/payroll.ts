@@ -109,6 +109,8 @@ export type PayrollBreakdown = {
     monthlyGrossSalary: number;
     dailyRate: number;
     segmentGross: number;
+    paidDays?: number;
+    payableGross?: number;
   }>;
   /** Category rollup for the single Reimbursement earning line (display detail only). */
   reimbursementBreakdown?: Array<{ category: string; amount: number }>;
