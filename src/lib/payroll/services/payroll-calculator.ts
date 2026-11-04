@@ -911,7 +911,7 @@ export function calculateEmployeePayroll(
   const additionalEarnings = Math.max(0, roundCurrency(adjustments.additionalEarnings ?? 0));
   const additionalDeductions = Math.max(0, roundCurrency(adjustments.additionalDeductions ?? 0));
 
-  let earnings = midMonthBlend
+  const earnings = midMonthBlend
     ? salarySegments
         .filter((segment) => (segment.payableGross ?? 0) > 0)
         .map((segment, index) => ({
