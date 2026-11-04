@@ -36,6 +36,24 @@ describe("employee payment timeline", () => {
     assert.equal(sent.at, "2026-11-04T11:21:00.000Z");
   });
 
+  it("ticks payroll generated on the 2nd even when the run is still draft", () => {
+    const timeline = buildEmployeePaymentTimeline({
+      payroll: {
+        ...octoberPayroll,
+        payroll_status: "draft",
+        processed_at: null,
+      },
+      emailSentAt: null,
+      publishedAt: "2026-11-04T18:30:00.000Z",
+      salaryCreditDate: "2026-11-02",
+      now: new Date("2026-11-04T12:00:00.000Z"),
+    });
+
+    assert.equal(timeline.stages[1]?.key, "generated");
+    assert.equal(timeline.stages[1]?.done, true);
+    assert.equal(timeline.stages[1]?.at, "2026-11-02");
+  });
+
   it("keeps salary credit in progress until the 2nd ends", () => {
     const timeline = buildEmployeePaymentTimeline({
       payroll: octoberPayroll,

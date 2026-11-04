@@ -91,9 +91,7 @@ export function buildEmployeePaymentTimeline(input: {
 
   const creditedDone =
     status === "paid" || istCalendarDayHasEnded(creditYmd, now);
-  const generatedDone =
-    rank >= TIMELINE_STATUS_ORDER.indexOf("processed") &&
-    istCalendarDayHasStarted(generatedYmd, now);
+  const generatedDone = istCalendarDayHasStarted(generatedYmd, now);
 
   const reviewedAt = input.payroll.approved_at
     ? input.payroll.approved_at

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import {
   Award,
@@ -113,12 +113,18 @@ export function EmployeePayrollView({
   showPolicyLink = true,
   showHeaderActions = true,
   showPageHeading = true,
+  heading = "My Payroll",
+  headingDescription = "View salary, payslips, earnings, deductions and payment history.",
+  extraHeaderActions,
 }: {
   data: EmployeePayrollData;
   policyHref?: string;
   showPolicyLink?: boolean;
   showHeaderActions?: boolean;
   showPageHeading?: boolean;
+  heading?: string;
+  headingDescription?: string;
+  extraHeaderActions?: ReactNode;
 }) {
   const data = useModuleSoftData(serverData, { moduleId: "employee-payroll" });
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
@@ -137,43 +143,11 @@ export function EmployeePayrollView({
     setDrawerOpen(true);
   }
 
-  const header = showPageHeading ? (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My Payroll</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View salary, payslips, earnings, deductions and payment history.
-        </p>
-      </div>
-      {showHeaderActions ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            disabled={!canOpenLatestPayslip}
-            onClick={() => latestPayslip && canOpenLatestPayslip && openPayslip(latestPayslip.id)}
-          >
-            <Download className="size-4" />
-            Latest Payslip
-          </Button>
-          {showPolicyLink ? (
-            <Button
-              variant="outline"
-              className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
-              nativeButton={false}
-              render={<Link href={policyHref} />}
-            >
-              <FileText className="size-4" />
-              Payroll Policy
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  ) : showHeaderActions ? (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+  const headerActions = showHeaderActions ? (
+    <div className="flex shrink-0 items-center gap-2">
       <Button
         variant="outline"
+        size="sm"
         className="gap-1.5"
         disabled={!canOpenLatestPayslip}
         onClick={() => latestPayslip && canOpenLatestPayslip && openPayslip(latestPayslip.id)}
@@ -181,9 +155,11 @@ export function EmployeePayrollView({
         <Download className="size-4" />
         Latest Payslip
       </Button>
+      {extraHeaderActions}
       {showPolicyLink ? (
         <Button
           variant="outline"
+          size="sm"
           className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
           nativeButton={false}
           render={<Link href={policyHref} />}
@@ -193,6 +169,22 @@ export function EmployeePayrollView({
         </Button>
       ) : null}
     </div>
+  ) : extraHeaderActions ? (
+    <div className="flex shrink-0 items-center gap-2">{extraHeaderActions}</div>
+  ) : null;
+
+  const header = showPageHeading ? (
+    <div>
+      <div className="flex flex-nowrap items-center justify-between gap-3">
+        <h1 className="min-w-0 truncate text-2xl font-semibold tracking-tight">{heading}</h1>
+        {headerActions}
+      </div>
+      {headingDescription ? (
+        <p className="mt-1 text-sm text-muted-foreground">{headingDescription}</p>
+      ) : null}
+    </div>
+  ) : headerActions ? (
+    <div className="flex items-center justify-end gap-2">{headerActions}</div>
   ) : null;
 
   const breakdown = data.displaySummary;
