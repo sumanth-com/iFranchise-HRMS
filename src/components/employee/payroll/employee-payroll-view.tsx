@@ -234,42 +234,50 @@ export function EmployeePayrollView({
       {/* KPI cards — always visible; use — when no published figures */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <EmployeeStatCard
-          label="Current Net Salary"
+          label="Monthly Salary"
+          value={
+            data.salaryStructure?.grossSalary
+              ? `${formatCurrency(
+                  data.salaryStructure.grossSalary,
+                  data.currencyCode,
+                  Number.isInteger(data.salaryStructure.grossSalary) ? 0 : 2,
+                )}/month`
+              : "—"
+          }
+          hint="Fixed monthly salary"
+          icon={Banknote}
+          tone="violet"
+          accent="text-violet-600 dark:text-violet-400"
+          iconBg="bg-violet-500/10"
+        />
+        <EmployeeStatCard
+          label="Net Salary"
           value={
             hasPublishedPayroll && data.kpis.currentNetSalary != null
               ? money(data.kpis.currentNetSalary)
               : "—"
           }
-          hint={hasPublishedPayroll ? "Take-home pay" : "Awaiting HR publish"}
+          hint={hasPublishedPayroll ? "Gross − deductions" : "Awaiting HR publish"}
           icon={Wallet}
+          tone="emerald"
           accent="text-emerald-600 dark:text-emerald-400"
           iconBg="bg-emerald-500/10"
-        />
-        <EmployeeStatCard
-          label="Gross Earning"
-          value={
-            hasPublishedPayroll && data.kpis.currentGrossSalary != null
-              ? money(data.kpis.currentGrossSalary)
-              : "—"
-          }
-          hint={hasPublishedPayroll ? "Salary earned this period" : "Awaiting HR publish"}
-          icon={Banknote}
-          accent="text-sky-600 dark:text-sky-400"
-          iconBg="bg-sky-500/10"
         />
         <EmployeeStatCard
           label="Last Payment"
           value={fmtDate(hasPublishedPayroll ? data.kpis.lastPaymentDate : null)}
           hint="2nd of every month"
           icon={CalendarDays}
-          accent="text-violet-600 dark:text-violet-400"
-          iconBg="bg-violet-500/10"
+          tone="sky"
+          accent="text-sky-600 dark:text-sky-400"
+          iconBg="bg-sky-500/10"
         />
         <EmployeeStatCard
           label="Total Deductions"
           value={hasPublishedPayroll ? money(totalDeductions) : "—"}
-          hint="From latest published payslip"
+          hint="PF, PT, TDS, LOP"
           icon={ReceiptText}
+          tone="amber"
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
         />
@@ -312,17 +320,15 @@ export function EmployeePayrollView({
                 money={money}
               />
 
-              <div className="mt-auto rounded-xl border bg-white px-4 py-3 dark:bg-input">
-                <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums">
-                  <span className="uppercase tracking-wide text-muted-foreground">
-                    Gross Earning
-                  </span>
+              <div className="mt-auto rounded-xl border border-border bg-card px-4 py-3">
+                <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums text-foreground">
+                  <span>Gross Earning</span>
                   <span>{money(gross)}</span>
-                  <span className="font-semibold text-muted-foreground">−</span>
-                  <span className="uppercase tracking-wide text-muted-foreground">Deductions</span>
+                  <span aria-hidden>−</span>
+                  <span>Deductions</span>
                   <span>{money(totalDeductions)}</span>
-                  <span className="font-semibold text-muted-foreground">=</span>
-                  <span className="uppercase tracking-wide text-muted-foreground">Net salary</span>
+                  <span aria-hidden>=</span>
+                  <span>Net Salary</span>
                   <span className="text-emerald-600 dark:text-emerald-400">{money(net)}</span>
                 </div>
               </div>
