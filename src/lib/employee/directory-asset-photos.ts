@@ -6,6 +6,7 @@ import dikshaChoudhary from "@/assets/Dikhsha Choudhary.png";
 import ektaPattanaik from "@/assets/Ekta.jpeg";
 import himaniBhargava from "@/assets/Himani.jpeg";
 import lohitKumar from "@/assets/Lohit.PNG";
+import namanThapiyal from "@/assets/Naman.jpeg";
 import omRamtekkar from "@/assets/Om.jpeg";
 import prajwalPhoto from "@/assets/Prajwal Photo.jpeg";
 import samitAli from "@/assets/Samit Ali.jpg";
@@ -29,6 +30,9 @@ const DIRECTORY_ASSET_PHOTOS: Record<string, StaticImageData> = {
   "himani tapadiya": himaniBhargava,
   himani: himaniBhargava,
   "lohit kumar": lohitKumar,
+  naman: namanThapiyal,
+  "naman thapiyal": namanThapiyal,
+  "naman thapliyal": namanThapiyal,
   om: omRamtekkar,
   "om anil ramtekkar": omRamtekkar,
   "om ramtekkar": omRamtekkar,
@@ -66,6 +70,8 @@ const DIRECTORY_ASSET_PHOTOS_BY_LAST_NAME: Record<string, StaticImageData> = {
   choudhary: dikshaChoudhary,
   pattanaik: ektaPattanaik,
   tapadiya: himaniBhargava,
+  thapiyal: namanThapiyal,
+  thapliyal: namanThapiyal,
   ramtekkar: omRamtekkar,
   negi: prajwalPhoto,
   mahajan: snehaMahajan,
@@ -78,6 +84,7 @@ const DIRECTORY_ASSET_PHOTOS_BY_CODE: Record<string, StaticImageData> = {
   IF2026009: sumanthReddy,
   "IF-PENDING-SA": sumanthReddy,
   IF2026010: swethaChintada,
+  IF2026023: namanThapiyal,
   IF2026024: lohitKumar,
 };
 
