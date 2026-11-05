@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import {
   activeEmploymentStatusFilter,
   isActiveEmploymentStatus,
@@ -5363,7 +5364,14 @@ export async function getPayslipById(
       lastName: employee.last_name,
       email: employee.email,
       departmentName: department?.name ?? null,
-      designationTitle: designation?.title ?? null,
+      designationTitle: formatDesignationDisplay(designation?.title ?? null, {
+        person: {
+          employeeCode: employee.employee_code,
+          firstName: employee.first_name,
+          lastName: employee.last_name,
+        },
+        fallback: "",
+      }) || null,
       employmentType: employmentType?.name ?? null,
       branchName: branch?.name ?? null,
       dateOfJoining: employee.date_of_joining,

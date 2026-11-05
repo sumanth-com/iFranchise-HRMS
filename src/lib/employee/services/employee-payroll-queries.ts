@@ -6,6 +6,7 @@ import {
   paymentStatusLabel,
 } from "@/lib/payroll/services/payslip-history-queries";
 import { buildEmployeePaymentTimeline } from "@/lib/employee/services/employee-payment-timeline";
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import {
   PAYSLIP_PUBLISH_DAY,
   canAccessPayslipDuringReview,
@@ -231,33 +232,34 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
   // org-wide sequential getPayslipById/PDF/email work on navigation paint.
   void options?.appOrigin;
 
-  const employeeMeta =
-    employeeId === profile.employee.id
-      ? {
-          employeeCode: profile.employee.employeeCode,
-          firstName: profile.employee.firstName,
-          lastName: profile.employee.lastName,
-        }
-      : await safe(async () => {
+  const employeeMeta = await safe(async () => {
           const { data, error } = await supabase
             .schema("hrms")
             .from("employees")
-            .select("employee_code, first_name, last_name")
+            .select("employee_code, first_name, last_name, designations:designation_id (title)")
             .eq("id", employeeId)
             .eq("organization_id", organizationId)
             .is("deleted_at", null)
             .maybeSingle();
           if (error) throw new Error(error.message);
           if (!data) throw new Error("Employee not found");
+          const designation = Array.isArray(data.designations)
+            ? data.designations[0]
+            : data.designations;
           return {
             employeeCode: data.employee_code as string,
             firstName: data.first_name as string,
             lastName: data.last_name as string,
+            designationTitle:
+              designation && typeof designation === "object" && "title" in designation
+                ? String((designation as { title?: string | null }).title ?? "") || null
+                : null,
           };
         }, {
           employeeCode: profile.employee.employeeCode,
           firstName: profile.employee.firstName,
           lastName: profile.employee.lastName,
+          designationTitle: null as string | null,
         });
 
   const viewingOwnPayroll = employeeId === profile.employee.id;
@@ -674,7 +676,14 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
         lastName: employeeMeta.lastName,
         email: profile.employee.email ?? "",
         departmentName: null,
-        designationTitle: null,
+        designationTitle: formatDesignationDisplay(employeeMeta.designationTitle, {
+          person: {
+            employeeCode: employeeMeta.employeeCode,
+            firstName: employeeMeta.firstName,
+            lastName: employeeMeta.lastName,
+          },
+          fallback: "",
+        }) || null,
         employmentType: null,
         branchName: null,
         dateOfJoining: null,

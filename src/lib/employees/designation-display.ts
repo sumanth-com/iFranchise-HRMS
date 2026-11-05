@@ -11,6 +11,8 @@ const DESIGNATION_BY_CODE: Record<string, string> = {
   WEB_DEVELOPMENT_INTERN: "Web Development Intern",
   UI_UX_INTERN: "UI/UX Intern",
   SQA_INTERN: "Software Quality Assurance Intern",
+  SDE: "Software Development Engineer (SDE)",
+  SOFTWARE_DEVELOPMENT_ENGINEER: "Software Development Engineer (SDE)",
 };
 
 const DESIGNATION_BY_TITLE: Record<string, string> = {
@@ -24,19 +26,20 @@ const DESIGNATION_BY_TITLE: Record<string, string> = {
   "software quality assurance intern": "Software Quality Assurance Intern",
   "sqa intern": "Software Quality Assurance Intern",
   intern: "Intern",
+  sde: "Software Development Engineer (SDE)",
+  "software development engineer": "Software Development Engineer (SDE)",
+  "software development engineer (sde)": "Software Development Engineer (SDE)",
 };
 
 const DESIGNATION_BY_EMPLOYEE_CODE: Record<string, string> = {
   IF2026000: "Super Admin",
-  IF2026009: "Web Development Intern",
-  "IF-PENDING-SA": "Web Development Intern",
 };
 
 function personFullName(person?: DesignationDisplayPerson): string {
   return `${person?.firstName ?? ""} ${person?.lastName ?? ""}`.trim().toLowerCase();
 }
 
-function designationForPerson(person?: DesignationDisplayPerson): string | null {
+function designationFallbackForPerson(person?: DesignationDisplayPerson): string | null {
   const code = normalizeEmployeeCode(person?.employeeCode);
   if (code && DESIGNATION_BY_EMPLOYEE_CODE[code]) {
     return DESIGNATION_BY_EMPLOYEE_CODE[code];
@@ -53,27 +56,29 @@ function designationForPerson(person?: DesignationDisplayPerson): string | null 
     return "Super Admin";
   }
 
-  if (fullName.includes("gangaram") && fullName.includes("reddy")) {
-    return "Web Development Intern";
-  }
-  if (fullName.includes("sumanth") && fullName.includes("reddy")) {
-    return "Web Development Intern";
-  }
-  if (fullName.includes("samit") && fullName.includes("ali")) {
-    return "UI/UX Intern";
-  }
-  if (
-    fullName.includes("hema") ||
-    fullName.includes("hemavathi") ||
-    (person?.lastName ?? "").toLowerCase().includes("hemavathi")
-  ) {
-    return "Software Quality Assurance Intern";
-  }
-
   return null;
 }
 
-/** Full designation label for ID cards, profile headers, and directory rows. */
+function polishDesignationTitle(title: string, code?: string | null): string {
+  const designationCode = (code ?? "").trim().toUpperCase();
+  if (designationCode && DESIGNATION_BY_CODE[designationCode]) {
+    return DESIGNATION_BY_CODE[designationCode];
+  }
+
+  const mapped = DESIGNATION_BY_TITLE[title.toLowerCase()];
+  if (mapped) return mapped;
+
+  if (title.toUpperCase() === "CEO") {
+    return "Chief Executive Officer";
+  }
+
+  return title;
+}
+
+/**
+ * Full designation label for cards, profile headers, directory, and payslips.
+ * Live employee.designation title always wins so HR/Admin/CEO edits show everywhere.
+ */
 export function formatDesignationDisplay(
   title: string | null | undefined,
   options?: {
@@ -82,7 +87,12 @@ export function formatDesignationDisplay(
     fallback?: string;
   },
 ): string {
-  const personMapped = designationForPerson(options?.person);
+  const trimmed = (title ?? "").trim();
+  if (trimmed) {
+    return polishDesignationTitle(trimmed, options?.code);
+  }
+
+  const personMapped = designationFallbackForPerson(options?.person);
   if (personMapped) return personMapped;
 
   const designationCode = (options?.code ?? "").trim().toUpperCase();
@@ -90,19 +100,7 @@ export function formatDesignationDisplay(
     return DESIGNATION_BY_CODE[designationCode];
   }
 
-  const trimmed = (title ?? "").trim();
-  if (!trimmed) {
-    return options?.fallback ?? "Team Member";
-  }
-
-  const mapped = DESIGNATION_BY_TITLE[trimmed.toLowerCase()];
-  if (mapped) return mapped;
-
-  if (trimmed.toUpperCase() === "CEO") {
-    return "Chief Executive Officer";
-  }
-
-  return trimmed;
+  return options?.fallback ?? "Team Member";
 }
 
 export function normalizeEmployeeCode(code: string | null | undefined): string {

@@ -1,5 +1,6 @@
 import { format, lastDayOfMonth, parseISO } from "date-fns";
 
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import {
   displaySalaryBankDetails,
   formatReadableAccountNumber,
@@ -190,7 +191,16 @@ export function getPayslipInfoRows(payslip: PayslipDetail): PayslipInfoCell[][] 
       { label: "Employee ID", value: fmtPayslipValue(payslip.employee.employeeCode) },
       {
         label: "Designation",
-        value: fmtPayslipValue(payslip.employee.designationTitle),
+        value: fmtPayslipValue(
+          formatDesignationDisplay(payslip.employee.designationTitle, {
+            person: {
+              employeeCode: payslip.employee.employeeCode,
+              firstName: payslip.employee.firstName,
+              lastName: payslip.employee.lastName,
+            },
+            fallback: "",
+          }),
+        ),
       },
     ],
     [
