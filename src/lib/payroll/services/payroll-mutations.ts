@@ -623,7 +623,10 @@ async function getAttendanceSummary(
   employeeId: string,
   month: number,
   year: number,
-  options?: { asOfDate?: Date },
+  options?: {
+    asOfDate?: Date;
+    employee?: { organization_id: string | null; date_of_joining: string | null };
+  },
 ): Promise<{ attendance: AttendanceSummary; leaveSummary: LeaveMonthSummary }> {
   const monthRange = getMonthDateRange(month, year);
   const applicable = resolvePayrollApplicablePeriod(month, year, { today: options?.asOfDate });
@@ -675,12 +678,12 @@ async function getAttendanceSummary(
   }
 
   if (!organizationId || joiningDate == null) {
-    const { data: employee } = await supabase
+    const employee = options?.employee ?? (await supabase
       .schema("hrms")
       .from("employees")
       .select("organization_id, date_of_joining")
       .eq("id", employeeId)
-      .maybeSingle();
+      .maybeSingle()).data;
     if (!organizationId) {
       organizationId = employee?.organization_id ? String(employee.organization_id) : null;
     }
@@ -3823,7 +3826,7 @@ export async function refreshDraftPayrollItemsForEmployee(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, employee_code, first_name, last_name, email, date_of_joining, employment_status, app_hidden_at, deleted_at, designations:designation_id (title)",
+      "id, organization_id, employee_code, first_name, last_name, email, date_of_joining, employment_status, app_hidden_at, deleted_at, designations:designation_id (title)",
     )
     .eq("id", employeeId)
     .maybeSingle();
@@ -3845,7 +3848,9 @@ export async function refreshDraftPayrollItemsForEmployee(
   if (error) throw new Error(error.message);
   if (!draftPayrolls?.length) return;
 
-  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const payrollSettings = await getPayrollSettings(supabase, organizationId, {
+    includeDisplayMetadata: false,
+  });
   const calcSettings = calcSettingsFromPayroll(payrollSettings);
   const asOfDate = new Date();
 
@@ -3883,29 +3888,34 @@ export async function refreshDraftPayrollItemsForEmployee(
       continue;
     }
 
-    const calendar = await loadPayrollCalendarContext(
-      supabase,
-      organizationId,
-      month,
-      year,
-      asOfDate,
-    );
-
-    const [salaryStructures, attendanceFacts, bonuses, reimbursements] =
-      await Promise.all([
+    // Only independent reads overlap. Preserve calendar-first error precedence and
+    // finish all reads before calculating or writing any payroll item/header.
+    const [calendarResult, factsResult] = await Promise.allSettled([
+      loadPayrollCalendarContext(supabase, organizationId, month, year, asOfDate),
+      Promise.all([
         getSalaryStructuresForMonth(supabase, employeeId, month, year),
-        getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
+        getAttendanceSummary(supabase, employeeId, month, year, {
+          asOfDate,
+          employee: targetEmployee ?? undefined,
+        }),
         getPayableBonuses(supabase, employeeId, [getPayrollMonthDate(month, year)], {
           includeAttached: true,
         }),
         getPayableReimbursements(supabase, employeeId, [getMonthDateRange(month, year)], {
           includeAttached: true,
         }),
-      ]);
+      ]),
+    ]);
+    if (calendarResult.status === "rejected") throw calendarResult.reason;
+    if (factsResult.status === "rejected") throw factsResult.reason;
+    const calendar = calendarResult.value;
+    const [salaryStructures, attendanceFacts, bonuses, reimbursements] = factsResult.value;
     const { attendance, leaveSummary } = attendanceFacts;
     const salaryStructure =
       salaryStructures.length > 0 ? salaryStructures[salaryStructures.length - 1]! : null;
 
+    // Keep this guard immediately before calculation: another request may have
+    // sent/locked the item while its payroll inputs were loading.
     const { data: existingItem } = await supabase
       .schema("hrms")
       .from("payroll_items")

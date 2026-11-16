@@ -26,10 +26,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NotificationPriorityBadge } from "@/components/notifications/notification-status-badge";
 import {
-  getNotificationBellDataAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
+import { createNotificationBellReader } from "@/lib/notifications/bell-client";
 import {
   runServerActionSafely,
 } from "@/lib/errors/stale-server-action";
@@ -70,9 +70,12 @@ export function NotificationBell() {
   const [isPending, startTransition] = useTransition();
   const knownIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
+  const [bellReader] = useState(() => createNotificationBellReader());
+
+  useEffect(() => () => bellReader.invalidate(), [bellReader]);
 
   const refresh = useCallback(async () => {
-    const res = await runServerActionSafely(() => getNotificationBellDataAction());
+    const res = await runServerActionSafely(() => bellReader.read());
     if (!res?.success) return;
 
     const next = res.data;
@@ -89,7 +92,16 @@ export function NotificationBell() {
     }
     initializedRef.current = true;
     setData(next);
-  }, []);
+  }, [bellReader]);
+
+  const removeFromBell = useCallback((itemId: string) => {
+    bellReader.invalidate();
+    setData((prev) => ({
+      ...prev,
+      unreadCount: Math.max(0, prev.unreadCount - 1),
+      items: prev.items.filter((item) => item.id !== itemId),
+    }));
+  }, [bellReader]);
 
   useEffect(() => {
     attachNotificationSoundUnlock();
@@ -114,15 +126,7 @@ export function NotificationBell() {
 
     window.addEventListener(NOTIFICATIONS_READ_EVENT, onNotificationRead);
     return () => window.removeEventListener(NOTIFICATIONS_READ_EVENT, onNotificationRead);
-  }, [refresh]);
-
-  function removeFromBell(itemId: string) {
-    setData((prev) => ({
-      ...prev,
-      unreadCount: Math.max(0, prev.unreadCount - 1),
-      items: prev.items.filter((item) => item.id !== itemId),
-    }));
-  }
+  }, [refresh, removeFromBell]);
 
   function openNotification(item: NotificationBellItem) {
     setOpen(false);
@@ -174,6 +178,7 @@ export function NotificationBell() {
               className="h-auto px-2 py-1 text-xs"
               disabled={isPending}
               onClick={() => {
+                bellReader.invalidate();
                 setData((prev) => ({
                   ...prev,
                   unreadCount: 0,

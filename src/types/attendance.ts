@@ -33,6 +33,8 @@ export type AttendanceListItem = {
   attendanceStatus: AttendanceDisplayStatus;
   /** Raw notes (`src:CL|…`) for sheet-aligned status display. */
   notes: string | null;
+  /** Festival / public-holiday name when the day is an official off. */
+  holidayName?: string | null;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;
   hasCheckInLocation: boolean;

@@ -275,19 +275,11 @@ export async function getNotificationBellData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<NotificationBellData> {
-  const [{ count: unreadCount }, { data }, preferences] = await Promise.all([
+  const [{ data, count }, preferences] = await Promise.all([
     supabase
       .schema("hrms")
       .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", profile.employee.organizationId)
-      .eq("user_id", profile.userId)
-      .eq("notification_status", "unread")
-      .is("deleted_at", null),
-    supabase
-      .schema("hrms")
-      .from("notifications")
-      .select("id, title, message, module, priority, notification_status, action_url, created_at")
+      .select("id, title, message, module, priority, notification_status, action_url, created_at", { count: "exact" })
       .eq("organization_id", profile.employee.organizationId)
       .eq("user_id", profile.userId)
       .eq("notification_status", "unread")
@@ -296,6 +288,17 @@ export async function getNotificationBellData(
       .limit(8),
     getNotificationUserPreferences(supabase, profile),
   ]);
+
+  // PostgREST returns the full filtered count even with the eight-row limit.
+  // Retain the independent count fallback if the list/count request fails.
+  const unreadCount = count ?? (await supabase
+    .schema("hrms")
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("user_id", profile.userId)
+    .eq("notification_status", "unread")
+    .is("deleted_at", null)).count;
 
   const items: NotificationBellItem[] = (data ?? []).map((row) => ({
     id: row.id,

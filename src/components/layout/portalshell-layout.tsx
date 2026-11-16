@@ -1,5 +1,6 @@
 import { type ReactNode, Suspense } from "react";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
@@ -7,7 +8,8 @@ import { ShellProfileAvatar } from "@/components/layout/shell-profile-avatar";
 import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
 import { TabletAccessDenied } from "@/components/layout/tablet-access-denied";
-import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { AUTH_ROUTES, IDLE_ACTIVITY_COOKIE } from "@/lib/auth/constants";
+import { idleActivityCooldownMs, parseActivityTimestamp } from "@/lib/auth/idle-session";
 import { isPendingInviteSetupEmployee } from "@/lib/auth/invite-setup";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
 import { PORTAL_PERMISSIONS, type PortalKey } from "@/lib/auth/portals";
@@ -110,10 +112,15 @@ async function ResolvedPortalShell({
   const tabletAllowed =
     portalVariant !== "employee" ||
     isTabletHrmsAllowed(profileResult.profile, tabletClient);
+  const cookieStore = await cookies();
+  const initialActivityCooldownMs = idleActivityCooldownMs(
+    parseActivityTimestamp(cookieStore.get(IDLE_ACTIVITY_COOKIE)?.value),
+  );
 
   return (
     <AuthProvider
       initialProfile={profileResult.profile}
+      initialActivityCooldownMs={initialActivityCooldownMs}
       portalVariant={portalVariant}
       portalLabel={portalLabel}
     >

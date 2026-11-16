@@ -95,19 +95,21 @@ const PORTAL_CONFIG: Record<
 type AuthProviderProps = {
   children: ReactNode;
   initialProfile: UserProfile;
+  initialActivityCooldownMs?: number;
   portalVariant?: PortalVariant;
   portalHome?: string;
   portalLabel?: string;
 };
 
-function IdleSessionManager() {
-  useIdleSession();
+function IdleSessionManager({ initialCooldownMs }: { initialCooldownMs: number }) {
+  useIdleSession(initialCooldownMs);
   return null;
 }
 
 export function AuthProvider({
   children,
   initialProfile,
+  initialActivityCooldownMs = 0,
   portalVariant = "hr",
   portalHome,
   portalLabel,
@@ -326,7 +328,7 @@ export function AuthProvider({
 
   return (
     <AuthContext.Provider value={value}>
-      <IdleSessionManager />
+      <IdleSessionManager initialCooldownMs={initialActivityCooldownMs} />
       <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
     </AuthContext.Provider>
   );

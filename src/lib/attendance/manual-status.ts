@@ -4,7 +4,10 @@
  * Maps onto existing hrms.attendance_status + `src:` note markers — no new DB enum.
  */
 import { leaveTypeCodeFromAttendanceNotes } from "@/lib/leave/services/leave-attendance-usage";
-import { isEarlyLogoutFullAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
+import {
+  attendanceOffDayDisplayLabel,
+  isEarlyLogoutFullAttendanceNotes,
+} from "@/lib/attendance/services/attendance-utils";
 
 export const ATTENDANCE_UI_DISPLAY_STATUSES = [
   "present",
@@ -106,6 +109,7 @@ export function resolveAttendanceUiDisplay(
   status: string | null | undefined,
   notes?: string | null,
   leaveTypeHint?: string | null,
+  options?: { attendanceDate?: string | null; holidayName?: string | null },
 ): { key: AttendanceUiDisplayStatus; label: string } {
   const normalized = String(status ?? "");
 
@@ -114,6 +118,16 @@ export function resolveAttendanceUiDisplay(
     normalized === "week_off" ||
     isHolidayAttendanceNotes(notes)
   ) {
+    const offLabel = attendanceOffDayDisplayLabel(
+      options?.attendanceDate,
+      options?.holidayName,
+    );
+    if (offLabel) {
+      return { key: "holiday", label: offLabel };
+    }
+    if (normalized === "week_off") {
+      return { key: "holiday", label: "Sunday" };
+    }
     return { key: "holiday", label: ATTENDANCE_UI_DISPLAY_LABELS.holiday };
   }
 

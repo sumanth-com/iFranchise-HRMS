@@ -1,6 +1,10 @@
 import { differenceInMinutes, parseISO } from "date-fns";
 
 import { workHoursFromCheckInOut } from "@/lib/employee/attendance-format";
+import {
+  isHalfDayCalendarDate,
+  isWeeklyHolidayDate,
+} from "@/lib/leave/services/leave-calendar-engine";
 
 export const OFFICE_TIMEZONE = "Asia/Kolkata";
 export const OFFICE_CHECK_IN_TIME = "10:00";
@@ -9,7 +13,7 @@ export const OFFICE_LATE_AFTER_TIME = "10:05";
 /** Check-in closes automatically at this office time (legacy; self-service punch no longer locks). */
 export const OFFICE_CHECK_IN_LOCK_TIME = "10:07";
 export const OFFICE_CHECK_OUT_TIME = "19:00";
-/** First half ends at 2:00 p.m. Checkout after this and before 7:00 p.m. is a half day. */
+/** First half ends at 2:00 p.m. On weekdays, checkout after this and before 7:00 p.m. is a half day. */
 export const OFFICE_FIRST_HALF_END_TIME = "14:00";
 
 export const LATE_ENTRY_NOTE_TAG = "late-entry";
@@ -22,21 +26,85 @@ export function getTodayDateString(timeZone = OFFICE_TIMEZONE) {
   return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
 }
 
-/**
- * Returns true if current time in IST is at or after office checkout time (19:00 / 7:00 PM).
- * Before 7:00 PM on the present day, employees with no punch record are considered pending/unrecorded ("—"),
- * not marked absent until the workday closes at 7:00 PM.
- */
-export function isAfterOfficeCheckoutTime(now = new Date(), timeZone = OFFICE_TIMEZONE): boolean {
-  const formatter = new Intl.DateTimeFormat("en-US", {
+function formatIstDateParts(now: Date, timeZone = OFFICE_TIMEZONE) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
-    hour: "numeric",
-    minute: "numeric",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
   });
   const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-  return hour >= 19;
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "0";
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    hour: parseInt(value("hour"), 10),
+    minute: parseInt(value("minute"), 10),
+  };
+}
+
+/**
+ * 2nd and 4th Saturdays close at 14:00 IST; other working days close at 19:00.
+ * Checkout at or after that time is a completed full day (not a half day).
+ */
+export function punchOfficeHoursForDate(attendanceDate: string): {
+  officeEnd: string;
+  firstHalfEnd: string;
+} {
+  const date = attendanceDate.slice(0, 10);
+  if (isHalfDayCalendarDate(date)) {
+    return {
+      officeEnd: OFFICE_FIRST_HALF_END_TIME,
+      firstHalfEnd: OFFICE_FIRST_HALF_END_TIME,
+    };
+  }
+  return {
+    officeEnd: OFFICE_CHECK_OUT_TIME,
+    firstHalfEnd: OFFICE_FIRST_HALF_END_TIME,
+  };
+}
+
+/**
+ * Sundays are weekly off. Unpunched Sundays should show as Sunday, not a blank dash.
+ */
+export function weeklyOffStatusForUnpunchedDate(
+  attendanceDate: string,
+): "week_off" | null {
+  return isWeeklyHolidayDate(attendanceDate.slice(0, 10)) ? "week_off" : null;
+}
+
+export function weekdayLongNameForDate(attendanceDate: string): string | null {
+  const date = attendanceDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: OFFICE_TIMEZONE,
+  }).format(new Date(`${date}T12:00:00+05:30`));
+}
+
+/** Festival name when given; otherwise Sunday/Saturday for a weekly off. */
+export function attendanceOffDayDisplayLabel(
+  attendanceDate?: string | null,
+  holidayName?: string | null,
+): string | null {
+  const named = String(holidayName ?? "").trim();
+  if (named) return named;
+  if (!attendanceDate) return null;
+  if (!isWeeklyHolidayDate(attendanceDate.slice(0, 10))) return null;
+  return weekdayLongNameForDate(attendanceDate);
+}
+
+/**
+ * Returns true if current time in IST is at or after that day's office checkout time.
+ * Weekdays: 19:00. 2nd/4th Saturdays: 14:00. Before close, unpunched employees stay pending.
+ */
+export function isAfterOfficeCheckoutTime(now = new Date(), timeZone = OFFICE_TIMEZONE): boolean {
+  const { date, hour, minute } = formatIstDateParts(now, timeZone);
+  const endMinutes = parseHmToMinutes(punchOfficeHoursForDate(date).officeEnd) ?? 19 * 60;
+  return hour * 60 + minute >= endMinutes;
 }
 
 export type AttendanceRules = {
@@ -273,12 +341,14 @@ export function mergeAttendancePolicyNotes(
 
 /**
  * Single source of truth for punch-derived attendance status + policy tags.
- * Priority when checkout exists:
+ * Weekdays when checkout exists:
  * 1) checkout before 14:00 → Absent (morning / incomplete first half)
  * 2) checkout from 14:00 and before 19:00 → half day
  * 3) checkout >= 19:00 + check-in ≤ 10:05 → Present
  * 4) checkout >= 19:00 + check-in > 10:05 → Late
- * Morning absence does not count toward the 3-late penalty.
+ * 2nd and 4th Saturdays close at 14:00: checkout at/after 14:00 is a full day
+ * (Present or Late). Checkout before 14:00 is still Absent. Morning absence
+ * does not count toward the 3-late penalty.
  */
 export function resolvePunchAttendanceResult(
   checkInAt: string | null,
@@ -297,10 +367,11 @@ export function resolvePunchAttendanceResult(
   const today = options?.today ?? getTodayDateString();
   const finalizeHours =
     options?.finalizeHours ?? (Boolean(checkOutAt) || attendanceDate < today);
+  const saturdayHours = punchOfficeHoursForDate(attendanceDate);
   const earlyLogout = finalizeHours
     ? resolveEarlyLogoutKind(checkOutAt, {
-        officeEnd: options?.officeEnd,
-        firstHalfEnd: options?.firstHalfEnd,
+        officeEnd: options?.officeEnd ?? saturdayHours.officeEnd,
+        firstHalfEnd: options?.firstHalfEnd ?? saturdayHours.firstHalfEnd,
       })
     : "none";
 
@@ -415,12 +486,16 @@ export function validateAttendanceStatusConsistency(input: {
   const lateMinutes = checkInAt
     ? computeLateMinutes(checkInAt, input.attendanceDate, rules.lateAfter)
     : 0;
+  const saturdayHours = punchOfficeHoursForDate(input.attendanceDate);
+  const expectedFullDayHours = isHalfDayCalendarDate(input.attendanceDate.slice(0, 10))
+    ? rules.halfDayMinimumHours
+    : rules.fullDayMinimumHours;
 
   if (attendanceStatus === "absent") {
     // Early checkout (before office end) is stored as Absent/incomplete while
     // punches and working hours remain on the record for later correction.
     if (checkOutAt) {
-      const earlyLogout = resolveEarlyLogoutKind(checkOutAt);
+      const earlyLogout = resolveEarlyLogoutKind(checkOutAt, saturdayHours);
       if (earlyLogout !== "none") {
         return null;
       }
@@ -459,8 +534,8 @@ export function validateAttendanceStatusConsistency(input: {
     if (!hasPunch) {
       return "Present status requires check-in and check-out times.";
     }
-    if (workHours < rules.fullDayMinimumHours) {
-      return `Present status requires at least ${rules.fullDayMinimumHours} working hours based on organization rules.`;
+    if (workHours < expectedFullDayHours) {
+      return `Present status requires at least ${expectedFullDayHours} working hours based on organization rules.`;
     }
     if (lateMinutes > 0) {
       return "Use Late status when check-in is after the allowed time.";
@@ -472,7 +547,7 @@ export function validateAttendanceStatusConsistency(input: {
     if (!hasPunch) {
       return "Half day status requires check-in and check-out times.";
     }
-    if (workHours >= rules.fullDayMinimumHours) {
+    if (workHours >= expectedFullDayHours) {
       return "Half day status cannot be used when working hours meet full-day requirements.";
     }
     if (workHours > 0 && workHours < rules.halfDayMinimumHours) {

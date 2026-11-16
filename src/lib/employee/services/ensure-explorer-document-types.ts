@@ -15,7 +15,7 @@ export async function ensureExplorerDocumentTypes(
   organizationId: string,
 ): Promise<void> {
   const { data: existing, error } = await fromHrms(supabase, "document_types")
-    .select("code")
+    .select("code, name, description")
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
 
@@ -28,10 +28,15 @@ export async function ensureExplorerDocumentTypes(
     (existing ?? []).map((row: { code?: string | null }) => String(row.code ?? "").toUpperCase()),
   );
 
+  // Keep metadata current without treating a page read as a metadata edit.
+  const changedNames = EXPLORER_DOCUMENT_TYPE_SEED.filter((seed) =>
+    (existing ?? []).some((row: { code?: string | null; name?: string | null; description?: string | null }) => row.code === seed.code &&
+      (row.name !== seed.name || row.description !== seed.description)),
+  );
   const missing = EXPLORER_DOCUMENT_TYPE_SEED.filter((seed) => !have.has(seed.code));
   if (missing.length === 0) {
     // Still refresh display names for certification slots when present.
-    await refreshExplorerTypeNames(supabase, organizationId);
+    await refreshExplorerTypeNames(supabase, organizationId, changedNames);
     return;
   }
 
@@ -55,14 +60,15 @@ export async function ensureExplorerDocumentTypes(
     console.error("[documents] failed to seed explorer document types", insertError.message);
   }
 
-  await refreshExplorerTypeNames(writer, organizationId);
+  await refreshExplorerTypeNames(writer, organizationId, changedNames);
 }
 
 async function refreshExplorerTypeNames(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  seeds: typeof EXPLORER_DOCUMENT_TYPE_SEED,
 ) {
-  for (const seed of EXPLORER_DOCUMENT_TYPE_SEED) {
+  for (const seed of seeds) {
     await fromHrms(supabase, "document_types")
       .update({
         name: seed.name,

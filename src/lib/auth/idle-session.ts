@@ -62,4 +62,11 @@ export function shouldRewriteIdleActivityCookie(
   return now - lastActivityMs >= IDLE_ACTIVITY_COOKIE_REFRESH_MS;
 }
 
+/** Remaining no-op window, calculated by the server from its existing cookie. */
+export function idleActivityCooldownMs(lastActivityMs: number | null, now = Date.now()): number {
+  if (lastActivityMs == null || !Number.isFinite(lastActivityMs) || lastActivityMs <= 0) return 0;
+  return Math.max(0, Math.min(IDLE_ACTIVITY_COOKIE_REFRESH_MS,
+    lastActivityMs + IDLE_ACTIVITY_COOKIE_REFRESH_MS - now));
+}
+
 export { IDLE_ACTIVITY_COOKIE, IDLE_SESSION_TIMEOUT_MS, IDLE_ACTIVITY_COOKIE_REFRESH_MS };

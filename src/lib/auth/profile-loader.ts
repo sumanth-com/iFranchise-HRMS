@@ -1,3 +1,4 @@
+import { getEmployeeProfileImageRow } from "@/lib/employee/profile-image-query";
 import { cache } from "react";
 import type {
   Employee,
@@ -250,13 +251,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
       .eq("user_id", userId)
       .is("deleted_at", null)
       .eq("status", "active"),
-    supabase
-      .schema("hrms")
-      .from("employee_profiles")
-      .select("profile_image_storage_path")
-      .eq("employee_id", employeeRow.id)
-      .is("deleted_at", null)
-      .maybeSingle(),
+    getEmployeeProfileImageRow(supabase, employeeRow.id),
   ]);
   mark("organization+user_roles");
 

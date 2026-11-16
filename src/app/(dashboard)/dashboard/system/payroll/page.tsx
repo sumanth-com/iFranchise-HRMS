@@ -26,6 +26,7 @@ export default async function SuperAdminPayrollPage() {
           policyHref={SELF_PAYROLL_ROUTES.policy}
           extraHeaderActions={
             <Button
+              key="payroll-settings"
               type="button"
               variant="outline"
               size="sm"

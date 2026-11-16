@@ -318,41 +318,46 @@ async function loadCaseDocuments(
   if (error) throw new Error(error.message);
 
   const docs: OnboardingDocumentRecord[] = [];
-  for (const row of data ?? []) {
-    let signedUrl: string | null = null;
-    if (includeSignedUrls && row.storage_path) {
-      try {
-        const { data: signed, error: signedError } = await admin.storage
-          .from("onboarding-documents")
-          .createSignedUrl(row.storage_path, 3600);
-        if (signedError) {
+  const rows = data ?? [];
+  // Limit concurrent storage requests while retaining the original document order.
+  for (let start = 0; start < rows.length; start += 4) {
+    const signedDocs = await Promise.all(rows.slice(start, start + 4).map(async (row) => {
+      let signedUrl: string | null = null;
+      if (includeSignedUrls && row.storage_path) {
+        try {
+          const { data: signed, error: signedError } = await admin.storage
+            .from("onboarding-documents")
+            .createSignedUrl(row.storage_path, 3600);
+          if (signedError) {
+            console.error("[onboarding] signed url failed", {
+              caseId,
+              documentId: row.id,
+              error: signedError.message,
+            });
+          } else {
+            signedUrl = signed?.signedUrl ?? null;
+          }
+        } catch (error) {
           console.error("[onboarding] signed url failed", {
             caseId,
             documentId: row.id,
-            error: signedError.message,
+            error: error instanceof Error ? error.message : error,
           });
-        } else {
-          signedUrl = signed?.signedUrl ?? null;
         }
-      } catch (error) {
-        console.error("[onboarding] signed url failed", {
-          caseId,
-          documentId: row.id,
-          error: error instanceof Error ? error.message : error,
-        });
       }
-    }
-    docs.push({
-      id: row.id,
-      documentCategory: row.document_category,
-      documentTypeCode: row.document_type_code,
-      fileName: row.file_name,
-      fileSize: row.file_size ? Number(row.file_size) : null,
-      reviewStatus: row.review_status,
-      hrComment: row.hr_comment ?? null,
-      reviewedAt: row.reviewed_at ?? null,
-      signedUrl,
-    });
+      return {
+        id: row.id,
+        documentCategory: row.document_category,
+        documentTypeCode: row.document_type_code,
+        fileName: row.file_name,
+        fileSize: row.file_size ? Number(row.file_size) : null,
+        reviewStatus: row.review_status,
+        hrComment: row.hr_comment ?? null,
+        reviewedAt: row.reviewed_at ?? null,
+        signedUrl,
+      };
+    }));
+    docs.push(...signedDocs);
   }
   return dedupeOnboardingDocuments(docs);
 }

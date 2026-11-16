@@ -331,6 +331,7 @@ function sampleBestPosition(options: {
     };
 
     const consider = (position: GeolocationPosition) => {
+      if (settled) return;
       const next = normalizePosition(position, options.source);
       sampleCount += 1;
 

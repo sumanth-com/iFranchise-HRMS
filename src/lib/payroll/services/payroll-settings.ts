@@ -257,7 +257,11 @@ async function resolveUserName(
 export async function getPayrollSettings(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  options?: { includeDisplayMetadata?: boolean },
 ): Promise<PayrollSettingsRecord> {
+  // Calculations use the stored settings only. Settings pages and payslip
+  // generation retain branding and audit names by default.
+  const includeDisplayMetadata = options?.includeDisplayMetadata !== false;
   const [{ data, error }, { data: org }] = await Promise.all([
     supabase
       .schema("hrms")
@@ -268,13 +272,15 @@ export async function getPayrollSettings(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .maybeSingle(),
-    supabase
-      .schema("hrms")
-      .from("organizations")
-      .select("name, logo_storage_path")
-      .eq("id", organizationId)
-      .is("deleted_at", null)
-      .maybeSingle(),
+    includeDisplayMetadata
+      ? supabase
+          .schema("hrms")
+          .from("organizations")
+          .select("name, logo_storage_path")
+          .eq("id", organizationId)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (error) throw new Error(error.message);
@@ -295,8 +301,8 @@ export async function getPayrollSettings(
   }
 
   const [createdByName, updatedByName] = await Promise.all([
-    resolveUserName(supabase, data?.created_by ?? null),
-    resolveUserName(supabase, data?.updated_by ?? null),
+    includeDisplayMetadata ? resolveUserName(supabase, data?.created_by ?? null) : null,
+    includeDisplayMetadata ? resolveUserName(supabase, data?.updated_by ?? null) : null,
   ]);
 
   return {

@@ -232,7 +232,7 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
   // org-wide sequential getPayslipById/PDF/email work on navigation paint.
   void options?.appOrigin;
 
-  const employeeMeta = await safe(async () => {
+  const employeeMetaPromise = safe(async () => {
           const { data, error } = await supabase
             .schema("hrms")
             .from("employees")
@@ -266,8 +266,9 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
   const hrPayslipAccess =
     !viewingOwnPayroll && canAccessPayslipDuringReview(profile.permissionCodes);
 
-  const [payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult, pendingPromotionRow] =
+  const [employeeMeta, payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult, pendingPromotionRow] =
     await Promise.all([
+    employeeMetaPromise,
     safe(async () => {
       const { data, error } = await supabase
         .schema("hrms")
@@ -357,7 +358,7 @@ export const getEmployeePayrollData = cache(async function getEmployeePayrollDat
       if (error) throw new Error(error.message);
       return data;
     }, null),
-    safe(() => getPayrollSettings(supabase, organizationId), null),
+    safe(() => getPayrollSettings(supabase, organizationId, { includeDisplayMetadata: false }), null),
     safe(
       () => listBonuses(supabase, profile, { employeeId, page: 1, pageSize: 12 }),
       { data: [] as BonusItem[], total: 0, page: 1, pageSize: 12 },

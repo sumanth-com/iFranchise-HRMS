@@ -126,6 +126,15 @@ async function touchIdleActivityCookie(
 }
 
 export async function touchSessionActivityAction(): Promise<void> {
+  // A fresh activity cookie makes this action a no-op. Check before the remote
+  // auth call; every path that actually writes still verifies the user below.
+  const cookieStore = await cookies();
+  if (!shouldRewriteIdleActivityCookie(
+    parseActivityTimestamp(cookieStore.get(IDLE_ACTIVITY_COOKIE)?.value),
+  )) {
+    return;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

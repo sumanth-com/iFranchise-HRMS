@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import {
   getModuleSoftCache,
@@ -18,7 +18,8 @@ type UseModuleSoftDataOptions = {
 /**
  * Keep valid module payloads across soft-nav remounts.
  * First visit: server data → render → cache.
- * Return visit: cache → immediate paint; prop updates still win when RSC delivers.
+ * Return visits reuse Next's route payload. Cache is only for scoped fallbacks;
+ * once server props arrive, render them immediately without a stale first frame.
  */
 export function useModuleSoftData<T>(
   serverData: T,
@@ -27,24 +28,17 @@ export function useModuleSoftData<T>(
   const { profile } = useAuth();
   const organizationId = profile.employee.organizationId;
   const employeeId = profile.employee.id;
-  const ttlMs = options.ttlMs ?? MODULE_SOFT_CACHE_TTL_MS;
 
   const key = useMemo(
     () => moduleSoftCacheKey(options.moduleId, { organizationId, employeeId }),
     [options.moduleId, organizationId, employeeId],
   );
 
-  const [data, setData] = useState<T>(() => {
-    const cached = getModuleSoftCache<T>(key, ttlMs);
-    return cached ?? serverData;
-  });
-
   useEffect(() => {
     setModuleSoftCache(key, serverData);
-    setData(serverData);
   }, [key, serverData]);
 
-  return data;
+  return serverData;
 }
 
 /** Peek cached module data for Suspense fallbacks (same-tab soft-nav). */

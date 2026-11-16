@@ -51,6 +51,7 @@ export type TeamAttendanceListItem = {
   attendanceStatus: AttendanceDisplayStatus;
   /** Raw notes for sheet-aligned status display. */
   notes: string | null;
+  holidayName?: string | null;
   lateMinutes: number;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;

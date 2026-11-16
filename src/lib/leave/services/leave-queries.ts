@@ -2320,22 +2320,34 @@ export async function getEmployeeRoleCodesByEmployeeIds(
   if (uniqueIds.length === 0) return result;
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .schema("hrms")
-    .from("user_roles")
-    .select("employee_id, roles!inner (code)")
-    .in("employee_id", uniqueIds)
-    .is("deleted_at", null);
+  // Bound URL size and page through every role row, including large/custom role sets.
+  for (let start = 0; start < uniqueIds.length; start += 100) {
+    const ids = uniqueIds.slice(start, start + 100);
+    let offset = 0;
+    while (true) {
+      const { data, error, count } = await admin
+        .schema("hrms")
+        .from("user_roles")
+        .select("employee_id, roles!inner (code)", { count: "exact" })
+        .in("employee_id", ids)
+        .is("deleted_at", null)
+        .order("id")
+        .range(offset, offset + 999);
 
-  if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message);
 
-  for (const row of data ?? []) {
-    const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-    const code = role?.code as string | undefined;
-    if (!code || !row.employee_id) continue;
-    const current = result.get(row.employee_id) ?? [];
-    current.push(code);
-    result.set(row.employee_id, current);
+      for (const row of data ?? []) {
+        const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+        const code = role?.code as string | undefined;
+        if (!code || !row.employee_id) continue;
+        const current = result.get(row.employee_id) ?? [];
+        current.push(code);
+        result.set(row.employee_id, current);
+      }
+      const received = data?.length ?? 0;
+      offset += received;
+      if (received === 0 || (count != null ? offset >= count : received < 1000)) break;
+    }
   }
 
   return result;

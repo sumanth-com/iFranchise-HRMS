@@ -1,3 +1,4 @@
+import { getEmployeeProfileImageRow } from "@/lib/employee/profile-image-query";
 import {
   averageApplicableWorkingHours,
   completedWorkHoursFromPunches,
@@ -807,9 +808,6 @@ function buildHistoryRows(input: {
     let remarks = toDisplayAttendanceNotes(attendance?.notes);
     if (!remarks && holidayName) remarks = holidayName;
     if (!remarks && leaveTypeName) remarks = leaveTypeName;
-    if (!remarks && weekendStatus === "week_off") {
-      remarks = "Weekend";
-    }
     if (!remarks && correction?.correction_status === "pending") {
       remarks = "Regularization pending review";
     }
@@ -828,6 +826,7 @@ function buildHistoryRows(input: {
       attendanceStatus: status,
       statusNotes: attendance?.notes ?? null,
       leaveTypeName,
+      holidayName,
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
       workHours: attendance
@@ -898,13 +897,7 @@ async function buildProfileCard(
       .eq("id", employeeId)
       .is("deleted_at", null)
       .maybeSingle(),
-    supabase
-      .schema("hrms")
-      .from("employee_profiles")
-      .select("profile_image_storage_path")
-      .eq("employee_id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle(),
+    getEmployeeProfileImageRow(supabase, employeeId),
   ]);
 
   if (employeeResult.error) throw new Error(employeeResult.error.message);
@@ -975,6 +968,11 @@ export async function getManagerProfilePageData(
   const organizationId = profile.employee.organizationId;
 
   const monthRowsPromise = loadMonthAttendance(supabase, employeeId, month, year);
+  // The current month's query contains the same uniquely keyed employee/day row.
+  // Historical views still load today's punch separately for the live panel.
+  const todayRowPromise = month === todayDate.getMonth() + 1 && year === todayDate.getFullYear()
+    ? monthRowsPromise.then((rows) => rows.find((row) => String(row.attendance_date).slice(0, 10) === today) ?? null)
+    : getAttendanceForDate(supabase, employeeId, today);
   const [
     rules,
     todayRow,
@@ -986,7 +984,7 @@ export async function getManagerProfilePageData(
     corrections,
   ] = await Promise.all([
     getOrganizationAttendanceRules(supabase, organizationId),
-    getAttendanceForDate(supabase, employeeId, today),
+    todayRowPromise,
     monthRowsPromise,
     loadMonthLeaves(supabase, employeeId, month, year),
     loadMonthHolidays(supabase, organizationId, month, year),
@@ -1322,12 +1320,20 @@ export async function punchManagerAttendance(
   if (!isActiveEmploymentStatus(employmentRow?.employment_status)) {
     throw new Error("This employee is not in the active workforce.");
   }
+  // These reads are independent. Capture the row error while policy loads so
+  // policy failures retain their original precedence and never reject unhandled.
+  const existingPromise = getAttendanceForDate(supabase, employeeId, today).then(
+    (value) => ({ value }),
+    (error: unknown) => ({ error }),
+  );
   const rules = await getOrganizationAttendanceRules(
     supabase,
     profile.employee.organizationId,
   );
 
-  const existing = await getAttendanceForDate(supabase, employeeId, today);
+  const existingResult = await existingPromise;
+  if ("error" in existingResult) throw existingResult.error;
+  const existing = existingResult.value;
   const nowIso = new Date().toISOString();
   const hasGeo =
     input.latitude != null &&

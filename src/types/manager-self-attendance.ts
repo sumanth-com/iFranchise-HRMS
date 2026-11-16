@@ -91,6 +91,7 @@ export type ManagerAttendanceHistoryRow = {
   statusNotes: string | null;
   /** Leave type name when the day is covered by a leave request. */
   leaveTypeName?: string | null;
+  holidayName?: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
   workHours: number;

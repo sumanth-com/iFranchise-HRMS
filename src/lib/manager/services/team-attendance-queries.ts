@@ -7,6 +7,7 @@ import {
   getTodayDateString,
   isAfterOfficeCheckoutTime,
   resolveEffectivePunchAttendanceStatus,
+  weeklyOffStatusForUnpunchedDate,
 } from "@/lib/attendance/services/attendance-utils";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
 import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
@@ -194,7 +195,7 @@ export async function listTeamAttendance(
       empQuery = empQuery.or(`employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`);
     }
 
-    const [empRes, attRes, leavesRes] = await Promise.all([
+    const [empRes, attRes, leavesRes, holidaysRes] = await Promise.all([
       empQuery,
       supabase
         .schema("hrms")
@@ -237,6 +238,24 @@ export async function listTeamAttendance(
           return { data: [] as LooseRow[], error: null };
         }
       })(),
+      (async () => {
+        try {
+          const res = await supabase
+            .schema("hrms")
+            .from("holidays")
+            .select("name, holiday_date, is_optional")
+            .eq("organization_id", organizationId)
+            .is("deleted_at", null)
+            .eq("holiday_date", targetSingleDate);
+          if (res.error) {
+            console.warn("Non-critical holidays query failed in listTeamAttendance:", res.error.message);
+            return { data: [] as LooseRow[], error: null };
+          }
+          return { data: (res.data ?? []) as LooseRow[], error: null };
+        } catch {
+          return { data: [] as LooseRow[], error: null };
+        }
+      })(),
     ]);
 
     if (empRes.error) {
@@ -263,6 +282,9 @@ export async function listTeamAttendance(
       attendanceMap.set(a.employee_id, a);
     }
     const leaveSet = new Set((leavesRes.data ?? []).map((l: LooseRow) => l.employee_id));
+    const holidayName =
+      (holidaysRes.data ?? []).find((holiday: LooseRow) => !holiday.is_optional)?.name?.trim() ||
+      null;
 
     const attendanceIds = (attRes.data ?? []).map((a: LooseRow) => a.id as string);
     const correctionsResult = attendanceIds.length
@@ -323,6 +345,16 @@ export async function listTeamAttendance(
         }) as AttendanceStatus;
       } else if (hasApprovedLeave) {
         status = "on_leave";
+      } else if (
+        att?.attendance_status === "on_leave" ||
+        att?.attendance_status === "holiday" ||
+        att?.attendance_status === "week_off"
+      ) {
+        status = att.attendance_status as AttendanceStatus;
+      } else if (holidayName) {
+        status = "holiday";
+      } else if (weeklyOffStatusForUnpunchedDate(targetSingleDate)) {
+        status = "week_off";
       } else if (att?.attendance_status) {
         status = att.attendance_status as AttendanceStatus;
       } else if (isToday) {
@@ -360,6 +392,7 @@ export async function listTeamAttendance(
         overtimeHours: Number(att?.overtime_hours ?? 0),
         attendanceStatus: status,
         notes: (att?.notes as string | null) ?? null,
+        holidayName,
         lateMinutes,
         correctionId: correction?.id ?? null,
         correctionStatus: (correction?.status as TeamAttendanceListResult["data"][number]["correctionStatus"]) ?? null,

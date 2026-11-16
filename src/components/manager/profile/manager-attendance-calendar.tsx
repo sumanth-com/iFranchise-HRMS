@@ -93,6 +93,7 @@ function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
       day.status,
       day.statusNotes,
       day.leaveTypeName,
+      { attendanceDate: day.date, holidayName: day.holidayName },
     );
     return {
       label: day.isToday ? `${display.label} · Today` : display.label,
@@ -114,7 +115,7 @@ function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
     return { label: "Today", tone: "today" };
   }
   if (day.inMonth && getDay(parseISO(day.date)) === 0) {
-    return { label: "Holiday", tone: "holiday" };
+    return { label: "Sunday", tone: "holiday" };
   }
   return null;
 }

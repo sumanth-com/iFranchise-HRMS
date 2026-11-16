@@ -21,6 +21,7 @@ import {
 } from "@/components/common/select";
 import { createLeaveRequestAction, getLeaveApplyContextAction, updateLeaveRequestAction } from "@/lib/leave/actions";
 import { notifyLeaveBalancesChanged } from "@/lib/leave/leave-balance-client-events";
+import { deduplicateInFlight } from "@/lib/perf/in-flight-request";
 import {
   clearStaleServerActionReloadFlag,
   isStaleServerActionError,
@@ -160,6 +161,7 @@ type LeaveFormProps = {
   /** Self-service modal: hide employee picker and optional fields. */
   variant?: "default" | "self";
   initialApplyContext?: LeaveApplyContext | null;
+  loadApplyContext?: typeof getLeaveApplyContextAction;
   initialBalances?: import("@/types/leave").LeaveEmployeeBalanceSnapshot[];
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -173,11 +175,14 @@ export function LeaveForm({
   redirectPath,
   variant = "default",
   initialApplyContext = null,
+  loadApplyContext,
   initialBalances = [],
   onSuccess,
   onCancel,
 }: LeaveFormProps) {
   const router = useRouter();
+  const [loadOwnContext] = useState(() => deduplicateInFlight(getLeaveApplyContextAction));
+  const loadContext = loadApplyContext ?? loadOwnContext;
   const submitLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -356,7 +361,7 @@ export function LeaveForm({
     let cancelled = false;
     if (initialBalances.length === 0) setBalancesLoading(true);
 
-    void getLeaveApplyContextAction(selectedEmployeeId)
+    void loadContext(selectedEmployeeId)
       .then((result) => {
         if (cancelled) return;
         setBalancesLoading(false);
@@ -376,7 +381,7 @@ export function LeaveForm({
     return () => {
       cancelled = true;
     };
-  }, [selectedEmployeeId, initialApplyContext, initialBalances.length]);
+  }, [selectedEmployeeId, initialApplyContext, initialBalances.length, loadContext]);
 
   // Always surface submission failures in the form (never toast-only / silent).
   useEffect(() => {

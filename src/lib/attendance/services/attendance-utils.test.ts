@@ -11,6 +11,8 @@ import {
   resolveEffectivePunchAttendanceStatus,
   resolvePunchAttendanceResult,
   toDisplayAttendanceNotes,
+  weeklyOffStatusForUnpunchedDate,
+  attendanceOffDayDisplayLabel,
 } from "@/lib/attendance/services/attendance-utils";
 import { applyPayrollAttendanceDay } from "@/lib/payroll/services/payroll-attendance-leave-sync";
 import {
@@ -352,5 +354,75 @@ describe("company attendance policy — late / early checkout / hours", () => {
     );
     assert.equal(morning.status, "absent");
     assert.equal(morning.earlyLogout, "full_lop");
+  });
+
+  it("2nd and 4th Saturday checkout at 14:00 is a full day, not a half day", () => {
+    const secondSaturday = "2026-11-14";
+    const fourthSaturday = "2026-11-28";
+    const firstSaturday = "2026-11-07";
+
+    const second = resolvePunchAttendanceResult(
+      `${secondSaturday}T10:00:00+05:30`,
+      `${secondSaturday}T14:00:00+05:30`,
+      secondSaturday,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(second.status, "present");
+    assert.equal(second.earlyLogout, "none");
+    assert.ok(!second.policyNoteTags.includes("early-logout:half"));
+
+    const lateSecond = resolvePunchAttendanceResult(
+      `${secondSaturday}T10:06:00+05:30`,
+      `${secondSaturday}T14:05:00+05:30`,
+      secondSaturday,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(lateSecond.status, "late");
+    assert.equal(lateSecond.earlyLogout, "none");
+
+    const earlySecond = resolvePunchAttendanceResult(
+      `${secondSaturday}T10:00:00+05:30`,
+      `${secondSaturday}T13:59:00+05:30`,
+      secondSaturday,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(earlySecond.status, "absent");
+    assert.equal(earlySecond.earlyLogout, "full_lop");
+
+    const fourth = resolvePunchAttendanceResult(
+      `${fourthSaturday}T10:00:00+05:30`,
+      `${fourthSaturday}T14:00:00+05:30`,
+      fourthSaturday,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(fourth.status, "present");
+
+    const first = resolvePunchAttendanceResult(
+      `${firstSaturday}T10:00:00+05:30`,
+      `${firstSaturday}T14:00:00+05:30`,
+      firstSaturday,
+      rules,
+      { finalizeHours: true },
+    );
+    assert.equal(first.status, "half_day");
+    assert.equal(first.earlyLogout, "half_day");
+  });
+
+  it("unpunched Sundays are weekly off, not a blank working-day status", () => {
+    assert.equal(weeklyOffStatusForUnpunchedDate("2026-11-01"), "week_off");
+    assert.equal(weeklyOffStatusForUnpunchedDate("2026-11-08"), "week_off");
+    assert.equal(weeklyOffStatusForUnpunchedDate("2026-11-02"), null);
+    assert.equal(weeklyOffStatusForUnpunchedDate("2026-11-14"), null);
+  });
+
+  it("off-day labels use Sunday or the festival name, not Holiday", () => {
+    assert.equal(attendanceOffDayDisplayLabel("2026-11-01"), "Sunday");
+    assert.equal(attendanceOffDayDisplayLabel("2026-11-08"), "Sunday");
+    assert.equal(attendanceOffDayDisplayLabel("2026-11-02"), null);
+    assert.equal(attendanceOffDayDisplayLabel("2026-10-02", "Gandhi Jayanti"), "Gandhi Jayanti");
   });
 });

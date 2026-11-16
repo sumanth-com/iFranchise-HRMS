@@ -1,7 +1,7 @@
 import { NotificationHistoryPanel } from "@/components/notifications/notification-history-panel";
 import { canManageNotifications } from "@/lib/notifications/constants";
 import { listNotificationHistory } from "@/lib/notifications/services/notification-queries";
-import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
+import { getManagers } from "@/lib/employees/services/employee-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type { NotificationHistoryParams } from "@/types/notifications";
@@ -29,12 +29,10 @@ export default async function NotificationHistoryPage({ searchParams }: Props) {
     search: params.search,
   };
 
-  const [result, lookups] = await Promise.all([
+  const [result, employees] = await Promise.all([
     listNotificationHistory(supabase, profile, historyParams),
-    isAdmin ? getEmployeeLookups(supabase, profile.employee.organizationId) : Promise.resolve(null),
+    isAdmin ? getManagers(supabase, profile.employee.organizationId) : Promise.resolve([]),
   ]);
-
-  const employees = lookups?.managers ?? [];
 
   return (
     <div className="space-y-6 p-6">

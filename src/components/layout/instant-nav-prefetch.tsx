@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
+import { createIntentPrefetch } from "@/lib/navigation/intent-prefetch";
 
 function toInternalPath(href: string | null | undefined): string | null {
   if (!href || !href.startsWith("/") || href.startsWith("//")) return null;
@@ -61,18 +62,31 @@ export function InstantNavPrefetch() {
       }
     };
 
+    const intent = createIntentPrefetch(prefetch);
     const onPointerOver = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a[href]");
-      if (anchor) prefetch(anchor.getAttribute("href"));
+      // AppNavLink owns its own hover/press handling.
+      if (!anchor || anchor.hasAttribute("data-hrms-intent-prefetch")) return;
+      const href = anchor.getAttribute("href");
+      if (href) intent.hover(href);
+    };
+
+    const onPointerOut = (event: PointerEvent) => {
+      const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (anchor && !(event.relatedTarget instanceof Node && anchor.contains(event.relatedTarget))) {
+        intent.cancel();
+      }
     };
 
     const onPointerDown = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a[href]");
-      if (anchor) prefetch(anchor.getAttribute("href"));
+      if (!anchor || anchor.hasAttribute("data-hrms-intent-prefetch")) return;
+      const href = anchor.getAttribute("href");
+      if (href) intent.press(href);
     };
 
     document.addEventListener("pointerover", onPointerOver, {
@@ -83,12 +97,15 @@ export function InstantNavPrefetch() {
       capture: true,
       passive: true,
     });
+    document.addEventListener("pointerout", onPointerOut, { capture: true, passive: true });
     // Intentionally no focusin listener — keyboard focus walked the whole sidebar
     // and prefetched every module as competing RSC requests.
 
     return () => {
+      intent.cancel();
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("pointerout", onPointerOut, true);
     };
   }, [navKey, portalHome, router]);
 

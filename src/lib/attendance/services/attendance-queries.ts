@@ -14,6 +14,7 @@ import {
   getTodayDateString,
   isAfterOfficeCheckoutTime,
   resolveEffectivePunchAttendanceStatus,
+  weeklyOffStatusForUnpunchedDate,
 } from "@/lib/attendance/services/attendance-utils";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import { matchesAttendanceUiStatusFilter } from "@/lib/attendance/manual-status";
@@ -284,7 +285,7 @@ async function loadAttendanceRosterUncached(
     attQuery = attQuery.eq("employee_id", employeeId);
   }
 
-  const [employees, attRes, leavesRes, rules] = await Promise.all([
+  const [employees, attRes, leavesRes, rules, holidaysRes] = await Promise.all([
     fetchAttendanceEmployees(supabase, {
       organizationId,
       employeeId,
@@ -316,6 +317,25 @@ async function loadAttendanceRosterUncached(
       }
     })(),
     getOrganizationAttendanceRules(supabase, organizationId),
+    (async () => {
+      try {
+        const res = await supabase
+          .schema("hrms")
+          .from("holidays")
+          .select("name, holiday_date, is_optional")
+          .eq("organization_id", organizationId)
+          .is("deleted_at", null)
+          .gte("holiday_date", attendanceFrom)
+          .lte("holiday_date", attendanceTo);
+        if (res.error) {
+          console.warn("Non-critical holidays query failed in listAttendance:", res.error.message);
+          return { data: [] as LooseRow[], error: null };
+        }
+        return { data: (res.data ?? []) as LooseRow[], error: null };
+      } catch {
+        return { data: [] as LooseRow[], error: null };
+      }
+    })(),
   ]);
 
   if (attRes.error) {
@@ -329,6 +349,13 @@ async function loadAttendanceRosterUncached(
   }
 
   const approvedLeaves = (leavesRes.data ?? []) as LooseRow[];
+  const holidayByDate = new Map<string, string>();
+  for (const holiday of holidaysRes.data ?? []) {
+    if (holiday.is_optional) continue;
+    const date = toDateKey(holiday.holiday_date);
+    const name = String(holiday.name ?? "").trim();
+    if (date && name) holidayByDate.set(date, name);
+  }
 
   const attendanceIds = includeCorrections
     ? (attRes.data ?? []).map((a: LooseRow) => a.id as string)
@@ -374,6 +401,7 @@ async function loadAttendanceRosterUncached(
     const department = unwrapRelation(emp.departments);
     const designation = unwrapRelation(emp.designations);
     const att = attendanceMap.get(`${emp.id}:${rosterDate}`);
+    const holidayName = holidayByDate.get(rosterDate) ?? null;
     const hasApprovedLeave = leaveCoversDate(approvedLeaves, emp.id, rosterDate);
     const checkInAt = att?.check_in_at ?? null;
     const checkOutAt = att?.check_out_at ?? null;
@@ -403,10 +431,20 @@ async function loadAttendanceRosterUncached(
         rules,
         today: todayStr,
       }) as AttendanceStatus;
-    } else if (att?.attendance_status) {
-      status = att.attendance_status as AttendanceStatus;
     } else if (hasApprovedLeave) {
       status = "on_leave";
+    } else if (
+      att?.attendance_status === "on_leave" ||
+      att?.attendance_status === "holiday" ||
+      att?.attendance_status === "week_off"
+    ) {
+      status = att.attendance_status as AttendanceStatus;
+    } else if (holidayName) {
+      status = "holiday";
+    } else if (weeklyOffStatusForUnpunchedDate(rosterDate)) {
+      status = "week_off";
+    } else if (att?.attendance_status) {
+      status = att.attendance_status as AttendanceStatus;
     } else if (!isSingleDay) {
       status = "upcoming";
     } else if (rosterDate === todayStr) {
@@ -445,6 +483,7 @@ async function loadAttendanceRosterUncached(
       overtimeHours: Number(att?.overtime_hours ?? 0),
       attendanceStatus: status,
       notes: rowNotes,
+      holidayName,
       correctionId: correction?.id ?? null,
       correctionStatus:
         (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??

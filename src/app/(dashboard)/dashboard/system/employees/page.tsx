@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
   getOccupiedDepartments,
-  getEmployeeLookups,
+  getEmployeeListLookups,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import {
@@ -64,7 +64,7 @@ export default async function SuperAdminEmployeesPage({
 
     const [departments, lookups, result] = await Promise.all([
       getOccupiedDepartments(supabase, profile.employee.organizationId),
-      getEmployeeLookups(supabase, profile.employee.organizationId),
+      getEmployeeListLookups(supabase, profile.employee.organizationId),
       listEmployees(supabase, profile, params),
     ]);
 
@@ -161,7 +161,7 @@ export default async function SuperAdminEmployeesPage({
   });
 
   const [lookups, result] = await Promise.all([
-    getEmployeeLookups(supabase, profile.employee.organizationId),
+    getEmployeeListLookups(supabase, profile.employee.organizationId),
     listEmployees(supabase, profile, params),
   ]);
 

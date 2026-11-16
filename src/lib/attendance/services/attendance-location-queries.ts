@@ -254,6 +254,7 @@ async function resolveAndCachePointAddress(
   const address = await reverseGeocodeAttendanceAddress(
     point.latitude,
     point.longitude,
+    `${attendanceId}:${point.kind}`,
   );
   if (!address) return point;
 

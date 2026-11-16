@@ -38,7 +38,7 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   half_day: "Half Day",
   on_leave: "Casual Leave",
   holiday: "Holiday",
-  week_off: "Holiday",
+  week_off: "Sunday",
 };
 
 export const ATTENDANCE_DISPLAY_STATUS_LABELS: Record<AttendanceDisplayStatus, string> = {

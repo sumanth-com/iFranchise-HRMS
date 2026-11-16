@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/common/modal";
 import { LeaveForm } from "@/components/leave/leave-form";
 import { getLeaveApplyContextAction } from "@/lib/leave/actions";
+import { deduplicateInFlight } from "@/lib/perf/in-flight-request";
 import { getLeaveApplyDialogDescription } from "@/lib/leave/leave-approval-copy";
 import {
   clearStaleServerActionReloadFlag,
@@ -16,15 +17,17 @@ import type { LeaveApplyContext, LeaveEmployeeBalanceSnapshot, LeaveLookups } fr
 const applyContextCache = new Map<string, LeaveApplyContext>();
 const applyContextInflight = new Map<string, Promise<LeaveApplyContext | null>>();
 
-function prefetchLeaveApplyContext(employeeId: string) {
+function prefetchLeaveApplyContext(employeeId: string, loadContext: typeof getLeaveApplyContextAction) {
   const cached = applyContextCache.get(employeeId);
   if (cached) return Promise.resolve(cached);
 
   const pending = applyContextInflight.get(employeeId);
   if (pending) return pending;
 
-  const request = getLeaveApplyContextAction(employeeId)
+  const request = loadContext(employeeId)
     .then((result) => {
+      // A completed submission may have invalidated this request while it ran.
+      if (applyContextInflight.get(employeeId) !== request) return null;
       applyContextInflight.delete(employeeId);
       if (!result.success) return null;
       applyContextCache.set(employeeId, result.data);
@@ -32,7 +35,7 @@ function prefetchLeaveApplyContext(employeeId: string) {
       return result.data;
     })
     .catch((error: unknown) => {
-      applyContextInflight.delete(employeeId);
+      if (applyContextInflight.get(employeeId) === request) applyContextInflight.delete(employeeId);
       if (isStaleServerActionError(error)) {
         reloadForStaleServerAction();
         return null;
@@ -74,6 +77,7 @@ export function ApplyLeaveDialog({
   onSubmitted,
 }: Props) {
   const isTeam = mode === "team";
+  const [loadContext] = useState(() => deduplicateInFlight(getLeaveApplyContextAction));
   const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(
     () => (employeeId ? applyContextCache.get(employeeId) ?? null : null),
   );
@@ -93,13 +97,13 @@ export function ApplyLeaveDialog({
     // after a rebuild while the browser still holds old action IDs.
     if (!open || !employeeId) return;
     let cancelled = false;
-    void prefetchLeaveApplyContext(employeeId).then((context) => {
+    void prefetchLeaveApplyContext(employeeId, loadContext).then((context) => {
       if (!cancelled && context) setApplyContext(context);
-    });
+    }, () => { /* The form handles the same request's failure. */ });
     return () => {
       cancelled = true;
     };
-  }, [open, employeeId]);
+  }, [open, employeeId, loadContext]);
 
   return (
     <Modal
@@ -124,6 +128,7 @@ export function ApplyLeaveDialog({
           defaultEmployeeId={isTeam ? employeeId : employeeId}
           variant={isTeam ? "default" : "self"}
           initialApplyContext={applyContext}
+          loadApplyContext={loadContext}
           initialBalances={balances}
           onSuccess={() => {
             clearLeaveApplyContextCache(employeeId);

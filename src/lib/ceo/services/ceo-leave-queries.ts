@@ -35,6 +35,7 @@ import {
   getLeaveLookups,
   ensurePendingExecutiveLeaveAssignedToCeo,
   getEmployeeRoleCodes,
+  getEmployeeRoleCodesByEmployeeIds,
   isCeoLeaveApprover,
   canActorDecideLeaveRequest,
   listCeoLeaveApproverEmployeeIds,
@@ -374,8 +375,12 @@ export async function listCeoApprovalQueue(
 
   if (byId.size === 0) return [];
 
-  const items: CeoApprovalQueueItem[] = [];
-  const roleCodesByEmployee = new Map<string, string[]>();
+  const eligible: Array<{
+    record: CeoLeaveRecord;
+    approvalRecordId: string;
+    submittedAt: string;
+    pendingHrReview: boolean;
+  }> = [];
 
   for (const row of byId.values()) {
     const employee = unwrapRelation(row.employees);
@@ -394,28 +399,33 @@ export async function listCeoApprovalQueue(
         (ceoStep!.level === activeLevel || (activeLevel === 1 && ceoStep!.level === 2)));
     if (!ceoCanActOnCurrentStep) continue;
 
-    const record = mapLeaveRow(row);
-    let roleCodes = roleCodesByEmployee.get(row.employee_id);
-    if (!roleCodes) {
-      roleCodes = await getEmployeeRoleCodes(supabase, row.employee_id);
-      roleCodesByEmployee.set(row.employee_id, roleCodes);
-    }
-    const requestCategory = getExecutiveRequestCategory(roleCodes);
-
-    items.push({
-      ...record,
+    eligible.push({
+      record: mapLeaveRow(row),
       approvalRecordId: ceoStep?.id ?? row.id,
       submittedAt: row.created_at,
+      pendingHrReview,
+    });
+  }
+
+  const roleCodesByEmployee = await getEmployeeRoleCodesByEmployeeIds(
+    eligible.map(({ record }) => record.employeeId),
+  );
+  return eligible.map(({ record, approvalRecordId, submittedAt, pendingHrReview }) => {
+    const requestCategory = getExecutiveRequestCategory(
+      roleCodesByEmployee.get(record.employeeId) ?? [],
+    );
+    return {
+      ...record,
+      approvalRecordId,
+      submittedAt,
       requestCategory: requestCategory ?? "hr",
       requestCategoryLabel: pendingHrReview
         ? "HR Review"
         : requestCategory
           ? executiveRequestCategoryLabel(requestCategory)
           : "Employee Request",
-    });
-  }
-
-  return items;
+    };
+  });
 }
 
 /** Leave decisions this CEO already acted on (approved / rejected), for the selected month. */

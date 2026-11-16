@@ -1,5 +1,9 @@
 import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
 
+// Only overlapping reads share work. Settled results (including failures) are
+// removed so later opens retain the existing persisted-address/retry behavior.
+const pendingAddresses = new Map<string, Promise<string | null>>();
+
 /**
  * Reverse-geocode via free OpenStreetMap Nominatim (display-only).
  * Never mutates attendance punch/status/hours data.
@@ -7,6 +11,7 @@ import type { AttendanceLocationPointKind } from "@/lib/attendance/services/atte
 export async function reverseGeocodeAttendanceAddress(
   latitude: number,
   longitude: number,
+  attendancePointScope?: string,
 ): Promise<string | null> {
   if (
     !Number.isFinite(latitude) ||
@@ -19,6 +24,25 @@ export async function reverseGeocodeAttendanceAddress(
     return null;
   }
 
+  // The caller authorizes the attendance record before reaching this helper.
+  // Include the record/point and full-precision coordinates; never share a
+  // record's database read or address write across callers.
+  if (!attendancePointScope) return requestAttendanceAddress(latitude, longitude);
+  const key = JSON.stringify([attendancePointScope, latitude, longitude]);
+  const pending = pendingAddresses.get(key);
+  if (pending) return pending;
+
+  const request = requestAttendanceAddress(latitude, longitude).finally(() => {
+    if (pendingAddresses.get(key) === request) pendingAddresses.delete(key);
+  });
+  pendingAddresses.set(key, request);
+  return request;
+}
+
+async function requestAttendanceAddress(
+  latitude: number,
+  longitude: number,
+): Promise<string | null> {
   const url = new URL("https://nominatim.openstreetmap.org/reverse");
   url.searchParams.set("format", "jsonv2");
   url.searchParams.set("lat", String(latitude));

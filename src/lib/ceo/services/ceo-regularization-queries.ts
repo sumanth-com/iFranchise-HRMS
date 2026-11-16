@@ -9,7 +9,7 @@ import {
   getExecutiveRequestCategory,
 } from "@/lib/approvals/executive-request-routing";
 import { isItSystemAccount } from "@/lib/employees/it-system-account";
-import { getEmployeeRoleCodes, isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
+import { getEmployeeRoleCodesByEmployeeIds, isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { getMonthDateRange } from "@/lib/leave/services/leave-utils";
 
 function unwrap<T>(value: T | T[] | null | undefined): T | null {
@@ -51,30 +51,24 @@ type CorrectionRow = {
 };
 
 async function mapCorrectionRows(
-  supabase: AuthSupabaseClient,
   rows: CorrectionRow[],
 ): Promise<CeoRegularizationQueueItem[]> {
-  const roleCodesByEmployee = new Map<string, string[]>();
+  const visibleRows = rows.filter((row) => {
+    const employee = unwrap(row.employees);
+    return employee && !isItSystemAccount({
+      email: employee.email,
+      employeeCode: employee.employee_code,
+    });
+  });
+  const roleCodesByEmployee = await getEmployeeRoleCodesByEmployeeIds(
+    visibleRows.map((row) => row.employee_id),
+  );
   const items: CeoRegularizationQueueItem[] = [];
 
-  for (const row of rows) {
-    const employee = unwrap(row.employees);
-    if (!employee) continue;
-    if (
-      isItSystemAccount({
-        email: employee.email,
-        employeeCode: employee.employee_code,
-      })
-    ) {
-      continue;
-    }
-
+  for (const row of visibleRows) {
+    const employee = unwrap(row.employees)!;
     const attendance = unwrap(row.attendance);
-    let roleCodes = roleCodesByEmployee.get(row.employee_id);
-    if (!roleCodes) {
-      roleCodes = await getEmployeeRoleCodes(supabase, row.employee_id);
-      roleCodesByEmployee.set(row.employee_id, roleCodes);
-    }
+    const roleCodes = roleCodesByEmployee.get(row.employee_id) ?? [];
     const requestCategory = getExecutiveRequestCategory(roleCodes) ?? "hr";
     const department = unwrap(employee.departments ?? null);
     const status = row.correction_status as CeoRegularizationStatus;
@@ -140,7 +134,7 @@ export async function listCeoRegularizationApprovalQueue(
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
-  const mapped = await mapCorrectionRows(supabase, (data ?? []) as CorrectionRow[]);
+  const mapped = await mapCorrectionRows((data ?? []) as CorrectionRow[]);
   return mapped.filter(
     (item) => item.requestCategory === "hr" || item.requestCategory === "manager",
   );
@@ -171,7 +165,7 @@ export async function listCeoProcessedRegularizations(
     .limit(100);
 
   if (error) throw new Error(error.message);
-  const mapped = await mapCorrectionRows(supabase, (data ?? []) as CorrectionRow[]);
+  const mapped = await mapCorrectionRows((data ?? []) as CorrectionRow[]);
   return mapped.filter(
     (item) => item.requestCategory === "hr" || item.requestCategory === "manager",
   );

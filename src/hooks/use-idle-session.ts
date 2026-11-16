@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { idleSessionLogoutAction, touchSessionActivityAction } from "@/lib/auth/actions";
+import { idleSessionLogoutAction } from "@/lib/auth/actions";
 import {
   IDLE_ACTIVITY_COOKIE_REFRESH_MS,
   IDLE_ACTIVITY_STORAGE_KEY,
@@ -39,8 +39,11 @@ function writeStoredActivity(timestamp: number) {
   }
 }
 
-export function useIdleSession() {
-  const lastTouchAtRef = useRef(0);
+export function useIdleSession(initialCooldownMs = 0) {
+  // Subtract the entire document age, conservatively accounting for transfer and
+  // delayed hydration without relying on matching browser/server wall clocks.
+  const remainingCooldownMs = Math.max(0, Math.min(ACTIVITY_DEBOUNCE_MS, initialCooldownMs) - performance.now());
+  const lastTouchAtRef = useRef(Date.now() - ACTIVITY_DEBOUNCE_MS + remainingCooldownMs);
   const isLoggingOutRef = useRef(false);
 
   useEffect(() => {
@@ -55,7 +58,12 @@ export function useIdleSession() {
       }
 
       lastTouchAtRef.current = now;
-      void touchSessionActivityAction().catch(() => {
+      void fetch("/api/session/activity", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        redirect: "error",
+      }).catch(() => {
         // Server touch is best-effort; middleware still enforces on navigation.
       });
     };

@@ -297,7 +297,8 @@ export function TeamLeaveBalancesPanel({
   const [loadFailed, setLoadFailed] = useState(false);
   const [, startTransition] = useTransition();
   const requestSeq = useRef(0);
-  const skipNextFilterLoad = useRef(hasSeed);
+  const filterKey = JSON.stringify([debouncedSearch, departmentId, employmentTypeId, year, month]);
+  const lastFilterLoad = useRef<string | null>(hasSeed ? filterKey : null);
   const yearItems = useMemo(() => getHrmsYearSelectItems(), []);
 
   const departmentOptions = useMemo(
@@ -369,10 +370,10 @@ export function TeamLeaveBalancesPanel({
   );
 
   useEffect(() => {
-    if (skipNextFilterLoad.current) {
-      skipNextFilterLoad.current = false;
-      return;
-    }
+    // Development effect replay must not reload the same filters. Mutations and
+    // explicit retries still call load directly, even when filters are unchanged.
+    if (lastFilterLoad.current === filterKey) return;
+    lastFilterLoad.current = filterKey;
     load({
       search: debouncedSearch,
       departmentId,
@@ -382,7 +383,7 @@ export function TeamLeaveBalancesPanel({
     });
     // Load once on mount (unless server-seeded) and whenever filters change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional filter-driven reload
-  }, [debouncedSearch, departmentId, employmentTypeId, year, month]);
+  }, [filterKey, debouncedSearch, departmentId, employmentTypeId, year, month]);
 
   // Targeted refresh after leave mutations (same tab) — keep current rows visible.
   useEffect(() => {

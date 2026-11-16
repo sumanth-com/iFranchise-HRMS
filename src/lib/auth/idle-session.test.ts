@@ -5,9 +5,19 @@ import { IDLE_ACTIVITY_COOKIE_REFRESH_MS } from "@/lib/auth/constants";
 import {
   shouldRefreshActivityInMiddleware,
   shouldRewriteIdleActivityCookie,
+  idleActivityCooldownMs,
 } from "@/lib/auth/idle-session";
 
 describe("idle activity cookie throttle", () => {
+  it("only skips the known remaining no-op window; missing and stale cookies still touch immediately", () => {
+    const now = 1_700_000_000_000;
+    assert.equal(idleActivityCooldownMs(null, now), 0);
+    assert.equal(idleActivityCooldownMs(NaN, now), 0);
+    assert.equal(idleActivityCooldownMs(now - IDLE_ACTIVITY_COOKIE_REFRESH_MS, now), 0);
+    assert.equal(idleActivityCooldownMs(now - IDLE_ACTIVITY_COOKIE_REFRESH_MS + 1000, now), 1000);
+    assert.equal(idleActivityCooldownMs(now, now), IDLE_ACTIVITY_COOKIE_REFRESH_MS);
+    assert.equal(idleActivityCooldownMs(now + 1000, now), IDLE_ACTIVITY_COOKIE_REFRESH_MS);
+  });
   it("skips prefetch requests", () => {
     const headers = new Headers({ "Next-Router-Prefetch": "1" });
     assert.equal(

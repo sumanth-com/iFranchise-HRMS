@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useEffect,
+  useMemo,
   type ComponentProps,
   type MouseEvent,
   type PointerEvent,
 } from "react";
+import { navigationDestination } from "@/lib/navigation/navigation-destination";
+import { createIntentPrefetch } from "@/lib/navigation/intent-prefetch";
 
 type AppNavLinkProps = ComponentProps<typeof Link>;
 
@@ -31,36 +35,42 @@ export function AppNavLink({
   ...props
 }: AppNavLinkProps) {
   const router = useRouter();
-  const path = hrefToPath(href);
+  const destination = typeof href === "string" ? navigationDestination(href) : href;
+  const path = hrefToPath(destination);
 
-  function prefetchRoute() {
-    if (!path) return;
-    try {
-      router.prefetch(path);
-    } catch {
-      // Prefetch is best-effort.
-    }
-  }
+  const intent = useMemo(() => createIntentPrefetch((target) => {
+    try { router.prefetch(target); } catch { /* Prefetch is best-effort. */ }
+  }), [router]);
+  useEffect(() => intent.cancel, [intent, path]);
 
   return (
     <Link
-      href={href}
+      href={destination}
       prefetch={prefetch}
       {...props}
+      data-hrms-intent-prefetch="true"
       onPointerEnter={(event: PointerEvent<HTMLAnchorElement>) => {
-        prefetchRoute();
+        if (path) intent.hover(path);
         props.onPointerEnter?.(event);
       }}
+      onPointerLeave={(event) => {
+        intent.cancel();
+        props.onPointerLeave?.(event);
+      }}
       onPointerDown={(event: PointerEvent<HTMLAnchorElement>) => {
-        prefetchRoute();
+        if (path) intent.press(path);
         onPointerDown?.(event);
       }}
       onMouseEnter={(event: MouseEvent<HTMLAnchorElement>) => {
-        prefetchRoute();
+        if (path) intent.hover(path);
         onMouseEnter?.(event);
       }}
+      onMouseLeave={(event) => {
+        intent.cancel();
+        props.onMouseLeave?.(event);
+      }}
       onTouchStart={(event) => {
-        prefetchRoute();
+        if (path) intent.press(path);
         props.onTouchStart?.(event);
       }}
     />

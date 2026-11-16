@@ -29,6 +29,7 @@ import {
 import { AttendanceLocationDialog } from "@/components/attendance/attendance-location-dialog";
 import { ManualAttendanceStatusDialog } from "@/components/attendance/manual-attendance-status-dialog";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
+import { weeklyOffStatusForUnpunchedDate } from "@/lib/attendance/services/attendance-utils";
 import {
   ApprovalSelectCheckbox,
   useApprovalSelection,
@@ -514,6 +515,8 @@ export function AttendanceTable({
             <AttendanceStatusBadge
               status={row.original.attendanceStatus}
               notes={row.original.notes}
+              attendanceDate={row.original.attendanceDate}
+              holidayName={row.original.holidayName}
             />
           </div>
         ),
@@ -674,7 +677,7 @@ export function AttendanceTable({
               checkOutAt: null,
               workHours: 0,
               overtimeHours: 0,
-              attendanceStatus: "upcoming",
+              attendanceStatus: weeklyOffStatusForUnpunchedDate(row.attendanceDate) ?? "upcoming",
               correctionId: null,
               correctionStatus: null,
               hasCheckInLocation: false,

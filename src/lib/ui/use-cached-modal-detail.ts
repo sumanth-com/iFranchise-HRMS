@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const defaultGetId = <T,>(detail: T): string => (detail as { id: string }).id;
+
 type UseCachedModalDetailOptions<T> = {
   /** Active record id while the modal is open (or about to open). */
   id: string | null;
@@ -40,7 +42,7 @@ export function useCachedModalDetail<T>(
     id,
     open,
     fetchDetail,
-    getId = (detail) => (detail as { id: string }).id,
+    getId = defaultGetId,
   } = options;
 
   const localCacheRef = useRef(new Map<string, T>());
@@ -50,6 +52,14 @@ export function useCachedModalDetail<T>(
 
   const fetchRef = useRef(fetchDetail);
   fetchRef.current = fetchDetail;
+  const activeRef = useRef({ id, open });
+  activeRef.current = { id, open };
+  const loadVersionRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const [detail, setDetail] = useState<T | null>(() =>
     id && cache.has(id) ? (cache.get(id) ?? null) : null,
@@ -59,45 +69,55 @@ export function useCachedModalDetail<T>(
 
   const load = useCallback(
     async (targetId: string, opts?: { force?: boolean }) => {
+      const version = ++loadVersionRef.current;
+      const canUpdate = () => mountedRef.current &&
+        version === loadVersionRef.current &&
+        activeRef.current.open && activeRef.current.id === targetId;
       if (!opts?.force) {
         const cached = cache.get(targetId);
         if (cached) {
-          setDetail(cached);
-          setError(null);
-          setLoading(false);
+          if (canUpdate()) {
+            setDetail(cached);
+            setError(null);
+            setLoading(false);
+          }
           return cached;
         }
       }
 
-      let promise = inflight.get(targetId);
+      let promise = opts?.force ? undefined : inflight.get(targetId);
       if (!promise) {
         promise = fetchRef
           .current(targetId)
           .then((result) => {
-            if (result) cache.set(targetId, result);
+            if (result && inflight.get(targetId) === promise) cache.set(targetId, result);
             return result;
           })
           .finally(() => {
-            inflight.delete(targetId);
+            if (inflight.get(targetId) === promise) inflight.delete(targetId);
           });
         inflight.set(targetId, promise);
       }
 
       // Only show loading if we have nothing useful to paint.
       const existing = cache.get(targetId);
-      if (!existing) setLoading(true);
+      if (!existing && canUpdate()) setLoading(true);
 
       try {
         const result = await promise;
-        setDetail(result);
-        setError(result ? null : "Not found");
+        if (canUpdate()) {
+          setDetail(result);
+          setError(result ? null : "Not found");
+        }
         return result;
       } catch (err) {
-        setDetail(null);
-        setError(err instanceof Error ? err.message : "Failed to load");
+        if (canUpdate()) {
+          setDetail(null);
+          setError(err instanceof Error ? err.message : "Failed to load");
+        }
         return null;
       } finally {
-        setLoading(false);
+        if (canUpdate()) setLoading(false);
       }
     },
     [cache, inflight],
@@ -129,18 +149,22 @@ export function useCachedModalDetail<T>(
 
   const invalidate = useCallback(
     (targetId?: string) => {
-      if (targetId) {
-        cache.delete(targetId);
-        return;
+      const invalidatedId = targetId ?? id;
+      if (invalidatedId) {
+        cache.delete(invalidatedId);
+        // An invalidated response must not repopulate the cache after a mutation.
+        inflight.delete(invalidatedId);
+        if (invalidatedId === activeRef.current.id) loadVersionRef.current++;
       }
-      if (id) cache.delete(id);
     },
-    [cache, id],
+    [cache, inflight, id],
   );
 
+  // Retain the closing dialog's content for its existing exit animation.
+  const matchingDetail = !open || (detail && getId(detail) === id) ? detail : null;
   return {
-    detail,
-    loading: loading && !detail,
+    detail: matchingDetail,
+    loading: loading && !matchingDetail,
     error,
     refresh,
     invalidate,
@@ -162,11 +186,11 @@ export function prefetchCachedModalDetail<T>(
   if (!promise) {
     promise = fetchDetail(id)
       .then((result) => {
-        if (result) cache.set(id, result);
+        if (result && inflight.get(id) === promise) cache.set(id, result);
         return result;
       })
       .finally(() => {
-        inflight.delete(id);
+        if (inflight.get(id) === promise) inflight.delete(id);
       });
     inflight.set(id, promise);
   }

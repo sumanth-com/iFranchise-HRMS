@@ -5,7 +5,7 @@ import anmolPrasad from "@/assets/Anmol Prasad.png";
 import dikshaChoudhary from "@/assets/Dikhsha Choudhary.png";
 import ektaPattanaik from "@/assets/Ekta.jpeg";
 import himaniBhargava from "@/assets/Himani.jpeg";
-import lohitKumar from "@/assets/Lohit.PNG";
+import lohitKumar from "@/assets/lohit-kumar.png";
 import namanThapiyal from "@/assets/Naman.jpeg";
 import omRamtekkar from "@/assets/Om.jpeg";
 import prajwalPhoto from "@/assets/Prajwal Photo.jpeg";

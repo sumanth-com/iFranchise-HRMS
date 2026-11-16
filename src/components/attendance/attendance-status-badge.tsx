@@ -6,7 +6,7 @@ import {
 import type { AttendanceDisplayStatus } from "@/types/attendance";
 
 const PILL_LAYOUT =
-  "inline-flex h-6 max-w-full min-w-[2.75rem] items-center justify-center rounded-full px-2.5 text-[11px] font-semibold leading-none";
+  "inline-flex h-6 max-w-[12rem] min-w-[2.75rem] items-center justify-center truncate rounded-full px-2.5 text-[11px] font-semibold leading-none";
 
 /** Dark-friendly pills: tinted fill + high-contrast label (no light-on-light). */
 const STATUS_STYLES: Record<AttendanceUiDisplayStatus | "upcoming" | "on_request", string> = {
@@ -38,6 +38,8 @@ type AttendanceStatusBadgeProps = {
   notes?: string | null;
   /** Leave type name/code when status is derived from a leave record. */
   leaveTypeHint?: string | null;
+  attendanceDate?: string | null;
+  holidayName?: string | null;
   className?: string;
 };
 
@@ -45,6 +47,8 @@ export function AttendanceStatusBadge({
   status,
   notes,
   leaveTypeHint,
+  attendanceDate,
+  holidayName,
   className,
 }: AttendanceStatusBadgeProps) {
   if (!status || status === "upcoming" || status === "-") {
@@ -65,7 +69,10 @@ export function AttendanceStatusBadge({
     );
   }
 
-  const display = resolveAttendanceUiDisplay(status, notes, leaveTypeHint);
+  const display = resolveAttendanceUiDisplay(status, notes, leaveTypeHint, {
+    attendanceDate,
+    holidayName,
+  });
 
   return (
     <span
@@ -85,6 +92,8 @@ export function AttendanceHistoryStatusCell({
   status,
   notes,
   leaveTypeHint,
+  attendanceDate,
+  holidayName,
   className,
 }: AttendanceStatusBadgeProps) {
   if (!status || status === "upcoming" || status === "-") {
@@ -96,6 +105,8 @@ export function AttendanceHistoryStatusCell({
       status={status}
       notes={notes}
       leaveTypeHint={leaveTypeHint}
+      attendanceDate={attendanceDate}
+      holidayName={holidayName}
       className={className}
     />
   );

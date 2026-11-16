@@ -73,7 +73,15 @@ describe("attendance status display", () => {
   it("maps sheet codes to display labels", () => {
     assert.equal(resolveAttendanceUiDisplay("present", "src:P").label, "Present");
     assert.equal(resolveAttendanceUiDisplay("holiday", "src:H").label, "Holiday");
-    assert.equal(resolveAttendanceUiDisplay("week_off", null).label, "Holiday");
+    assert.equal(resolveAttendanceUiDisplay("week_off", null).label, "Sunday");
+    assert.equal(
+      resolveAttendanceUiDisplay("week_off", null, null, { attendanceDate: "2026-11-01" }).label,
+      "Sunday",
+    );
+    assert.equal(
+      resolveAttendanceUiDisplay("holiday", "src:H", null, { holidayName: "Diwali" }).label,
+      "Diwali",
+    );
     assert.equal(resolveAttendanceUiDisplay("late", null).label, "Late");
     assert.equal(resolveAttendanceUiDisplay("late", null).key, "late");
     assert.equal(resolveAttendanceUiDisplay("half_day", null).label, "Half Day");

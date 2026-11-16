@@ -6,7 +6,7 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-queries";
-import { getDepartments } from "@/lib/organization/services/org-lookups";
+import { getDepartments, getEmploymentTypes } from "@/lib/organization/services/org-lookups";
 import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
   isHiddenFromPeopleFilters,
@@ -747,6 +747,18 @@ export async function getDocumentTypes(
     label: row.name,
     code: row.code,
   }));
+}
+
+/** List cards only need the employment-type dialog options, not the full edit-form bundle. */
+export async function getEmployeeListLookups(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+) {
+  return {
+    employmentTypes: filterStandardEmploymentTypes(
+      await getEmploymentTypes(supabase, organizationId),
+    ),
+  };
 }
 
 export async function getEmployeeLookups(

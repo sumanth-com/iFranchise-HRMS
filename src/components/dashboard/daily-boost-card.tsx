@@ -53,9 +53,9 @@ export function DailyBoostCard({
           src={dashArt}
           alt=""
           fill
-          sizes="55vw"
+          sizes="(min-width: 1280px) 55vw, 100vw"
           className="object-cover object-[center_28%]"
-          priority={false}
+          priority
           aria-hidden
         />
       </div>
@@ -64,9 +64,9 @@ export function DailyBoostCard({
         alt=""
         width={1920}
         height={720}
-        sizes="100vw"
+        sizes="(min-width: 1280px) 55vw, 100vw"
         className="block aspect-[2.4/1] h-auto max-h-[13.5rem] min-h-[11rem] w-full object-cover object-[86%_42%] xl:hidden"
-        priority={false}
+        priority
         aria-hidden
       />
       <div

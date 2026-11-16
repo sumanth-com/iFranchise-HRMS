@@ -223,6 +223,8 @@ export function EmployeeAttendanceHistoryTable({
                     status={row.attendanceStatus}
                     notes={row.statusNotes}
                     leaveTypeHint={row.leaveTypeName}
+                    attendanceDate={row.attendanceDate}
+                    holidayName={row.holidayName}
                   />
                 </td>
                 <td className="px-4 py-3">
@@ -349,6 +351,8 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
           status={row.attendanceStatus}
           notes={row.statusNotes}
           leaveTypeHint={row.leaveTypeName}
+          attendanceDate={row.attendanceDate}
+          holidayName={row.holidayName}
         />
         {isComplete ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
