@@ -28,10 +28,8 @@ export const managerNavItems: NavigationItem[] = [
     documents: MANAGER_ROUTES.documents,
     leave: MANAGER_ROUTES.leave,
     goals: MANAGER_ROUTES.goals,
-    assets: MANAGER_ROUTES.assets,
     announcements: MANAGER_ROUTES.announcements,
     notifications: MANAGER_ROUTES.notificationsCenter,
-    settings: MANAGER_ROUTES.settings,
   }),
 
   // ── Administration (team) ────────────────────────────────────────

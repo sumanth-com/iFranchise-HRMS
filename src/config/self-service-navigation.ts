@@ -1,12 +1,9 @@
 import {
   Bell,
   CalendarCheck,
-  CalendarDays,
   FileText,
-  LaptopMinimal,
   LayoutDashboard,
   Receipt,
-  Settings,
   Target,
   UserRound,
   Users,
@@ -26,10 +23,8 @@ export type SelfServiceRouteMap = {
   documents: string;
   leave: string;
   goals: string;
-  assets: string;
   announcements: string;
   notifications: string;
-  settings: string;
 };
 
 const SELF_SERVICE_SECTION = "Self-service";
@@ -52,6 +47,12 @@ export function buildSelfServiceNavItems(
       section,
     },
     {
+      title: "Employee Directory",
+      href: routes.directory,
+      icon: Users,
+      section,
+    },
+    {
       title: "My Profile",
       href: routes.profile,
       icon: UserRound,
@@ -59,17 +60,12 @@ export function buildSelfServiceNavItems(
       permissions: ["employee_profile.view"],
     },
     {
-      title: "Employee Directory",
-      href: routes.directory,
-      icon: Users,
-      section,
-    },
-    {
-      title: "Attendance",
+      title: "Attendance & Leave",
       href: routes.attendance,
+      selfServiceLeaveHref: routes.leave,
       icon: CalendarCheck,
       section,
-      permissions: ["attendance.view"],
+      permissions: ["attendance.view", "leave.view"],
     },
     {
       title: "Payroll",
@@ -79,25 +75,11 @@ export function buildSelfServiceNavItems(
       permissions: ["payslip.view", "payroll.view"],
     },
     {
-      title: "Reimbursements",
-      href: routes.reimbursements,
-      icon: Receipt,
-      section,
-      permissions: ["reimbursement.view", "reimbursement.create"],
-    },
-    {
       title: "Documents",
       href: routes.documents,
       icon: FileText,
       section,
       permissions: ["documents.view"],
-    },
-    {
-      title: "Leave",
-      href: routes.leave,
-      icon: CalendarDays,
-      section,
-      permissions: ["leave.view"],
     },
     {
       title: "My Goals",
@@ -106,10 +88,11 @@ export function buildSelfServiceNavItems(
       section,
     },
     {
-      title: "Assets",
-      href: routes.assets,
-      icon: LaptopMinimal,
+      title: "Reimbursements",
+      href: routes.reimbursements,
+      icon: Receipt,
       section,
+      permissions: ["reimbursement.view", "reimbursement.create"],
     },
     // Company announcements live on the Self-Service dashboard (Announcements tab),
     // not as a separate sidebar module. Route maps may still keep `announcements` for deep links.
@@ -119,12 +102,6 @@ export function buildSelfServiceNavItems(
       icon: Bell,
       section,
       permissions: ["notification.view", "notifications.view"],
-    },
-    {
-      title: "Settings",
-      href: routes.settings,
-      icon: Settings,
-      section,
     },
   ];
 }

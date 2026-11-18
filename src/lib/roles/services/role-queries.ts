@@ -296,33 +296,66 @@ export async function listRoles(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const parent = row.parent as { name: string } | { name: string }[] | null;
-      const parentName = Array.isArray(parent) ? parent[0]?.name : parent?.name;
-      const [userCount, permissionCount] = await Promise.all([
-        countRoleUsers(supabase, organizationId, row.id),
-        countRolePermissions(supabase, row.id),
-      ]);
-      return {
-        id: row.id,
-        name: row.name,
-        code: row.code,
-        description: row.description,
-        isSystemRole: row.is_system_role,
-        isDefault: row.is_default ?? false,
-        parentRoleId: row.parent_role_id,
-        parentRoleName: parentName ?? null,
-        status: row.status,
-        userCount,
-        permissionCount,
-        portalKey: row.portal_key ?? null,
-        portalRoute: row.portal_route ?? null,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      };
-    }),
-  );
+  const roleRows = data ?? [];
+  const roleIds = roleRows.map((row) => row.id);
+  const countsByRole = new Map<string, { userCount: number; permissionCount: number }>();
+
+  if (roleIds.length > 0) {
+    const { data: counts, error: countError } = await supabase
+      .schema("hrms")
+      .rpc("get_role_list_counts", {
+        p_organization_id: organizationId,
+        p_role_ids: roleIds,
+      });
+
+    if (countError) {
+      // Keep this page functional during a staggered deployment where app code
+      // reaches production before the additive RPC migration has been applied.
+      if (countError.code !== "PGRST202" && countError.code !== "42883") {
+        throw new Error(countError.message);
+      }
+      const legacyCounts = await Promise.all(
+        roleRows.map(async (role) => ({
+          roleId: role.id,
+          userCount: await countRoleUsers(supabase, organizationId, role.id),
+          permissionCount: await countRolePermissions(supabase, role.id),
+        })),
+      );
+      for (const item of legacyCounts) {
+        countsByRole.set(item.roleId, item);
+      }
+    } else {
+      for (const item of counts ?? []) {
+        countsByRole.set(item.role_id, {
+          userCount: Number(item.user_count),
+          permissionCount: Number(item.permission_count),
+        });
+      }
+    }
+  }
+
+  const rows = roleRows.map((row) => {
+    const parent = row.parent as { name: string } | { name: string }[] | null;
+    const parentName = Array.isArray(parent) ? parent[0]?.name : parent?.name;
+    const roleCounts = countsByRole.get(row.id);
+    return {
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      description: row.description,
+      isSystemRole: row.is_system_role,
+      isDefault: row.is_default ?? false,
+      parentRoleId: row.parent_role_id,
+      parentRoleName: parentName ?? null,
+      status: row.status,
+      userCount: roleCounts?.userCount ?? 0,
+      permissionCount: roleCounts?.permissionCount ?? 0,
+      portalKey: row.portal_key ?? null,
+      portalRoute: row.portal_route ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
 
   return { data: rows, total: count ?? 0, page, pageSize };
 }

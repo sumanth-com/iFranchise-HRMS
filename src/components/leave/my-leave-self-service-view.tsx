@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { CalendarPlus, Eye, FileText, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,7 +32,6 @@ import {
   DEFAULT_LEAVE_CALENDAR,
   type LeaveCalendarContext,
 } from "@/lib/leave/services/leave-calendar-engine";
-import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import {
   formatLeaveDayCount,
   resolveLeaveDurationBreakdown,
@@ -189,7 +188,18 @@ function formatHistoryDayCount(value: number) {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
-type Props = {
+export type LeaveWorkspaceParts = {
+  actions: ReactNode;
+  balances: ReactNode;
+  calendarData: {
+    leaves: LeaveCalendarEntry[];
+    holidays: LeaveHolidayEntry[];
+    calendar: LeaveCalendarContext;
+  };
+  history: ReactNode;
+};
+
+export type MyLeaveSelfServiceProps = {
   title?: string;
   description?: string;
   policyHref?: string;
@@ -208,6 +218,9 @@ type Props = {
   showPageHeading?: boolean;
   /** Pin Leave Policy / Apply Leave under the portal header while the rest of the page scrolls. */
   stickyHeader?: boolean;
+  renderWorkspace?: (parts: LeaveWorkspaceParts) => ReactNode;
+  onPeriodChange?: (month: number, year: number) => void;
+  onHistorySelect?: () => void;
 };
 
 export function MyLeaveSelfServiceView({
@@ -228,14 +241,19 @@ export function MyLeaveSelfServiceView({
   calendarContext,
   showPageHeading = true,
   stickyHeader = false,
-}: Props) {
+  renderWorkspace,
+  onPeriodChange,
+  onHistorySelect,
+}: MyLeaveSelfServiceProps) {
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
   const [viewMode, setViewMode] = useState<"view" | "edit" | "delete">("view");
-  const [month, setMonth] = useState(calendarMonth);
-  const [year, setYear] = useState(calendarYear);
+  const [localMonth, setMonth] = useState(calendarMonth);
+  const [localYear, setYear] = useState(calendarYear);
+  const month = onPeriodChange ? calendarMonth : localMonth;
+  const year = onPeriodChange ? calendarYear : localYear;
   const [leaves, setLeaves] = useState(calendarLeaves ?? []);
   const [holidays, setHolidays] = useState(calendarHolidays ?? []);
   const [calendar, setCalendar] = useState(() => normalizeCalendarContext(calendarContext));
@@ -339,6 +357,10 @@ export function MyLeaveSelfServiceView({
   }
 
   function loadMonth(nextMonth: number, nextYear: number) {
+    if (onPeriodChange) {
+      onPeriodChange(nextMonth, nextYear);
+      return;
+    }
     setMonth(nextMonth);
     setYear(nextYear);
     startMonthTransition(async () => {
@@ -371,6 +393,7 @@ export function MyLeaveSelfServiceView({
       setOptionalHolidayOpen(true);
       return;
     }
+    onHistorySelect?.();
     const next = code.toUpperCase();
     setSelectedLeaveTypeCode((current) =>
       current?.toUpperCase() === next ? null : next,
@@ -440,7 +463,7 @@ export function MyLeaveSelfServiceView({
     },
     {
       key: "actions",
-      header: "",
+      header: "Actions",
       className: "w-[1%] whitespace-nowrap text-right",
       render: (row) => {
         const source =
@@ -506,7 +529,7 @@ export function MyLeaveSelfServiceView({
         ) : null}
         {canApply ? (
           canOpenApplyDialog ? (
-            <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
+            <Button type="button" variant="default" className={cn("gap-1.5", renderWorkspace && "h-11")} onClick={() => setApplyOpen(true)}>
               <CalendarPlus className="size-4" />
               Apply Leave
             </Button>
@@ -515,48 +538,18 @@ export function MyLeaveSelfServiceView({
       </div>
     ) : null;
 
-  return (
-    <div
-      className={cn(
-        stickyHeader ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex flex-col gap-4",
-      )}
-    >
-      {showPageHeading ? (
-        <div className={cn(stickyHeader && "z-20 shrink-0 pb-4")}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            {headerActions}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-      ) : null}
-
-      <div
-        className={cn(
-          stickyHeader
-            ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4"
-            : "contents",
-        )}
-      >
-      {annualBalances.length > 0 ? (
+  const balanceCards = (annualBalances.length > 0 ? (
         <LeaveBalanceSummaryCards
+          compact={Boolean(renderWorkspace)}
+          layout={renderWorkspace ? "sidebar" : "grid"}
           balances={annualBalances}
           month={month}
           year={year}
           selectedCode={selectedLeaveTypeCode}
           onSelectCode={handleSelectLeaveType}
         />
-      ) : null}
-
-      <OptionalHolidaysDialog
-        open={optionalHolidayOpen}
-        onOpenChange={setOptionalHolidayOpen}
-        year={year}
-        remaining={
-          annualBalances.find((row) => isOptionalHolidayCode(row.leaveTypeCode))?.balanceDays ?? 0
-        }
-      />
-
+      ) : null);
+  const leaveCalendar = (
       <EmployeeLeaveCalendar
         month={month}
         year={year}
@@ -567,21 +560,19 @@ export function MyLeaveSelfServiceView({
         onMonthChange={loadMonth}
       />
 
+  );
+  const leaveHistory = (
       <section
         ref={historyRef}
         className="card-surface-static w-full shrink-0 rounded-2xl border bg-card p-4 shadow-sm"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">My Request & History</h2>
+            <h2 className="text-sm font-semibold tracking-tight">{renderWorkspace ? "Leave History" : "My Request & History"}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {selectedLeaveTypeCode && selectedTypeLabel
-                ? `${selectedTypeLabel} in ${monthLabel} · ${formatLeaveDayCount(historyDaysTotal)} day${historyDaysTotal === 1 ? "" : "s"} this month${
-                    selectedBalance
-                      ? ` · ${formatLeaveBalanceUsedTotal(selectedBalance)} on card (year to date)`
-                      : ""
-                  }.`
-                : `Requests in ${monthLabel}. Click a leave card for that type’s history in this month only.`}
+                ? `${monthLabel} · ${selectedTypeLabel} · ${formatLeaveDayCount(historyDaysTotal)} day${historyDaysTotal === 1 ? "" : "s"}`
+                : monthLabel}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -616,7 +607,54 @@ export function MyLeaveSelfServiceView({
           }
         />
       </section>
+  );
+
+  return (
+    <div
+      className={cn(
+        stickyHeader ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex flex-col gap-4",
+      )}
+    >
+      {renderWorkspace ? renderWorkspace({
+        actions: headerActions,
+        balances: balanceCards,
+        calendarData: { leaves, holidays, calendar },
+        history: leaveHistory,
+      }) : (
+        <>
+      {showPageHeading ? (
+        <div className={cn(stickyHeader && "z-20 shrink-0 pb-4")}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {headerActions}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          stickyHeader
+            ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4"
+            : "contents",
+        )}
+      >
+      {balanceCards}
+      {leaveCalendar}
+      {leaveHistory}
       </div>
+
+        </>
+      )}
+      <OptionalHolidaysDialog
+        open={optionalHolidayOpen}
+        onOpenChange={setOptionalHolidayOpen}
+        year={year}
+        remaining={
+          annualBalances.find((row) => isOptionalHolidayCode(row.leaveTypeCode))?.balanceDays ?? 0
+        }
+      />
+
 
       {viewOpen && viewPreview ? (
         <MyLeaveDetailPopup
@@ -637,13 +675,15 @@ export function MyLeaveSelfServiceView({
           canDelete={canDelete}
           onActionComplete={() => {
             router.refresh();
-            loadMonth(month, year);
-            refreshAnnualBalances(year);
+            if (!onPeriodChange) {
+              loadMonth(month, year);
+              refreshAnnualBalances(year);
+            }
           }}
         />
       ) : null}
 
-      {showPageHeading && applyLeaveLookups && employeeId ? (
+      {(showPageHeading || renderWorkspace) && applyLeaveLookups && employeeId ? (
         <ApplyLeaveDialog
           open={applyOpen}
           onOpenChange={setApplyOpen}
@@ -651,9 +691,11 @@ export function MyLeaveSelfServiceView({
           lookups={applyLeaveLookups}
           balances={annualBalances}
           onSubmitted={() => {
-            // Soft refresh of leave data only — form pending is already cleared.
-            loadMonth(month, year);
-            refreshAnnualBalances(year);
+            // The unified server page refreshes both calendars, histories and balances.
+            if (!onPeriodChange) {
+              loadMonth(month, year);
+              refreshAnnualBalances(year);
+            }
             router.refresh();
           }}
         />

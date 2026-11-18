@@ -2,9 +2,12 @@ import { Suspense } from "react";
 
 import { SoftLoadError } from "@/components/common/soft-load-error";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { safeServerCallWithError } from "@/lib/errors/safe-server";
+import { getAttendanceLeaveData } from "@/lib/dashboard/self-service/attendance-leave-data";
+import { attendancePageParamsInput } from "@/lib/attendance/attendance-leave-navigation";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -26,14 +29,9 @@ async function EmployeeAttendanceContent({
   const supabase = await createClient();
   const raw = await searchParams;
 
-  const parsed = managerProfilePageParamsSchema.safeParse({
-    month: typeof raw.month === "string" ? raw.month : undefined,
-    year: typeof raw.year === "string" ? raw.year : undefined,
-    date: typeof raw.date === "string" ? raw.date : undefined,
-    status: typeof raw.status === "string" ? raw.status : undefined,
-    searchDate: typeof raw.searchDate === "string" ? raw.searchDate : undefined,
-    page: typeof raw.page === "string" ? raw.page : undefined,
-  });
+  const parsed = managerProfilePageParamsSchema.safeParse(
+    attendancePageParamsInput(raw),
+  );
 
   if (!parsed.success) {
     console.error("[employee-attendance] invalid search params", parsed.error);
@@ -41,11 +39,20 @@ async function EmployeeAttendanceContent({
   }
 
   const params = parsed.data;
-  const { data, error } = await safeServerCallWithError(
-    () => getManagerProfilePageData(supabase, profile, params),
-    null,
-    "[employee-attendance] page load",
-  );
+  const [{ data, error }, leave] = await Promise.all([
+    safeServerCallWithError(
+      () => getManagerProfilePageData(supabase, profile, params),
+      null,
+      "[employee-attendance] page load",
+    ),
+    getAttendanceLeaveData(
+      supabase,
+      profile,
+      "employee",
+      params.month ?? new Date().getMonth() + 1,
+      params.year ?? new Date().getFullYear(),
+    ),
+  ]);
 
   if (error || !data) {
     return <SoftLoadError variant="page" />;
@@ -54,6 +61,8 @@ async function EmployeeAttendanceContent({
   return (
     <EmployeeAttendanceView
       data={data}
+      basePath={EMPLOYEE_ROUTES.attendance}
+      leave={leave ? { ...leave, policyHref: EMPLOYEE_ROUTES.leavePolicy } : null}
       status={params.status}
       searchDate={params.searchDate}
       policyHref={EMPLOYEE_ROUTES.attendancePolicy}
@@ -64,7 +73,7 @@ async function EmployeeAttendanceContent({
 export default function EmployeeAttendancePage({ searchParams }: PageProps) {
   // Soft-nav: keep prior content when possible; null avoids a full-page skeleton.
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ModulePageSkeleton />}>
       <EmployeeAttendanceContent searchParams={searchParams} />
     </Suspense>
   );

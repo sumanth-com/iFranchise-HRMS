@@ -138,7 +138,7 @@ export function EmployeePayrollView({
 
   function openPayslip(id: string) {
     // Start detail fetch immediately so the drawer can paint from cache/inflight.
-    void prefetchEmployeePayslipDetail(id);
+    void prefetchEmployeePayslipDetail(id).catch(() => null);
     setActivePayslipId(id);
     setDrawerOpen(true);
   }
@@ -150,6 +150,8 @@ export function EmployeePayrollView({
         size="sm"
         className="gap-1.5"
         disabled={!canOpenLatestPayslip}
+        onPointerEnter={() => latestPayslip && canOpenLatestPayslip && void prefetchEmployeePayslipDetail(latestPayslip.id).catch(() => null)}
+        onFocus={() => latestPayslip && canOpenLatestPayslip && void prefetchEmployeePayslipDetail(latestPayslip.id).catch(() => null)}
         onClick={() => latestPayslip && canOpenLatestPayslip && openPayslip(latestPayslip.id)}
       >
         <Download className="size-4" />
@@ -495,6 +497,8 @@ export function EmployeePayrollView({
                       variant="outline"
                       className="gap-1.5"
                       disabled={!row.canEmployeeAccess}
+                      onPointerEnter={() => row.canEmployeeAccess && void prefetchEmployeePayslipDetail(row.id).catch(() => null)}
+                      onFocus={() => row.canEmployeeAccess && void prefetchEmployeePayslipDetail(row.id).catch(() => null)}
                       onClick={() => openPayslip(row.id)}
                     >
                       <FileText className="size-3.5" />

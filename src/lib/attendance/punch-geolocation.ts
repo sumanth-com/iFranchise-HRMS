@@ -36,12 +36,12 @@ const GOOD_ACCURACY_M = 100;
  * and must still be saved as the nearest available real-world location.
  */
 const ABSURD_ACCURACY_M = 100_000;
-const HIGH_ACCURACY_TIMEOUT_MS = 10_000;
-const NETWORK_FALLBACK_TIMEOUT_MS = 8_000;
+const HIGH_ACCURACY_TIMEOUT_MS = 5_000;
+const NETWORK_FALLBACK_TIMEOUT_MS = 3_000;
 /** Brief refine window while collecting multiple high-accuracy samples. */
 const REFINE_WINDOW_MS = 2_000;
 /** Extra wait only while the browser permission prompt may still be open. */
-const PERMISSION_PROMPT_BUDGET_MS = 90_000;
+const PERMISSION_PROMPT_BUDGET_MS = 4_000;
 
 /**
  * Capture the best available fresh employee location for Check In / Check Out.
@@ -55,10 +55,11 @@ export async function fetchEmployeeLocation(): Promise<PunchGeolocationResult> {
   let permissionState: PermissionState | "unknown" = "unknown";
   try {
     if (navigator.permissions?.query) {
-      const status = await navigator.permissions.query({
-        name: "geolocation" as PermissionName,
-      });
-      permissionState = status.state;
+      const status = await Promise.race([
+        navigator.permissions.query({ name: "geolocation" as PermissionName }),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 250)),
+      ]);
+      permissionState = status?.state ?? "unknown";
     }
   } catch {
     permissionState = "unknown";
@@ -84,6 +85,12 @@ export async function fetchEmployeeLocation(): Promise<PunchGeolocationResult> {
   if (isSavableFix(high)) {
     logCapture("high_accuracy", high);
     return high;
+  }
+
+  // Do not stack another location request on top of an unanswered browser
+  // permission prompt. Attendance can still be recorded without coordinates.
+  if (permissionState !== "granted" && high.status === "timeout") {
+    return { status: "timeout", sampleCount: high.sampleCount, source: high.source };
   }
 
   // 2) Automatic Wi-Fi / network fallback for laptops, desktops, Macs, indoor.

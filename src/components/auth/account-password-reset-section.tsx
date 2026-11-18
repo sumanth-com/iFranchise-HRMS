@@ -35,6 +35,7 @@ function PasswordResetContent({
   const [error, setError] = useState<string | null>(null);
   const [limitReached, setLimitReached] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [resetConfirmationOpen, setResetConfirmationOpen] = useState(false);
   const [limitMessage, setLimitMessage] = useState(
     "You've reached today's password reset limit (3 times). For your account's security, please try again tomorrow. If you still need help, contact your HR administrator.",
   );
@@ -53,6 +54,7 @@ function PasswordResetContent({
     }
 
     setError(null);
+    setResetConfirmationOpen(false);
 
     startTransition(async () => {
       const result = await requestPasswordResetEmailAction();
@@ -83,7 +85,10 @@ function PasswordResetContent({
         !embedded && "col-start-3 row-start-1 self-center",
       )}
       disabled={isPending || limitReached}
-      onClick={requestReset}
+      onClick={() => {
+        if (limitReached) setLimitDialogOpen(true);
+        else setResetConfirmationOpen(true);
+      }}
     >
       {isPending ? (
         <Loader2 className="size-3.5 animate-spin" />
@@ -163,6 +168,26 @@ function PasswordResetContent({
           </div>
         </div>
       ) : null}
+
+      <Dialog open={resetConfirmationOpen} onOpenChange={setResetConfirmationOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm password reset</DialogTitle>
+            <DialogDescription className="text-left leading-relaxed">
+              Send a password reset link to <span className="font-medium text-foreground">{email}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setResetConfirmationOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={isPending} onClick={requestReset}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Send reset link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {sent && !limitReached ? (
         <div className="mt-3 flex gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3">

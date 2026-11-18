@@ -5,7 +5,6 @@ import {
   CalendarCheck,
   CalendarDays,
   LayoutDashboard,
-  LaptopMinimal,
   Shield,
   Target,
   UserRoundPlus,
@@ -46,10 +45,8 @@ export const mainNavItems: NavigationItem[] = [
     documents: HR_HUB_ROUTES.myDocuments,
     leave: HR_HUB_ROUTES.myLeave,
     goals: HR_HUB_ROUTES.myGoals,
-    assets: HR_HUB_ROUTES.myAssets,
     announcements: HR_HUB_ROUTES.myAnnouncements,
     notifications: "/dashboard/notifications",
-    settings: "/dashboard/settings",
   }),
 
   // ── Administration (org-wide) ───────────────────────────────────────────
@@ -94,13 +91,6 @@ export const mainNavItems: NavigationItem[] = [
     icon: Wallet,
     section: "Administration",
     permissions: ["payroll.view", "payslip.view"],
-  },
-  {
-    title: "Company Assets",
-    href: HR_HUB_ROUTES.teamAssets,
-    icon: LaptopMinimal,
-    section: "Administration",
-    permissions: ["asset.view"],
   },
   {
     title: "Performance",

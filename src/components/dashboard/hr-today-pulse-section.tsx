@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import {
   Cake,
@@ -19,6 +20,7 @@ import {
 } from "@/components/dashboard/dashboard-surface-classes";
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
 import { birthdayCardMessage, birthdayDisplayFirstName } from "@/lib/employee/birthday-utils";
+import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import type { DashboardListItem, DashboardPersonEvent, HrTodayPulse } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
@@ -136,6 +138,9 @@ function CelebrationFeaturedCard({
   const isBirthday = item.kind === "birthday";
   const isAnniversary = item.kind === "anniversary";
   const firstName = birthdayDisplayFirstName(undefined, item.title);
+  const birthdayPhoto = isBirthday
+    ? getDirectoryAssetPhoto({ fullName: item.title })
+    : null;
 
   const content = (
     <div
@@ -150,24 +155,41 @@ function CelebrationFeaturedCard({
       )}
     >
       <div className={cn("flex gap-3", fill ? "w-full max-w-sm flex-col items-center" : "items-start")}>
-        <span
-          className={cn(
-            "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-violet-500/10 text-violet-700 ring-1 ring-violet-500/15 dark:bg-background/80 dark:text-violet-300",
-            fill ? "size-14" : "size-11",
-            isBirthday && "bg-rose-500/10 text-rose-700 ring-rose-500/15 dark:text-rose-300",
-          )}
-        >
-          {isBirthday ? (
-            <Cake className={fill ? "size-6" : "size-5"} />
-          ) : isAnniversary ? (
-            <Medal className={fill ? "size-6" : "size-5"} />
-          ) : (
-            <HolidayGlyph
-              name={item.title}
-              className={cn(fill ? "size-10" : "size-8")}
+        {birthdayPhoto ? (
+          <span
+            className={cn(
+              "relative shrink-0 overflow-hidden rounded-2xl bg-rose-100 ring-2 ring-white shadow-md dark:ring-background",
+              fill ? "size-16" : "size-11 rounded-xl",
+            )}
+          >
+            <Image
+              src={birthdayPhoto}
+              alt={item.title}
+              fill
+              sizes={fill ? "64px" : "44px"}
+              className="object-cover object-top"
             />
-          )}
-        </span>
+          </span>
+        ) : (
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-violet-500/10 text-violet-700 ring-1 ring-violet-500/15 dark:bg-background/80 dark:text-violet-300",
+              fill ? "size-14" : "size-11",
+              isBirthday && "bg-rose-500/10 text-rose-700 ring-rose-500/15 dark:text-rose-300",
+            )}
+          >
+            {isBirthday ? (
+              <Cake className={fill ? "size-6" : "size-5"} />
+            ) : isAnniversary ? (
+              <Medal className={fill ? "size-6" : "size-5"} />
+            ) : (
+              <HolidayGlyph
+                name={item.title}
+                className={cn(fill ? "size-10" : "size-8")}
+              />
+            )}
+          </span>
+        )}
         <div className={cn("min-w-0", fill ? "w-full" : "flex-1")}>
           <div className={cn("flex items-center gap-1.5", fill && "justify-center")}>
             <p

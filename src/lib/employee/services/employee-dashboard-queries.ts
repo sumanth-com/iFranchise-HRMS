@@ -145,8 +145,9 @@ export async function loadUpcomingCelebrations(
   const windowEnd = format(addDays(todayDate, 7), "yyyy-MM-dd");
   const events: EmployeeUpcomingEvent[] = [];
 
-  // Holidays and employee roster are independent — fetch in parallel.
-  const [holidaysResult, employeesResult] = await Promise.all([
+  // Holidays, employee roster, and announcements are independent — fetch
+  // together so the slower birthday profile lookup does not delay news.
+  const [holidaysResult, employeesResult, announcements] = await Promise.all([
     supabase
       .schema("hrms")
       .from("holidays")
@@ -164,6 +165,10 @@ export async function loadUpcomingCelebrations(
       .eq("organization_id", organizationId)
       .in("employment_status", activeEmploymentStatusFilter())
       .is("deleted_at", null),
+    listPublishedDashboardAnnouncements(supabase, organizationId).catch((error) => {
+      console.error("[celebrations] announcements query failed", error);
+      return [];
+    }),
   ]);
 
   if (holidaysResult.error) {
@@ -282,14 +287,6 @@ export async function loadUpcomingCelebrations(
     const byDate = a.date.localeCompare(b.date);
     if (byDate !== 0) return byDate;
     return typeRank(a.type) - typeRank(b.type);
-  });
-
-  const announcements = await listPublishedDashboardAnnouncements(
-    supabase,
-    organizationId,
-  ).catch((error) => {
-    console.error("[celebrations] announcements query failed", error);
-    return [];
   });
 
   const importantAnnouncementEvents: EmployeeUpcomingEvent[] = [];

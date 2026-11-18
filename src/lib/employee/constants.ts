@@ -31,7 +31,7 @@ export const EMPLOYEE_DASHBOARD_KPI_LINKS = {
   attendance: EMPLOYEE_ROUTES.attendance,
   workingHours: EMPLOYEE_ROUTES.attendance,
   leaveBalance: EMPLOYEE_ROUTES.leave,
-  pendingLeaveRequests: `${EMPLOYEE_ROUTES.leave}?status=pending`,
+  pendingLeaveRequests: `${EMPLOYEE_ROUTES.attendance}?history=leave`,
 } as const;
 
 /** Self-service dashboard KPI destinations in the HR portal home (/dashboard). */
@@ -39,5 +39,5 @@ export const HR_SELF_SERVICE_DASHBOARD_KPI_LINKS = {
   attendance: HR_HUB_ROUTES.myAttendance,
   workingHours: HR_HUB_ROUTES.myAttendance,
   leaveBalance: HR_HUB_ROUTES.myLeave,
-  pendingLeaveRequests: `${HR_HUB_ROUTES.myLeave}?status=pending`,
+  pendingLeaveRequests: `${HR_HUB_ROUTES.myAttendance}?history=leave`,
 } as const;

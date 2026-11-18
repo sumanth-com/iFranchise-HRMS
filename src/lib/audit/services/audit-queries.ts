@@ -281,6 +281,32 @@ export async function getAuditSummaryCardStats(
   const todayStart = startOfTodayIso();
   const scope = getAuditModuleScope(profile);
 
+  const { data: summaryRows, error: summaryError } = await supabase
+    .schema("hrms")
+    .rpc("get_audit_summary_card_stats", {
+      p_organization_id: organizationId,
+      p_today_start: todayStart,
+      p_modules: scope,
+    });
+
+  if (!summaryError && summaryRows?.[0]) {
+    const summary = summaryRows[0];
+    return {
+      totalToday: Number(summary.total_today),
+      criticalActions: Number(summary.critical_actions),
+      failedActions: Number(summary.failed_actions),
+      loginEvents: Number(summary.login_events),
+    };
+  }
+
+  if (
+    summaryError &&
+    summaryError.code !== "PGRST202" &&
+    summaryError.code !== "42883"
+  ) {
+    throw new Error(summaryError.message);
+  }
+
   const base = () => {
     let q = supabase
       .schema("hrms")

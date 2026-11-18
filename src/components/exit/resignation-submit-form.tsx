@@ -25,6 +25,7 @@ type Props = {
   defaultNoticePeriodDays: number;
   redirectPath?: string;
   embedded?: boolean;
+  onCancel?: () => void;
   onSuccess?: () => void;
 };
 
@@ -37,6 +38,7 @@ export function ResignationSubmitForm({
   defaultNoticePeriodDays,
   redirectPath,
   embedded = false,
+  onCancel,
   onSuccess,
 }: Props) {
   const router = useRouter();
@@ -77,7 +79,7 @@ export function ResignationSubmitForm({
         });
       })}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Resignation date">
           <Input
             type="date"
@@ -115,13 +117,13 @@ export function ResignationSubmitForm({
             })}
           />
         </Field>
-        <Field label="Last working day" className="sm:col-span-2">
+        <Field label="Last working day">
           <Input type="date" disabled={isPending} {...form.register("lastWorkingDay")} />
           <p className="text-xs text-muted-foreground">
             Suggested: resignation date + {noticePeriodDays} day notice period.
           </p>
         </Field>
-        <Field label="Reason" className="sm:col-span-2">
+        <Field label="Reason">
           <LabeledSelect
             items={EXIT_REASON_OPTIONS.map((reason) => ({ value: reason, label: reason }))}
             value={form.watch("reason")}
@@ -138,10 +140,17 @@ export function ResignationSubmitForm({
           />
         </Field>
       </div>
-      <Button type="submit" disabled={isPending}>
-        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Submit resignation
-      </Button>
+      <div className="flex justify-end gap-2 border-t pt-3">
+        {embedded && onCancel ? (
+          <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
+            Close
+          </Button>
+        ) : null}
+        <Button type="submit" disabled={isPending}>
+          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Submit resignation
+        </Button>
+      </div>
     </form>
   );
 }

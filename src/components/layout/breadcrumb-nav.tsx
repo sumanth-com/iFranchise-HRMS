@@ -950,7 +950,12 @@ export function BreadcrumbNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const breadcrumbLabel = useBreadcrumbLabelState();
-  const items = buildBreadcrumbItems(pathname, searchParams);
+  const selfServiceModule = /^\/(?:dashboard(?:\/system)?|employee|accountant|manager)\/(?:attendance|leave)$/;
+  const items = buildBreadcrumbItems(pathname, searchParams).map((item) =>
+    selfServiceModule.test(item.href) && selfServiceModule.test(pathname)
+      ? { ...item, label: "Attendance & Leave" }
+      : item,
+  );
 
   const resolvedItems =
     breadcrumbLabel?.label && items.length > 0

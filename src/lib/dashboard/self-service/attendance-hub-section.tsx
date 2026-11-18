@@ -1,3 +1,7 @@
+import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
+import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { attendancePageParamsInput } from "@/lib/attendance/attendance-leave-navigation";
+import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { HrAttendanceHubView } from "@/components/attendance/hr-attendance-hub-view";
 import { firstHubSearchParam } from "@/lib/dashboard/hub-page-utils";
 import {
@@ -6,6 +10,7 @@ import {
   listAttendance,
 } from "@/lib/attendance/services/attendance-queries";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { getAttendanceLeaveData } from "@/lib/dashboard/self-service/attendance-leave-data";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions/utils";
@@ -39,14 +44,34 @@ export async function AttendanceHubSection({
     ...TEAM_ATTENDANCE_PERMISSIONS,
   ]);
 
+  const attendanceParams = attendancePageParamsInput(raw);
   const selfParams = managerProfilePageParamsSchema.parse({
-    month: firstString(raw.month),
-    year: firstString(raw.year),
-    date: firstString(raw.date),
-    status: firstString(raw.status),
-    searchDate: firstString(raw.searchDate),
-    page: section === "my" ? firstString(raw.page) : undefined,
+    ...attendanceParams,
+    page: section === "my" ? attendanceParams.page : undefined,
   });
+
+  if (section === "my") {
+    const [data, leave] = await Promise.all([
+      getManagerProfilePageData(supabase, profile, selfParams),
+      getAttendanceLeaveData(
+        supabase,
+        profile,
+        "hr",
+        selfParams.month ?? new Date().getMonth() + 1,
+        selfParams.year ?? new Date().getFullYear(),
+      ),
+    ]);
+    return (
+      <EmployeeAttendanceView
+        data={data}
+        status={selfParams.status}
+        searchDate={selfParams.searchDate}
+        basePath={SELF_ATTENDANCE_ROUTES.list}
+        policyHref={SELF_ATTENDANCE_ROUTES.policy}
+        leave={leave ? { ...leave, policyHref: SELF_LEAVE_ROUTES.policy } : null}
+      />
+    );
+  }
 
   const teamParams = attendanceListParamsSchema.parse({
     page: section === "team" ? firstString(raw.page) : undefined,
@@ -68,7 +93,7 @@ export async function AttendanceHubSection({
     employeeId: firstString(raw.employeeId) || undefined,
   });
 
-  const loadMySection = section === "my";
+  const loadMySection = false;
   const loadTeamSection = section === "team" && canViewTeam;
 
   const [selfData, teamResult, lookups, summary] = await Promise.all([

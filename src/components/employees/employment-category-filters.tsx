@@ -66,7 +66,7 @@ export function EmploymentCategoryFilters({
       ref={containerRef}
       role="tablist"
       aria-label="Employment filters"
-      className="relative inline-flex max-w-full flex-wrap items-center gap-2"
+      className="relative inline-flex max-w-full flex-wrap items-center gap-2 2xl:flex-nowrap 2xl:shrink-0"
     >
       <span
         aria-hidden

@@ -7,6 +7,8 @@ export type NavigationItem = NavItem & {
   permissions?: string[];
   /** User must have at least one of these role codes */
   roles?: string[];
+  /** Preserve the existing Leave entry point for users without attendance access. */
+  selfServiceLeaveHref?: string;
 };
 
 export function getSidebarNavigation(
@@ -16,7 +18,11 @@ export function getSidebarNavigation(
 ): NavItem[] {
   const seenHrefs = new Set<string>();
 
-  return items.filter((item) => {
+  return items.map((item) =>
+    item.selfServiceLeaveHref && !hasAnyPermission(permissionCodes, ["attendance.view"])
+      ? { ...item, href: item.selfServiceLeaveHref }
+      : item,
+  ).filter((item) => {
     const permissionAllowed = hasAnyPermission(
       permissionCodes,
       item.permissions ?? [],

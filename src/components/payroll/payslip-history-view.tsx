@@ -566,7 +566,7 @@ export function PayslipHistoryView({
         toast.error("Payslip is not available for this employee yet.");
         return;
       }
-      void prefetchEmployeePayslipDetail(row.id);
+      void prefetchEmployeePayslipDetail(row.id).catch(() => null);
       setActivePayslipId(row.id);
       setPreviewOpen(true);
       return;

@@ -23,6 +23,7 @@ type Props = {
   defaultNoticePeriodDays: number;
   activeResignation: ExitResignationItem | null;
   rejectedResignation?: ExitResignationItem | null;
+  onCancel?: () => void;
   onSubmitted?: () => void;
 };
 
@@ -41,6 +42,7 @@ export function SettingsResignationModalContent({
   defaultNoticePeriodDays,
   activeResignation,
   rejectedResignation = null,
+  onCancel,
   onSubmitted,
 }: Props) {
   const router = useRouter();
@@ -154,6 +156,7 @@ export function SettingsResignationModalContent({
         employeeId={employeeId}
         defaultNoticePeriodDays={defaultNoticePeriodDays}
         embedded
+        onCancel={onCancel}
         onSuccess={() => {
           router.refresh();
           onSubmitted?.();

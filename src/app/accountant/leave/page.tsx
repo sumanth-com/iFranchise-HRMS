@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { canOpenSelfAttendance, leaveWorkspaceUrl } from "@/lib/attendance/attendance-leave-navigation";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
 import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
@@ -13,11 +15,14 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function AccountantLeavePage() {
+export default async function AccountantLeavePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.accountant,
     "leave.view",
   ]);
+  if (canOpenSelfAttendance(profile.permissionCodes, "accountant")) {
+    redirect(leaveWorkspaceUrl(ACCOUNTANT_ROUTES.attendance, await searchParams));
+  }
   const supabase = await createClient();
   const employeeId = profile.employee.id;
   const canApply = hasPermission(profile.permissionCodes, "leave.create");

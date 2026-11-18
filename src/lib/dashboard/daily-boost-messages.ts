@@ -71,8 +71,8 @@ const TEAM_LINES = [
     close: "Your honesty sets a gentle, lasting tone.",
   },
   {
-    open: "your support means more than empty words.",
-    close: "Thank you for standing with us always.",
+    open: "your dedication turns everyday effort into shared progress.",
+    close: "Together, we build a team we’re proud to be part of.",
   },
   {
     open: "you bring hope into quiet early mornings.",

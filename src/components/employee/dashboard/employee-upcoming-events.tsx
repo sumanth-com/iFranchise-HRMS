@@ -79,14 +79,16 @@ function HighlightsEmptyState({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center px-4 py-5">
-      <div className="flex w-full max-w-[17rem] flex-col items-center rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-5 py-6 text-center ring-1 ring-violet-500/15">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15">
+      <div className="flex w-full max-w-[24rem] flex-col items-center rounded-2xl border border-violet-200/70 bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-6 py-7 text-center shadow-sm dark:border-violet-300/15 dark:from-violet-400/[0.08] dark:to-violet-400/[0.02]">
+        <span className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15 dark:text-violet-300">
           {icon}
         </span>
-        <p className="mt-3 text-sm font-semibold tracking-tight text-foreground">{title}</p>
-        <p className="mt-1.5 max-w-[14rem] text-xs leading-relaxed text-muted-foreground">
-          {description}
-        </p>
+        <div className="mt-4 min-w-0 text-center">
+          <p className="text-sm font-semibold tracking-tight text-foreground">{title}</p>
+          <p className="mt-2 max-w-[20rem] text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -725,82 +727,87 @@ export function EmployeeUpcomingEvents({
           className,
         )}
       >
-        <div className="mb-3 flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:items-start sm:justify-between sm:text-left">
-          <div className="flex min-w-0 flex-wrap items-center justify-center gap-1.5 sm:justify-start">
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              className={highlightTabClass(panel === "celebrations" && !announcementsOpen)}
-              aria-pressed={panel === "celebrations" && !announcementsOpen}
-              onClick={() => {
-                setPanel("celebrations");
-                setManageOpen(false);
-                setAnnouncementsOpen(false);
-              }}
-            >
-              <Sparkles className="size-3 shrink-0" />
-              Celebrations
-            </Button>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              className={highlightTabClass(panel === "notices" && !announcementsOpen)}
-              aria-pressed={panel === "notices" && !announcementsOpen}
-              onClick={() => {
-                setPanel("notices");
-                setAnnouncementsOpen(false);
-              }}
-            >
-              <Newspaper className="size-3 shrink-0" />
-              Team Updates
-            </Button>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              className={highlightTabClass(announcementsOpen)}
-              aria-pressed={announcementsOpen}
-              aria-haspopup="dialog"
-              onClick={() => setAnnouncementsOpen(true)}
-            >
-              <Megaphone className="size-3 shrink-0" />
-              Announcements
-              {unreadAnnouncementCount > 0 ? (
-                <span
-                  className={cn(
-                    "ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
-                    announcementsOpen
-                      ? "bg-white/25 text-white"
-                      : "bg-violet-600 text-white",
-                  )}
-                >
-                  {unreadAnnouncementCount > 99 ? "99+" : unreadAnnouncementCount}
-                </span>
-              ) : null}
-            </Button>
+        <div className="mb-3 flex min-w-0 flex-col gap-2.5">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">Highlights</h2>
+            <span className="text-xs text-muted-foreground">
+              {announcementsOpen
+                ? "Company notices"
+                : panel === "notices"
+                  ? "From HR and leadership"
+                  : "Today and this week"}
+            </span>
           </div>
-          {panel === "notices" && canEditTeamUpdates && !announcementsOpen ? (
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              className={highlightTabClass(false)}
-              onClick={() => setManageOpen(true)}
-            >
-              <Pencil className="size-3 shrink-0" />
-              Edit
-            </Button>
-          ) : null}
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className={highlightTabClass(panel === "celebrations" && !announcementsOpen)}
+                aria-pressed={panel === "celebrations" && !announcementsOpen}
+                onClick={() => {
+                  setPanel("celebrations");
+                  setManageOpen(false);
+                  setAnnouncementsOpen(false);
+                }}
+              >
+                <Sparkles className="size-3 shrink-0" />
+                Celebrations
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className={highlightTabClass(panel === "notices" && !announcementsOpen)}
+                aria-pressed={panel === "notices" && !announcementsOpen}
+                onClick={() => {
+                  setPanel("notices");
+                  setAnnouncementsOpen(false);
+                }}
+              >
+                <Newspaper className="size-3 shrink-0" />
+                Team Updates
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className={highlightTabClass(announcementsOpen)}
+                aria-pressed={announcementsOpen}
+                aria-haspopup="dialog"
+                onClick={() => setAnnouncementsOpen(true)}
+              >
+                <Megaphone className="size-3 shrink-0" />
+                Announcements
+                {unreadAnnouncementCount > 0 ? (
+                  <span
+                    className={cn(
+                      "ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+                      announcementsOpen
+                        ? "bg-white/25 text-white"
+                        : "bg-violet-600 text-white",
+                    )}
+                  >
+                    {unreadAnnouncementCount > 99 ? "99+" : unreadAnnouncementCount}
+                  </span>
+                ) : null}
+              </Button>
+            </div>
+            {panel === "notices" && canEditTeamUpdates && !announcementsOpen ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className={highlightTabClass(false)}
+                onClick={() => setManageOpen(true)}
+              >
+                <Pencil className="size-3 shrink-0" />
+                Edit
+              </Button>
+            ) : null}
+          </div>
         </div>
-        <p className="mb-3 shrink-0 text-center text-xs text-muted-foreground sm:text-left">
-          {announcementsOpen
-            ? "Company notices shared with you."
-            : panel === "notices"
-              ? "Quick notes from HR and leadership."
-              : "Highlights for today and this week."}
-        </p>
         <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-x-clip">
           <div
             className="flex h-full min-h-[14rem] min-w-0 transition-transform duration-500 ease-out"

@@ -58,7 +58,7 @@ export const SUPER_ADMIN_SELF_SERVICE_DASHBOARD_KPI_LINKS = {
   attendance: SYSTEM_ADMIN_ROUTES.attendance,
   workingHours: SYSTEM_ADMIN_ROUTES.attendance,
   leaveBalance: SYSTEM_ADMIN_ROUTES.leave,
-  pendingLeaveRequests: `${SYSTEM_ADMIN_ROUTES.leave}?status=pending`,
+  pendingLeaveRequests: `${SYSTEM_ADMIN_ROUTES.attendance}?history=leave`,
 } as const;
 
 export const SUPER_ADMIN_GOALS_SUB_NAV = [

@@ -5,15 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 
+import { BrandMarkTile } from "@/components/brand/brand-logo";
 import { AuthNotice } from "@/components/auth/auth-notice";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/lib/auth/actions";
-import { AUTH_ROUTES, IDLE_ACTIVITY_STORAGE_KEY } from "@/lib/auth/constants";
+import {
+  AUTH_ROUTES,
+  IDLE_ACTIVITY_STORAGE_KEY,
+  PUBLIC_LANDING_ROUTE,
+} from "@/lib/auth/constants";
 import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
 import { detectClientDeviceKind } from "@/lib/device-access/tablet-device";
 import {
@@ -252,36 +257,24 @@ export function LoginForm() {
         : null;
 
   const fieldClass =
-    "h-11 rounded-full border-indigo-200/80 bg-indigo-50/50 pl-10 text-sm font-medium text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:border-[#5f55ee] focus-visible:ring-[#5f55ee]/25 dark:border-border/80 dark:bg-muted/40";
+    "auth-input h-11 rounded-xl border pl-10 pr-10 text-base font-medium shadow-none placeholder:font-normal focus-visible:ring-2 focus-visible:ring-[#8b5cf6]/30";
 
   const noticeMessage = formError ?? profileError;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
+      <div className="auth-login-heading">
+        <Link
+          href={PUBLIC_LANDING_ROUTE}
+          className="mx-auto mb-4 flex w-fit rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/50"
+          aria-label="Go to HRMS home"
+        >
+          <BrandMarkTile size={40} priority />
+        </Link>
+        <h1>Welcome to iFranchise</h1>
+        <p>Access your workspace and continue</p>
+      </div>
       <DeviceKindReporter />
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
-          Welcome Back
-        </h1>
-        <p className="text-sm font-medium text-muted-foreground">
-          Sign in with the email HR registered for your account
-        </p>
-      </div>
-
-      <div className="flex items-start gap-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/70 px-4 py-3.5 text-left shadow-sm dark:border-indigo-500/25 dark:bg-indigo-500/10">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#5f55ee]/15 text-[#5f55ee] dark:bg-[#5f55ee]/20 dark:text-indigo-300">
-          <ShieldCheck className="size-4" strokeWidth={2.25} />
-        </span>
-        <div className="min-w-0 space-y-0.5">
-          <p className="text-sm font-semibold text-slate-900 dark:text-indigo-100">
-            Secure access
-          </p>
-          <p className="text-[13px] leading-snug text-slate-600 dark:text-slate-300">
-            Your workplace data is protected with enterprise-grade security.
-          </p>
-        </div>
-      </div>
-
       {isInviteLinkPending ? (
         <div className="flex items-center justify-center gap-2 rounded-2xl border border-indigo-200/80 bg-indigo-50/50 px-3 py-3 text-sm text-slate-600 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-slate-300">
           <Loader2 className="size-4 animate-spin" />
@@ -301,9 +294,9 @@ export function LoginForm() {
         </AuthNotice>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-4" autoComplete="on">
+      <form onSubmit={onSubmit} className="mx-auto w-full max-w-[20rem] space-y-3.5" autoComplete="on">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-semibold text-foreground">
+          <Label htmlFor="email" className="sr-only">
             Work Email
           </Label>
           <div className="relative">
@@ -325,17 +318,9 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="password" className="text-sm font-semibold text-foreground">
-              Password
-            </Label>
-            <Link
-              href="/forgot-password"
-              className="text-xs font-semibold text-[#5f55ee] hover:text-[#5247e3] dark:text-indigo-400 dark:hover:text-indigo-300"
-            >
-              Forgot Password?
-            </Link>
-          </div>
+          <Label htmlFor="password" className="sr-only">
+            Password
+          </Label>
           <div className="relative">
             <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -362,18 +347,29 @@ export function LoginForm() {
           ) : null}
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-foreground/90">
-          <input
-            type="checkbox"
-            className="size-4 rounded border-border bg-background text-[#5f55ee] focus:ring-[#5f55ee]/30"
-            {...register("rememberMe")}
-          />
-          Remember me
-        </label>
+        <div className="flex items-center justify-between gap-3">
+          <label className="auth-remember-row flex cursor-pointer items-center gap-2.5 text-[13px] font-medium">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-border bg-background focus:ring-[#8b5cf6]/30"
+              {...register("rememberMe")}
+            />
+            Remember me
+          </label>
+          <Link
+            href="/forgot-password"
+            className="auth-forgot-link text-[13px] font-semibold transition-colors"
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         <Button
           type="submit"
-          className="group inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-[#5f55ee] hover:bg-[#5247e3] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(95,85,238,0.4)] transition-all disabled:opacity-100"
+          className={cn(
+            "auth-submit group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-full text-[13px] font-semibold text-white transition-all disabled:opacity-100",
+            isSubmitting && "auth-submit--loading",
+          )}
           disabled={isSubmitting}
         >
           {isSubmitting ? (
@@ -383,12 +379,12 @@ export function LoginForm() {
             </>
           ) : (
             <>
-              Sign In
+              Sign in
               <span
-                className="inline-flex size-5 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30 transition-transform duration-200 group-hover:translate-x-0.5"
+                className="auth-submit-arrow transition-transform duration-200 group-hover:translate-x-0.5"
                 aria-hidden
               >
-                <ArrowRight className="size-3.5" strokeWidth={2.75} />
+                <ArrowRight className="size-5" strokeWidth={2.25} />
               </span>
             </>
           )}

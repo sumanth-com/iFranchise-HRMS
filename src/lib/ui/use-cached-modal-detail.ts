@@ -2,6 +2,40 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const MODAL_DETAIL_TIMEOUT_MS = 12_000;
+const MAX_CACHED_MODAL_DETAILS = 24;
+
+function rememberDetail<T>(cache: Map<string, T>, id: string, detail: T) {
+  // Keep frequently opened details warm without retaining an unlimited number
+  // of large modal payloads for the lifetime of the tab.
+  cache.delete(id);
+  cache.set(id, detail);
+  while (cache.size > MAX_CACHED_MODAL_DETAILS) {
+    const oldestId = cache.keys().next().value;
+    if (oldestId === undefined) break;
+    cache.delete(oldestId);
+  }
+}
+
+function fetchDetailWithTimeout<T>(
+  id: string,
+  fetchDetail: (id: string) => Promise<T | null>,
+): Promise<T | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("This took longer than expected. Please try again.")),
+      MODAL_DETAIL_TIMEOUT_MS,
+    );
+  });
+
+  return Promise.race([Promise.resolve().then(() => fetchDetail(id)), timeout]).finally(
+    () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    },
+  );
+}
+
 const defaultGetId = <T,>(detail: T): string => (detail as { id: string }).id;
 
 type UseCachedModalDetailOptions<T> = {
@@ -76,6 +110,7 @@ export function useCachedModalDetail<T>(
       if (!opts?.force) {
         const cached = cache.get(targetId);
         if (cached) {
+          rememberDetail(cache, targetId, cached);
           if (canUpdate()) {
             setDetail(cached);
             setError(null);
@@ -87,10 +122,11 @@ export function useCachedModalDetail<T>(
 
       let promise = opts?.force ? undefined : inflight.get(targetId);
       if (!promise) {
-        promise = fetchRef
-          .current(targetId)
+        promise = fetchDetailWithTimeout(targetId, fetchRef.current)
           .then((result) => {
-            if (result && inflight.get(targetId) === promise) cache.set(targetId, result);
+            if (result && inflight.get(targetId) === promise) {
+              rememberDetail(cache, targetId, result);
+            }
             return result;
           })
           .finally(() => {
@@ -180,13 +216,16 @@ export function prefetchCachedModalDetail<T>(
   inflight: Map<string, Promise<T | null>>,
 ): Promise<T | null> {
   const cached = cache.get(id);
-  if (cached) return Promise.resolve(cached);
+  if (cached) {
+    rememberDetail(cache, id, cached);
+    return Promise.resolve(cached);
+  }
 
   let promise = inflight.get(id);
   if (!promise) {
-    promise = fetchDetail(id)
+    promise = fetchDetailWithTimeout(id, fetchDetail)
       .then((result) => {
-        if (result && inflight.get(id) === promise) cache.set(id, result);
+        if (result && inflight.get(id) === promise) rememberDetail(cache, id, result);
         return result;
       })
       .finally(() => {

@@ -85,7 +85,7 @@ export const MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS = {
   attendance: MANAGER_ROUTES.attendance,
   workingHours: MANAGER_ROUTES.attendance,
   leaveBalance: MANAGER_ROUTES.leave,
-  pendingLeaveRequests: `${MANAGER_ROUTES.leave}?status=pending`,
+  pendingLeaveRequests: `${MANAGER_ROUTES.attendance}?history=leave`,
 } as const;
 
 export const MANAGER_DASHBOARD_KPI_LINKS = {

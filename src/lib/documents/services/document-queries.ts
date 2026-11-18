@@ -17,7 +17,7 @@ import type {
   LetterListParams,
 } from "@/lib/validations/documents";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { createSignedStorageUrl } from "@/lib/storage/signed-url";
+import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import type {
   DocumentEmployeeCard,
   DocumentTypeItem,
@@ -525,36 +525,35 @@ export async function listDocumentEmployeeCards(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return Promise.all(
-    (data ?? []).map(async (row: DocRow): Promise<DocumentEmployeeCard> => {
-      const designation = unwrapRelation(row.designations) as { title?: string } | null;
-      const employeeProfile = unwrapRelation(row.employee_profiles) as {
-        profile_image_storage_path?: string | null;
-      } | null;
-
-      const imagePath = employeeProfile?.profile_image_storage_path ?? null;
-      const avatarUrl = imagePath
-        ? await createSignedStorageUrl(
-            supabase,
-            EMPLOYEE_STORAGE_BUCKETS.profileImages,
-            imagePath,
-          )
-        : null;
-
-      const firstName = row.first_name as string;
-      const lastName = row.last_name as string;
-
-      return {
-        id: row.id as string,
-        employeeCode: row.employee_code as string,
-        firstName,
-        lastName,
-        fullName: formatEmployeeName(firstName, lastName),
-        designationTitle: designation?.title ?? null,
-        avatarUrl,
-      };
-    }),
+  const rows = (data ?? []) as DocRow[];
+  const imagePaths = rows.map((row) => {
+    const employeeProfile = unwrapRelation(row.employee_profiles) as {
+      profile_image_storage_path?: string | null;
+    } | null;
+    return employeeProfile?.profile_image_storage_path ?? null;
+  });
+  const signedUrls = await createSignedStorageUrls(
+    supabase,
+    EMPLOYEE_STORAGE_BUCKETS.profileImages,
+    imagePaths,
   );
+
+  return rows.map((row, index): DocumentEmployeeCard => {
+    const designation = unwrapRelation(row.designations) as { title?: string } | null;
+    const imagePath = imagePaths[index];
+    const firstName = row.first_name as string;
+    const lastName = row.last_name as string;
+
+    return {
+      id: row.id as string,
+      employeeCode: row.employee_code as string,
+      firstName,
+      lastName,
+      fullName: formatEmployeeName(firstName, lastName),
+      designationTitle: designation?.title ?? null,
+      avatarUrl: imagePath ? signedUrls.get(imagePath) ?? null : null,
+    };
+  });
 }
 
 export async function getDocumentsLookups(

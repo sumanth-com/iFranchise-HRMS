@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { ShellProfileAvatar } from "@/components/layout/shell-profile-avatar";
 import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
@@ -129,9 +130,9 @@ async function ResolvedPortalShell({
       <DesktopOnlyGate>
         {tabletAllowed ? (
           <DashboardShell>
-            {/* Soft-nav: keep prior module visible while the next RSC streams.
-                Do not swap the main pane to a full skeleton (loading.tsx removed). */}
-            <Suspense fallback={null}>{children}</Suspense>
+            {/* Cached soft navigations retain the current page; cold/direct loads
+                get immediate feedback while their module data streams. */}
+            <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
           </DashboardShell>
         ) : (
           <TabletAccessDenied />

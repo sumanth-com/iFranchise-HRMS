@@ -71,22 +71,24 @@ function AppearanceSection() {
 export function EmployeeSettingsView({
   email,
   accountBeside,
+  showAccountActions = true,
 }: {
   email: string;
   /** Renders beside Account & security (e.g. Resignation) in the same row. */
   accountBeside?: ReactNode;
+  showAccountActions?: boolean;
 }) {
   return (
     <>
       <AppearanceSection />
-      {accountBeside ? (
+      {showAccountActions ? accountBeside ? (
         <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
           <AccountPasswordResetSection email={email} className="h-full" />
           {accountBeside}
         </div>
       ) : (
         <AccountPasswordResetSection email={email} />
-      )}
+      ) : null}
     </>
   );
 }

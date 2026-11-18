@@ -32,14 +32,14 @@ export function DashboardShell({ children }: DashboardShellProps) {
           <Suspense fallback={null}>
             <MobileSidebar />
           </Suspense>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <TopNav />
+            <NavigationProgress />
             {/*
             Overflow is owned by ModuleShell / PageScroll children so
             sticky module headers never fight page content.
           */}
             <main className="app-shell-main relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-              <NavigationProgress />
               {children}
             </main>
           </div>

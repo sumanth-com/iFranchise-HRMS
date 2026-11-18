@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { legacyHubTabRedirectUrl } from "@/lib/dashboard/hub-paths";
 import { PayrollHubSection } from "@/lib/dashboard/self-service/payroll-hub-section";
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
 
 type PageProps = {
@@ -17,7 +18,7 @@ export default async function PayrollSelfServicePage({ searchParams }: PageProps
   if (legacy) redirect(legacy);
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ModulePageSkeleton />}>
       <PayrollHubSection section="my" searchParams={searchParams} />
     </Suspense>
   );

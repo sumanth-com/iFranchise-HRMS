@@ -488,14 +488,13 @@ export function LeaveForm({
 
   return (
     <form onSubmit={onSubmit} className={cn("space-y-3", isSelfService && "space-y-2.5")}>
-      <LeavePolicyInfo
-        compact={isSelfService}
+      {!isSelfService ? <LeavePolicyInfo
         context={applyContext}
         employeeName={
           lookups.employees.find((employee) => employee.id === selectedEmployeeId)?.label ??
           "Employee"
         }
-      />
+      /> : null}
       <div className="grid gap-3 md:grid-cols-2">
         {!isSelfService ? (
           <div className="space-y-2">
@@ -529,7 +528,14 @@ export function LeaveForm({
         ) : null}
 
         <div className={cn("space-y-2", isSelfService && "md:col-span-2")}>
-          <Label htmlFor="leaveTypeId">Leave Type</Label>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="leaveTypeId">Leave Type</Label>
+            {isSelfService ? <LeavePolicyInfo
+              compact
+              context={applyContext}
+              employeeName={lookups.employees.find((employee) => employee.id === selectedEmployeeId)?.label ?? "Employee"}
+            /> : null}
+          </div>
           <Select
             items={leaveTypeItems}
             value={form.watch("leaveTypeId")}

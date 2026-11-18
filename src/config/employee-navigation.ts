@@ -4,7 +4,8 @@ import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 
 /**
  * Employee portal sidebar — Self-Service modules only (no Administration block).
- * Section labels match Manager / HR / Accountant for a consistent shell.
+ * Employee modules start directly at Dashboard without a section dropdown.
+ * Assets and Settings are only available inside the dedicated Super Admin portal.
  */
 export const employeeNavItems: NavigationItem[] = buildSelfServiceNavItems({
   home: EMPLOYEE_ROUTES.home,
@@ -16,8 +17,6 @@ export const employeeNavItems: NavigationItem[] = buildSelfServiceNavItems({
   documents: EMPLOYEE_ROUTES.documents,
   leave: EMPLOYEE_ROUTES.leave,
   goals: EMPLOYEE_ROUTES.goals,
-  assets: EMPLOYEE_ROUTES.assets,
   announcements: EMPLOYEE_ROUTES.announcements,
   notifications: EMPLOYEE_ROUTES.notifications,
-  settings: EMPLOYEE_ROUTES.settings,
-});
+}, { includeSection: false });

@@ -17,6 +17,7 @@ import {
   parseISO,
   startOfMonth,
 } from "date-fns";
+import { after } from "next/server";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { isActiveEmploymentStatus } from "@/lib/employees/employment-eligibility";
@@ -70,6 +71,7 @@ import type {
   ManagerAttendancePunchInput,
   ManagerAttendanceRegularizationInput,
   ManagerProfilePageParams,
+  SelfAttendanceLocationSaveInput,
   ManagerUpdateCheckoutInput,
 } from "@/lib/validations/manager-self-attendance";
 import type { UserProfile } from "@/types/auth";
@@ -86,6 +88,16 @@ import type {
   ManagerProfilePageData,
   ManagerTodayAttendance,
 } from "@/types/manager-self-attendance";
+
+function scheduleAttendanceSideEffects(label: string, task: () => Promise<void>) {
+  after(async () => {
+    try {
+      await task();
+    } catch (error) {
+      console.error(`[${label}] post-punch work failed`, error);
+    }
+  });
+}
 
 type AttendanceRow = {
   id: string;
@@ -1216,6 +1228,35 @@ async function persistAttendanceLocationColumns(
   return false;
 }
 
+/** Save a fresh browser location after the attendance punch has already returned. */
+export async function saveSelfAttendanceLocation(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: SelfAttendanceLocationSaveInput,
+): Promise<boolean> {
+  if (!isValidLatLng(input.latitude, input.longitude)) return false;
+
+  const attendanceDate = getTodayDateString();
+  const row = await getAttendanceForDate(
+    supabase,
+    profile.employee.id,
+    attendanceDate,
+  );
+  if (!row || row.id !== input.attendanceId) return false;
+  if (input.type === "in" && !row.check_in_at) return false;
+  if (input.type === "out" && !row.check_out_at) return false;
+
+  return persistAttendanceLocationColumns(supabase, {
+    attendanceId: row.id,
+    employeeId: profile.employee.id,
+    type: input.type,
+    latitude: input.latitude,
+    longitude: input.longitude,
+    accuracy: input.accuracy,
+    userId: profile.userId,
+  });
+}
+
 async function loadTodayAfterPunch(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -1561,16 +1602,19 @@ export async function punchManagerAttendance(
       });
     }
 
-    await writeApplicationAudit(supabase, {
-      organizationId: profile.employee.organizationId,
-      module: "attendance",
-      action: "check_in",
-      description: `Checked in on ${today}`,
-      recordId: employeeId,
-      metadata: { attendanceDate: today, type: "in", attendanceId: result.id },
+    scheduleAttendanceSideEffects("attendance-check-in", async () => {
+      await Promise.all([
+        writeApplicationAudit(supabase, {
+          organizationId: profile.employee.organizationId,
+          module: "attendance",
+          action: "check_in",
+          description: `Checked in on ${today}`,
+          recordId: employeeId,
+          metadata: { attendanceDate: today, type: "in", attendanceId: result.id },
+        }),
+        notifyAttendanceCheckedIn(supabase, profile, today),
+      ]);
     });
-
-    await notifyAttendanceCheckedIn(supabase, profile, today);
     return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
   }
 
@@ -1610,36 +1654,37 @@ export async function punchManagerAttendance(
     }
   }
 
-  await writeApplicationAudit(supabase, {
-    organizationId: profile.employee.organizationId,
-    module: "attendance",
-    action: existing?.check_out_at ? "update_checkout" : "check_out",
-    description: existing?.check_out_at
-      ? `Updated checkout on ${today}`
-      : `Checked out on ${today}`,
-    recordId: result.id,
-    metadata: {
-      attendanceDate: today,
-      workHours: punchedWorkHours || workHours,
-      overtimeHours,
-    },
+  scheduleAttendanceSideEffects("attendance-check-out", async () => {
+    await Promise.all([
+      writeApplicationAudit(supabase, {
+        organizationId: profile.employee.organizationId,
+        module: "attendance",
+        action: existing?.check_out_at ? "update_checkout" : "check_out",
+        description: existing?.check_out_at
+          ? `Updated checkout on ${today}`
+          : `Checked out on ${today}`,
+        recordId: result.id,
+        metadata: {
+          attendanceDate: today,
+          workHours: punchedWorkHours || workHours,
+          overtimeHours,
+        },
+      }),
+      existing?.check_out_at
+        ? notifyAttendanceCheckoutUpdated(
+            supabase,
+            profile,
+            today,
+            punchedWorkHours || workHours,
+          )
+        : notifyAttendanceCheckedOut(
+            supabase,
+            profile,
+            today,
+            punchedWorkHours || workHours,
+          ),
+    ]);
   });
-
-  if (existing?.check_out_at) {
-    await notifyAttendanceCheckoutUpdated(
-      supabase,
-      profile,
-      today,
-      punchedWorkHours || workHours,
-    );
-  } else {
-    await notifyAttendanceCheckedOut(
-      supabase,
-      profile,
-      today,
-      punchedWorkHours || workHours,
-    );
-  }
 
   return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
 }
@@ -1767,16 +1812,19 @@ export async function updateManagerCheckout(
     );
   }
 
-  await writeApplicationAudit(supabase, {
-    organizationId: profile.employee.organizationId,
-    module: "attendance",
-    action: "update_checkout",
-    description: `Manager updated checkout on ${today}`,
-    recordId: existing.id,
-    metadata: { attendanceDate: today, workHours, overtimeHours },
+  scheduleAttendanceSideEffects("attendance-checkout-edit", async () => {
+    await Promise.all([
+      writeApplicationAudit(supabase, {
+        organizationId: profile.employee.organizationId,
+        module: "attendance",
+        action: "update_checkout",
+        description: `Manager updated checkout on ${today}`,
+        recordId: existing.id,
+        metadata: { attendanceDate: today, workHours, overtimeHours },
+      }),
+      notifyAttendanceCheckoutUpdated(supabase, profile, today, workHours),
+    ]);
   });
-
-  await notifyAttendanceCheckoutUpdated(supabase, profile, today, workHours);
   return getSelfTodayAttendance(supabase, profile);
 }
 

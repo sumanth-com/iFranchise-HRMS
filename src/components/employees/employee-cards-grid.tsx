@@ -13,7 +13,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
+import {
+  getDirectoryAssetPhoto,
+  shouldPreferDirectoryAssetPhoto,
+} from "@/lib/employee/directory-asset-photos";
 import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import {
@@ -26,6 +29,7 @@ import type { EmployeeListItem } from "@/types/employee";
 
 function CardPhoto({ employee }: { employee: EmployeeListItem }) {
   const assetPhoto = getDirectoryAssetPhoto(employee);
+  const preferAssetPhoto = shouldPreferDirectoryAssetPhoto(employee);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
     employee.profileImageSignedUrl ?? peekSignedProfileImageUrl(employee.profileImagePath),
   );
@@ -67,7 +71,7 @@ function CardPhoto({ employee }: { employee: EmployeeListItem }) {
   }, [employee.id]);
 
   const photoClass = "absolute inset-0 h-full w-full object-cover object-top";
-  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed;
+  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed && !preferAssetPhoto;
   const showAsset = Boolean(assetPhoto) && !assetFailed && !showUpload;
 
   if (showUpload && resolvedAvatarUrl) {

@@ -3,6 +3,7 @@
 import { toast } from "sonner";
 
 import {
+  selfAttendanceLocationSaveAction,
   selfAttendancePunchAction,
   selfAttendanceUpdateCheckoutAction,
 } from "@/lib/attendance/actions/self-attendance-punch-actions";
@@ -51,49 +52,57 @@ async function captureFreshPunchGps() {
 export async function punchSelfAttendanceWithFreshGps(
   type: "in" | "out",
 ): Promise<SelfAttendancePunchResult> {
-  // Fresh capture every punch — never reuse prior check-in/out coordinates.
-  const geo = await captureFreshPunchGps();
-  const captured = geo.status === "captured";
-
-  if (captured) {
-    console.info("[self-attendance] punch GPS ready", {
-      type,
-      latitude: geo.latitude,
-      longitude: geo.longitude,
-      accuracyM: geo.accuracy,
-      source: geo.source,
-    });
-  }
-
-  // Attendance time must succeed even when GPS is unavailable.
-  const result = await selfAttendancePunchAction({
-    type,
-    ...geoPayload(geo),
+  // Start fresh location capture from the click gesture, but never make the
+  // attendance timestamp wait for a browser GPS prompt or slow fix.
+  const geoPromise = captureFreshPunchGps().catch((error) => {
+    console.warn("[self-attendance] fresh location capture failed", error);
+    return { status: "unavailable" as const };
   });
+  const result = await selfAttendancePunchAction({ type });
 
-  if (!result.success) {
-    return result;
-  }
+  // Save the coordinates only after the server confirms today's punch. The
+  // server checks that the attendance row belongs to this employee and date.
+  void geoPromise
+    .then(async (geo) => {
+      if (!result.success) return;
+      if (geo.status !== "captured") {
+        toast.message(geoUnavailableMessage(geo), { duration: 4500 });
+        return;
+      }
 
-  if (captured) {
-    const saved =
-      type === "in"
-        ? Boolean(result.today?.hasCheckInLocation)
-        : Boolean(result.today?.hasCheckOutLocation);
-    if (saved) {
-      toast.success("Location captured successfully", { duration: 2500 });
-    } else {
-      // Do not claim success if DB verification failed.
-      toast.message(
-        type === "in"
-          ? "Checked in. Location could not be stored this time."
-          : "Checked out. Location could not be stored this time.",
-        { duration: 4500 },
-      );
-    }
-  } else {
-    toast.message(geoUnavailableMessage(geo), { duration: 4500 });
-  }
+      const payload = geoPayload(geo);
+      const attendanceId = result.today.attendanceId;
+      const saved =
+        attendanceId && payload.latitude != null && payload.longitude != null
+          ? await selfAttendanceLocationSaveAction({
+              attendanceId,
+              type,
+              ...payload,
+            }).then((response) => response.success)
+          : false;
+
+      if (saved) {
+        toast.success("Location captured successfully", { duration: 2500 });
+      } else {
+        toast.message(
+          type === "in"
+            ? "Checked in. Location could not be stored this time."
+            : "Checked out. Location could not be stored this time.",
+          { duration: 4500 },
+        );
+      }
+    })
+    .catch((error) => {
+      console.error("[self-attendance] background location save failed", error);
+      if (result.success) {
+        toast.message(
+          type === "in"
+            ? "Checked in. Location could not be stored this time."
+            : "Checked out. Location could not be stored this time.",
+          { duration: 4500 },
+        );
+      }
+    });
 
   return result;
 }

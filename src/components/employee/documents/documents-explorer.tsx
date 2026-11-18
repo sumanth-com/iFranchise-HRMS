@@ -170,7 +170,7 @@ export function DocumentsExplorer({
     // Open the Payroll drawer immediately; resolve id / prefetch in parallel.
     let payslipId = file.payslipId?.trim() || null;
     if (payslipId) {
-      void prefetchEmployeePayslipDetail(payslipId);
+      void prefetchEmployeePayslipDetail(payslipId).catch(() => null);
       setPayslipPreviewId(payslipId);
       setPayslipPreviewOpen(true);
       return;
@@ -184,7 +184,7 @@ export function DocumentsExplorer({
         return;
       }
       payslipId = result.data;
-      void prefetchEmployeePayslipDetail(payslipId);
+      void prefetchEmployeePayslipDetail(payslipId).catch(() => null);
       setPayslipPreviewId(payslipId);
       setPayslipPreviewOpen(true);
     } finally {
@@ -219,9 +219,13 @@ export function DocumentsExplorer({
     const inCategory = data.files.filter((file) => file.categoryKey === openFolder);
     if (openFolder === "payroll") {
       if (!payrollSub) return [];
-      return inCategory.filter(
-        (file) => file.documentTypeCode.toUpperCase() === payrollSub,
-      );
+      return inCategory
+        .filter((file) => file.documentTypeCode.toUpperCase() === payrollSub)
+        .sort(
+          (left, right) =>
+            right.createdAt.localeCompare(left.createdAt) ||
+            right.id.localeCompare(left.id),
+        );
     }
     return inCategory;
   }, [data.files, openFolder, payrollSub]);

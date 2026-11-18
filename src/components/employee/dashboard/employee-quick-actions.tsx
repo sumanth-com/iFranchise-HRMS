@@ -1,68 +1,45 @@
 import Link from "next/link";
-import { CalendarPlus, FileText, Wallet } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight, CalendarPlus, ReceiptText, Zap } from "lucide-react";
 
-import { EmployeeSectionCard } from "@/components/employee/dashboard/employee-module-primitives";
+import { employeeSectionClass } from "@/components/employee/dashboard/employee-module-primitives";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { cn } from "@/lib/utils";
 
-type QuickAction = {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  className: string;
-};
-
-const ACTIONS: QuickAction[] = [
+const ACTIONS = [
   {
     label: "Apply Leave",
     href: `${EMPLOYEE_ROUTES.leave}/new`,
     icon: CalendarPlus,
-    className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
   },
   {
-    label: "Download Payslip",
-    href: EMPLOYEE_ROUTES.payroll,
-    icon: Wallet,
-    className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    label: "Submit Reimbursement",
+    href: EMPLOYEE_ROUTES.reimbursements,
+    icon: ReceiptText,
   },
-  {
-    label: "View Documents",
-    href: EMPLOYEE_ROUTES.documents,
-    icon: FileText,
-    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  },
-];
+] as const;
 
 export function EmployeeQuickActions() {
   return (
-    <EmployeeSectionCard
-      title="Quick Actions"
-      description="Jump straight to what you need."
-      className="shrink-0"
-    >
-      <div className="grid grid-cols-3 gap-2">
-        {ACTIONS.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.label}
-              href={action.href}
-              className="group flex flex-col items-center gap-2 rounded-xl border bg-card px-3 py-3.5 text-center shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/40"
-            >
-              <span
-                className={cn(
-                  "flex size-10 items-center justify-center rounded-lg transition-transform group-hover:scale-105",
-                  action.className,
-                )}
-              >
-                <Icon className="size-5" />
-              </span>
-              <span className="text-xs font-medium leading-tight">{action.label}</span>
-            </Link>
-          );
-        })}
+    <section className={cn(employeeSectionClass, "shrink-0")}>
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-tight">
+        <Zap className="size-4 text-violet-600" aria-hidden />
+        Quick Actions
+      </h2>
+      <div className="grid grid-cols-2 gap-2.5">
+        {ACTIONS.map(({ label, href, icon: Icon }) => (
+          <Link
+            key={label}
+            href={href}
+            className="group flex min-h-[5.25rem] min-w-0 flex-col justify-between rounded-xl border border-violet-500/15 bg-violet-500/[0.025] px-3.5 py-3 transition-colors hover:border-violet-500/35 hover:bg-violet-500/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+          >
+            <Icon className="size-5 text-violet-700 dark:text-violet-300" aria-hidden />
+            <span className="flex min-w-0 items-center justify-between gap-2 text-xs font-semibold leading-tight">
+              <span className="min-w-0">{label}</span>
+              <ArrowRight className="size-4 shrink-0 text-violet-700 transition-transform group-hover:translate-x-0.5 dark:text-violet-300" aria-hidden />
+            </span>
+          </Link>
+        ))}
       </div>
-    </EmployeeSectionCard>
+    </section>
   );
 }

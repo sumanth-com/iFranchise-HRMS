@@ -2,6 +2,8 @@ import { Suspense } from "react";
 
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
+import { attendancePageParamsInput } from "@/lib/attendance/attendance-leave-navigation";
+import { getAttendanceLeaveData } from "@/lib/dashboard/self-service/attendance-leave-data";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
@@ -12,10 +14,6 @@ type SuperAdminAttendancePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function firstString(value: string | string[] | undefined) {
-  return typeof value === "string" ? value : undefined;
-}
-
 export default async function SuperAdminAttendancePage({
   searchParams,
 }: SuperAdminAttendancePageProps) {
@@ -23,16 +21,20 @@ export default async function SuperAdminAttendancePage({
   const supabase = await createClient();
   const rawParams = await searchParams;
 
-  const selfParams = managerProfilePageParamsSchema.parse({
-    month: firstString(rawParams.month),
-    year: firstString(rawParams.year),
-    date: firstString(rawParams.date),
-    status: firstString(rawParams.status),
-    searchDate: firstString(rawParams.searchDate),
-    page: firstString(rawParams.page),
-  });
+  const selfParams = managerProfilePageParamsSchema.parse(
+    attendancePageParamsInput(rawParams),
+  );
 
-  const selfData = await getManagerProfilePageData(supabase, profile, selfParams);
+  const [selfData, leave] = await Promise.all([
+    getManagerProfilePageData(supabase, profile, selfParams),
+    getAttendanceLeaveData(
+      supabase,
+      profile,
+      "system",
+      selfParams.month ?? new Date().getMonth() + 1,
+      selfParams.year ?? new Date().getFullYear(),
+    ),
+  ]);
 
   return (
     <Suspense
@@ -44,6 +46,7 @@ export default async function SuperAdminAttendancePage({
     >
       <EmployeeAttendanceView
         data={selfData}
+        leave={leave}
         status={selfParams.status}
         searchDate={selfParams.searchDate}
         basePath={SYSTEM_ADMIN_ROUTES.attendance}

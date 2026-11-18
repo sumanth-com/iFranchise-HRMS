@@ -12,7 +12,10 @@ import {
 
 import { Button } from "@/components/common/button";
 import { ProfilePhotoFallback } from "@/components/employees/profile-photo-fallback";
-import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
+import {
+  getDirectoryAssetPhoto,
+  shouldPreferDirectoryAssetPhoto,
+} from "@/lib/employee/directory-asset-photos";
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import {
   getSignedProfileImageUrl,
@@ -53,6 +56,7 @@ function CardPhoto({
   className?: string;
 }) {
   const assetPhoto = getDirectoryAssetPhoto(person);
+  const preferAssetPhoto = shouldPreferDirectoryAssetPhoto(person);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
     person.avatarUrl ?? peekSignedProfileImageUrl(person.profileImagePath),
   );
@@ -89,7 +93,7 @@ function CardPhoto({
     "absolute inset-0 h-full w-full object-cover object-top",
     className,
   );
-  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed;
+  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed && !preferAssetPhoto;
   const showAsset = Boolean(assetPhoto) && !assetFailed && !showUpload;
 
   if (showUpload && resolvedAvatarUrl) {
@@ -140,6 +144,7 @@ function CardPhoto({
 
 function ReadOnlyCardPhoto({ person }: { person: DirectoryCardPerson }) {
   const assetPhoto = getDirectoryAssetPhoto(person);
+  const preferAssetPhoto = shouldPreferDirectoryAssetPhoto(person);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
     person.avatarUrl ?? peekSignedProfileImageUrl(person.profileImagePath),
   );
@@ -173,7 +178,7 @@ function ReadOnlyCardPhoto({ person }: { person: DirectoryCardPerson }) {
   }, [person.avatarUrl, person.profileImagePath]);
 
   const photoClass = "absolute inset-0 h-full w-full object-cover object-top";
-  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed;
+  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed && !preferAssetPhoto;
   const showAsset = Boolean(assetPhoto) && !assetFailed && !showUpload;
 
   if (showUpload && resolvedAvatarUrl) {

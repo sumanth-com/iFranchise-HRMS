@@ -26,9 +26,8 @@ import {
   leaveCalendarMarkLabel,
   leaveCalendarPillClass,
 } from "@/lib/leave/leave-calendar-display";
-import { expandDateRange } from "@/lib/leave/services/leave-utils";
+import { buildLeaveCalendarMarks } from "@/lib/leave/leave-calendar-marks";
 import {
-  calculateLeaveDuration,
   classifyCalendarDay,
   DEFAULT_LEAVE_CALENDAR,
   type LeaveCalendarContext,
@@ -211,14 +210,6 @@ export function LeaveCalendarView({
 
   const yearOptions = useMemo(() => getHrmsYears(), []);
 
-  const holidayMap = useMemo(() => {
-    const map = new Map<string, LeaveHolidayEntry>();
-    holidays.forEach((holiday) => {
-      map.set(holiday.holidayDate, holiday);
-    });
-    return map;
-  }, [holidays]);
-
   function leaveMarkLabel(leave: LeaveCalendarEntry, date: string) {
     return leaveCalendarMarkLabel(leave, date, { compact });
   }
@@ -243,70 +234,10 @@ export function LeaveCalendarView({
     return "bg-primary/5 ring-1 ring-inset ring-primary/20";
   }
 
-  const calendarWithHolidays = useMemo<LeaveCalendarContext>(
-    () => ({
-      ...calendar,
-      holidays: Array.from(
-        new Set([
-          ...(calendar.holidays ?? []),
-          ...(holidays ?? [])
-            .filter((item) => !item.isOptional)
-            .map((item) => item.holidayDate),
-        ]),
-      ),
-    }),
-    [calendar, holidays],
+  const { holidayMap, calendarWithHolidays, sandwichDates, leavesByDate } = useMemo(
+    () => buildLeaveCalendarMarks(leaves, holidays, calendar),
+    [leaves, holidays, calendar],
   );
-
-  const sandwichDates = useMemo(() => {
-    const dates = new Set<string>();
-    leaves.forEach((leave) => {
-      const days = calculateLeaveDuration({
-        startDate: leave.startDate,
-        endDate: leave.endDate,
-        isHalfDay: leave.isHalfDay,
-        calendar: calendarWithHolidays,
-      }).days;
-      (days ?? []).forEach((day) => {
-        if (day.kind === "sandwich") dates.add(day.date);
-      });
-    });
-    return dates;
-  }, [leaves, calendarWithHolidays]);
-
-  const leavesByDate = useMemo(() => {
-    const map = new Map<string, LeaveCalendarEntry[]>();
-
-    leaves.forEach((leave) => {
-      const pendingHrReview =
-        Boolean(leave.hrReviewRequired) &&
-        leave.leaveStatus === "pending" &&
-        !leave.hrDecision;
-
-      const dates =
-        leave.dayAllocations && leave.dayAllocations.length > 0
-          ? leave.dayAllocations
-              .filter((item) => {
-                // Pending HR review stores days as kind "none" until HR decides;
-                // still show those requested/counted days on the calendar.
-                if (item.kind !== "none") return true;
-                if (!pendingHrReview || !(item.counted > 0)) return false;
-                // Sandwich Sundays use the dedicated sandwich overlay chip.
-                return !sandwichDates.has(item.date);
-              })
-              .map((item) => item.date)
-          : expandDateRange(leave.startDate, leave.endDate).filter(
-              (date) => !sandwichDates.has(date),
-            );
-      dates.forEach((date) => {
-        const existing = map.get(date) ?? [];
-        existing.push(leave);
-        map.set(date, existing);
-      });
-    });
-
-    return map;
-  }, [leaves, sandwichDates]);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM");
 
@@ -447,7 +378,7 @@ export function LeaveCalendarView({
       >
         <div className="overflow-x-auto">
           <div className={gridMinWidth}>
-            <div className="grid grid-cols-7 border-b bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
+            <div className="grid grid-cols-7 border-b bg-gradient-to-r from-blue-600 to-violet-600 text-white">
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}

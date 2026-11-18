@@ -148,15 +148,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, 308);
   }
 
-  const { supabase, supabaseResponse, user, authUnavailable } =
+  const { supabase, supabaseResponse, userId, authUnavailable } =
     await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
 
   if (pathname === "/") {
-    if (user) {
+    if (userId) {
       let destination: string = HR_PORTAL_HOME;
       try {
-        const cached = await getCachedPermissionPayload(request, user.id);
+        const cached = await getCachedPermissionPayload(request, userId);
         if (cached) {
           destination = getPortalRedirectPath(
             cached.codes,
@@ -196,8 +196,8 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublicRoute(pathname)) {
-    if (user && supabase && isAuthRoute(pathname) && request.method === "GET") {
-      const cached = await getCachedPermissionPayload(request, user.id).catch(
+    if (userId && supabase && isAuthRoute(pathname) && request.method === "GET") {
+      const cached = await getCachedPermissionPayload(request, userId).catch(
         () => null,
       );
       if (cached) {
@@ -218,9 +218,9 @@ export async function middleware(request: NextRequest) {
 
       const resolved = await withMiddlewareTimeout(
         Promise.all([
-          resolveUserPermissionCodes(supabase, user.id),
-          resolveUserPortalRoute(supabase, user.id),
-          resolveUserRoleCodes(supabase, user.id),
+          resolveUserPermissionCodes(supabase, userId),
+          resolveUserPortalRoute(supabase, userId),
+          resolveUserRoleCodes(supabase, userId),
         ]),
         MIDDLEWARE_PERMISSION_TIMEOUT_MS,
         "public-auth-portal-redirect",
@@ -254,7 +254,7 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  if (!user || !supabase) {
+  if (!userId || !supabase) {
     // Auth was unreachable rather than negative, and the browser still holds session
     // cookies: do not sign this user out over a blip. Same fallback the permission
     // layer already uses below — the layout RSC still enforces before rendering.
@@ -294,7 +294,7 @@ export async function middleware(request: NextRequest) {
 
   let cachedPermissionPayload: Awaited<ReturnType<typeof getCachedPermissionPayload>> = null;
   try {
-    cachedPermissionPayload = await getCachedPermissionPayload(request, user.id);
+    cachedPermissionPayload = await getCachedPermissionPayload(request, userId);
   } catch (error) {
     console.error("[middleware] permission cache read failed", error);
   }
@@ -304,7 +304,7 @@ export async function middleware(request: NextRequest) {
     let accountAllowed = cachedPermissionPayload.accountAllowed;
     if (typeof accountAllowed !== "boolean") {
       const allowed = await withMiddlewareTimeout(
-        userAccountAllowsPortalAccess(supabase, user.id),
+        userAccountAllowsPortalAccess(supabase, userId),
         MIDDLEWARE_PERMISSION_TIMEOUT_MS,
         "cached-account-allowed",
       );
@@ -335,7 +335,7 @@ export async function middleware(request: NextRequest) {
     let roleCodes = cachedPermissionPayload.roleCodes;
     if (!Array.isArray(roleCodes) || roleCodes.length === 0) {
       const resolvedRoles = await withMiddlewareTimeout(
-        resolveUserRoleCodes(supabase, user.id),
+        resolveUserRoleCodes(supabase, userId),
         MIDDLEWARE_PERMISSION_TIMEOUT_MS,
         "cached-role-codes",
       );
@@ -347,7 +347,7 @@ export async function middleware(request: NextRequest) {
       try {
         await attachPermissionCache(
           supabaseResponse,
-          user.id,
+          userId,
           cachedPermissionCodes,
           accountAllowed,
           roleCodes,
@@ -370,7 +370,7 @@ export async function middleware(request: NextRequest) {
 
     if (!canAccessPortalPath(pathname, cachedPermissionCodes, roleCodes)) {
       const portalRoute = await withMiddlewareTimeout(
-        resolveUserPortalRoute(supabase, user.id),
+        resolveUserPortalRoute(supabase, userId),
         MIDDLEWARE_PERMISSION_TIMEOUT_MS,
         "cached-portal-route",
       );
@@ -387,9 +387,9 @@ export async function middleware(request: NextRequest) {
 
   const bootstrapped = await withMiddlewareTimeout(
     Promise.all([
-      userAccountAllowsPortalAccess(supabase, user.id),
-      resolveUserPermissionCodes(supabase, user.id),
-      resolveUserRoleCodes(supabase, user.id),
+      userAccountAllowsPortalAccess(supabase, userId),
+      resolveUserPermissionCodes(supabase, userId),
+      resolveUserRoleCodes(supabase, userId),
     ]),
     MIDDLEWARE_PERMISSION_TIMEOUT_MS,
     "permission-bootstrap",
@@ -412,7 +412,7 @@ export async function middleware(request: NextRequest) {
   try {
     await attachPermissionCache(
       supabaseResponse,
-      user.id,
+      userId,
       permissionCodes,
       accountAllowed,
       roleCodes,
@@ -442,7 +442,7 @@ export async function middleware(request: NextRequest) {
 
   if (!canAccessPortalPath(pathname, permissionCodes, roleCodes)) {
     const portalRoute = await withMiddlewareTimeout(
-      resolveUserPortalRoute(supabase, user.id),
+        resolveUserPortalRoute(supabase, userId),
       MIDDLEWARE_PERMISSION_TIMEOUT_MS,
       "portal-route",
     );

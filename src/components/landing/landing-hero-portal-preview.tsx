@@ -17,7 +17,7 @@ import {
   Settings,
 } from "lucide-react";
 
-import brandLogo from "@/assets/brand/if-mark-rounded.png";
+import brandLogo from "@/assets/brand/if-mark.png";
 
 function wishForHour(hour: number): string {
   if (hour < 12) return "Good morning";

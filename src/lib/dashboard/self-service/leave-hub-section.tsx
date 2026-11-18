@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { leaveWorkspaceUrl } from "@/lib/attendance/attendance-leave-navigation";
 import { HrLeaveHubView } from "@/components/leave/hr-leave-hub-view";
 import { firstHubSearchParam } from "@/lib/dashboard/hub-page-utils";
 import {
@@ -35,6 +37,9 @@ export async function LeaveHubSection({
   const profile = await requireServerPermission("leave.view");
   const supabase = await createClient();
   const raw = await searchParams;
+  if (section === "my" && hasPermission(profile.permissionCodes, "attendance.view")) {
+    redirect(leaveWorkspaceUrl("/dashboard/attendance", raw));
+  }
   const now = new Date();
   const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_LEAVE_PERMISSIONS]);
   const employeeId = profile.employee.id;

@@ -48,7 +48,12 @@ import {
   validateInvitationForUser,
 } from "@/lib/employees/services/employee-account";
 import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
-import { resolveUserPortalRoute, resolveUserPermissionCodes, resolveUserRoleCodes } from "@/lib/auth/permission-resolver";
+import {
+  resolveUserPermissionCodes,
+  resolveUserRoleCodes,
+  resolveUserPortalRoute,
+} from "@/lib/auth/permission-resolver";
+import { getPortalRouteForRoleCodes } from "@/lib/auth/portals";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -227,7 +232,11 @@ export async function loginAction(
     }
 
     const { email: rawEmail, password, rememberMe } = parsed.data;
-    const portalAccess = await evaluatePortalLoginAccess(rawEmail);
+    const [portalAccess, email, ctx] = await Promise.all([
+      evaluatePortalLoginAccess(rawEmail),
+      resolveApprovedLoginEmail(rawEmail),
+      getRequestAuditContext(),
+    ]);
     if (portalAccess === "denied") {
       return {
         success: false,
@@ -235,9 +244,6 @@ export async function loginAction(
         message: getAuthErrorMessage("PORTAL_ACCESS_DENIED"),
       };
     }
-
-    const email = await resolveApprovedLoginEmail(rawEmail);
-    const ctx = await getRequestAuditContext();
 
     try {
       assertRateLimit({
@@ -308,6 +314,7 @@ export async function loginAction(
       authData.user.id,
       email,
       supabase,
+      { includeOrganizationLogo: false, includeProfileImageUrl: false },
     );
 
     if (!profileResult.success) {
@@ -377,7 +384,11 @@ export async function loginAction(
       }
     }
 
-    const portalRoute = await resolveUserPortalRoute(supabase, userId);
+    // The authenticated profile already includes roles. Use them for common
+    // portal routing and only query the database for custom role fallbacks.
+    const portalRoute =
+      getPortalRouteForRoleCodes(roleCodes) ??
+      (await resolveUserPortalRoute(supabase, userId));
     const redirectTo = getAuthenticatedRedirectPath(
       profileResult.profile.roles,
       permissionCodes,

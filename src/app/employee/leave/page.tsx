@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { canOpenSelfAttendance, leaveWorkspaceUrl } from "@/lib/attendance/attendance-leave-navigation";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
@@ -13,11 +15,14 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function EmployeeLeavePage() {
+export default async function EmployeeLeavePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
     "leave.view",
   ]);
+  if (canOpenSelfAttendance(profile.permissionCodes, "employee")) {
+    redirect(leaveWorkspaceUrl(EMPLOYEE_ROUTES.attendance, await searchParams));
+  }
   const supabase = await createClient();
   const employeeId = profile.employee.id;
   const canApply = hasPermission(profile.permissionCodes, "leave.create");

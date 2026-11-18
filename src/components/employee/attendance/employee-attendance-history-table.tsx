@@ -30,11 +30,10 @@ import {
 } from "@/lib/attendance/services/attendance-utils";
 import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { getHrmsYears } from "@/lib/date/hrms-year";
-import { ATTENDANCE_STATUS_FILTER_ITEMS, ATTENDANCE_UI_DISPLAY_LABELS, resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
+import { ATTENDANCE_STATUS_FILTER_ITEMS } from "@/lib/attendance/manual-status";
 import { updateCheckoutWithFreshGps } from "@/lib/attendance/self-attendance-punch-with-gps";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { formatHoursLabel, formatLateByLabel } from "@/lib/employee/attendance-format";
-import type { AttendanceStatus } from "@/types/attendance";
 import type {
   ManagerAttendanceHistoryResult,
   ManagerAttendanceHistoryRow,
@@ -294,13 +293,6 @@ export function EmployeeAttendanceHistoryTable({
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="border-t px-5 py-3 text-sm text-muted-foreground">
-        <p>
-          Showing {historyRows.length} day(s) for{" "}
-          {format(new Date(year, month - 1, 1), "MMMM yyyy")}
-        </p>
       </div>
 
       <Modal

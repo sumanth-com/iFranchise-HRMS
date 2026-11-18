@@ -67,13 +67,8 @@ export function SettingsResignationModalSection({
         onOpenChange={setOpen}
         title={title}
         description="Submit or track your resignation request."
-        contentClassName="sm:max-w-2xl"
+        contentClassName="sm:max-w-xl"
         showCancel={false}
-        footer={
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Close
-          </Button>
-        }
       >
         <SettingsResignationModalContent
           canApply={canApply}
@@ -81,6 +76,7 @@ export function SettingsResignationModalSection({
           defaultNoticePeriodDays={defaultNoticePeriodDays}
           activeResignation={activeResignation}
           rejectedResignation={rejectedResignation}
+          onCancel={() => setOpen(false)}
           onSubmitted={() => setOpen(false)}
         />
       </Modal>

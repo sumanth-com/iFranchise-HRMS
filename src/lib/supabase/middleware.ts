@@ -36,30 +36,34 @@ export async function updateSession(request: NextRequest) {
       },
     });
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+    // Middleware only needs the verified subject for portal routing. getClaims
+    // verifies asymmetric JWTs locally (using cached JWKS) and still falls back
+    // to Auth verification for symmetric signing keys.
+    const { data: verifiedJwt, error } = await supabase.auth.getClaims();
+    const userId =
+      typeof verifiedJwt?.claims.sub === "string"
+        ? verifiedJwt.claims.sub
+        : null;
 
     // A 5xx/429/transport error means Supabase never decided anything about this
     // session. Report it separately so the caller does not treat it as "signed out".
-    if (!user && isTransientAuthFailure(error)) {
+    if (!userId && isTransientAuthFailure(error)) {
       console.error("[middleware] auth service unreachable; preserving session", {
         name: error?.name,
         status: error?.status,
         message: error?.message,
       });
-      return { supabase, supabaseResponse, user: null, authUnavailable: true };
+      return { supabase, supabaseResponse, userId: null, authUnavailable: true };
     }
 
-    return { supabase, supabaseResponse, user, authUnavailable: false };
+    return { supabase, supabaseResponse, userId, authUnavailable: false };
   } catch (error) {
     console.error("[middleware] session update failed or timed out", {
       name: error instanceof Error ? error.name : "unknown",
       message: error instanceof Error ? error.message : "unknown",
     });
-    // getUser() returns auth denials rather than throwing, so reaching this catch
-    // always means transport/config failure — never a decision about this session.
-    return { supabase: null, supabaseResponse, user: null, authUnavailable: true };
+    // Claims verification returns auth denials rather than throwing, so reaching
+    // this catch means transport/config failure — never a decision about session validity.
+    return { supabase: null, supabaseResponse, userId: null, authUnavailable: true };
   }
 }

@@ -1,4 +1,5 @@
 import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
+import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import type { ManagerAttendanceMonthSummary } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +8,12 @@ type Props = {
   className?: string;
   /** Sidebar stack beside calendar (My Attendance). Default is a responsive grid row. */
   layout?: "grid" | "sidebar";
+  /** Personal attendance page: replace absence/late totals with today's live punch details. */
+  today?: {
+    workingHoursLabel: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+  };
 };
 
 const CARDS: {
@@ -45,6 +52,7 @@ export function ManagerProfileSummaryCards({
   summary,
   className,
   layout = "grid",
+  today,
 }: Props) {
   const isSidebar = layout === "sidebar";
   const live = useOptionalSelfAttendanceLive();
@@ -59,6 +67,8 @@ export function ManagerProfileSummaryCards({
       )}
     >
       {CARDS.map((card) => {
+        const showWorkingHours = Boolean(today && card.key === "absent");
+        const showPunchTimes = Boolean(today && card.key === "late");
         const raw =
           card.key === "leave" && live
             ? live.calendarDays.filter(
@@ -83,26 +93,33 @@ export function ManagerProfileSummaryCards({
                 isSidebar ? "text-xs font-semibold uppercase tracking-wider" : "text-[11px] font-medium",
               )}
             >
-              {card.label}
+              {showWorkingHours ? "Working Hours" : showPunchTimes ? "Check In / Out" : card.label}
             </p>
-            <p
+            {showPunchTimes && today ? (
+              <dl className="mt-2 grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm">
+                <dt className="text-left text-muted-foreground">Check In</dt>
+                <dd className="text-right font-semibold tabular-nums">{formatAttendanceTime(today.checkInAt)}</dd>
+                <dt className="text-left text-muted-foreground">Check Out</dt>
+                <dd className="text-right font-semibold tabular-nums">{formatAttendanceTime(today.checkOutAt)}</dd>
+              </dl>
+            ) : <p
               className={cn(
                 "font-bold tracking-tight tabular-nums",
                 isSidebar ? "mt-1 text-2xl leading-tight" : "mt-2 text-2xl font-semibold",
-                card.key === "absent" && Number(raw) > 0 && "text-red-600 dark:text-red-400",
+                !showWorkingHours && card.key === "absent" && Number(raw) > 0 && "text-red-600 dark:text-red-400",
                 card.key === "late" && Number(raw) > 0 && "text-orange-600 dark:text-orange-400",
                 card.key === "leave" && Number(raw) > 0 && "text-violet-600 dark:text-violet-400",
               )}
             >
-              {display}
-            </p>
+              {showWorkingHours ? today?.workingHoursLabel : display}
+            </p>}
             <p
               className={cn(
                 "leading-snug text-muted-foreground",
                 isSidebar ? "mt-1 text-xs" : "mt-0.5 text-[11px]",
               )}
             >
-              {isSidebar ? card.sidebarHint : card.hint}
+              {showWorkingHours || showPunchTimes ? "Today" : isSidebar ? card.sidebarHint : card.hint}
             </p>
           </div>
         );

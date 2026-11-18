@@ -289,13 +289,6 @@ export function ManagerProfileHistoryTable({
         </table>
       </div>
 
-      <div className="border-t px-5 py-3 text-sm text-muted-foreground">
-        <p>
-          Showing {history.data.length} day(s) for{" "}
-          {format(new Date(year, month - 1, 1), "MMMM yyyy")}
-        </p>
-      </div>
-
       <Modal
         open={Boolean(selectedRow)}
         onOpenChange={(open) => {

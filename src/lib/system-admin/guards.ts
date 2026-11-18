@@ -13,3 +13,9 @@ export async function requireSuperAdminProfile() {
   }
   return profile;
 }
+
+/** Keep system-only modules on their dedicated Super Admin portal routes. */
+export async function redirectSuperAdminToSystemPortal(href: string): Promise<never> {
+  await requireSuperAdminProfile();
+  redirect(href);
+}

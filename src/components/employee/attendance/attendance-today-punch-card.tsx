@@ -22,11 +22,6 @@ import {
   hasShownBirthdayCheckInCelebration,
   markBirthdayCheckInCelebrationShown,
 } from "@/lib/employee/birthday-utils";
-import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
-import {
-  formatLiveWorkingDuration,
-  formatWorkingDuration,
-} from "@/lib/employee/attendance-format";
 import { cn } from "@/lib/utils";
 import type {
   ManagerAttendancePunchState,
@@ -101,19 +96,21 @@ type Props = {
   onUpdateCheckout: () => Promise<PunchResult>;
   /** When false, checked-out state is read-only (no Update Check Out). */
   allowUpdateCheckout?: boolean;
+  compact?: boolean;
+  fillHeight?: boolean;
+  extraActions?: ReactNode;
+  /** Render the punch controls in the page header without a separate card. */
+  heading?: ReactNode;
 };
 
-function workflowHint(
-  punchState: ManagerAttendancePunchState,
-  _allowUpdateCheckout: boolean,
-) {
+function workflowHint(punchState: ManagerAttendancePunchState) {
   switch (punchState) {
     case "checked_in":
-      return "You're checked in. Tap Check Out when you finish for the day.";
+      return "Checked in. Check out when you're done.";
     case "checked_out":
-      return "Checked out for today. Update Check Out stays available for every employee until the day ends.";
+      return "Your attendance is complete for today.";
     default:
-      return "Tap Check In when you start work. After check-in, Check Out stays available all day.";
+      return "Check in when you start work to record today’s attendance.";
   }
 }
 
@@ -198,10 +195,11 @@ export function AttendanceTodayPunchCard({
   onCheckIn,
   onCheckOut,
   onUpdateCheckout,
-  allowUpdateCheckout = false,
+  compact = false,
+  fillHeight = false,
+  extraActions,
+  heading,
 }: Props) {
-  // Every employee can update their own checkout after punching out.
-  const canUpdateCheckout = true;
   const live = useOptionalSelfAttendanceLive();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -226,18 +224,6 @@ export function AttendanceTodayPunchCard({
       setOptimisticToday(null);
     }
   }, [baseToday, optimisticToday]);
-
-  const elapsedSeconds = useLiveWorkingSeconds(
-    today.checkInAt,
-    today.checkOutAt,
-    today.priorCompletedSeconds ?? 0,
-  );
-  // Prefer optimistic/local elapsed so Check In never shows 0h while already punched.
-  const workingSeconds = Math.max(elapsedSeconds, live?.workingSeconds ?? 0);
-  const workingHoursLabel =
-    today.checkInAt && !today.checkOutAt
-      ? formatLiveWorkingDuration(workingSeconds)
-      : formatWorkingDuration(workingSeconds);
 
   useEffect(() => {
     if (dialog?.kind !== "check_in" && dialog?.kind !== "check_out") return;
@@ -360,19 +346,16 @@ export function AttendanceTodayPunchCard({
 
   return (
     <>
-      <section className="dashboard-surface card-surface-static attendance-wave-surface max-xl:min-h-0 w-full min-w-0 rounded-2xl border-0 bg-card p-4 md:p-5 dark:border">
-        <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+      <section className={heading ? "w-full min-w-0" : cn("w-full min-w-0 rounded-2xl bg-card p-4 md:p-5", compact ? "border shadow-sm" : "dashboard-surface card-surface-static attendance-wave-surface max-xl:min-h-0 border-0 dark:border", fillHeight && "flex h-full flex-col justify-center")}>
+        <div className={cn("flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between lg:gap-4", heading && "lg:items-start")}>
           <div className="min-w-0 flex-1 space-y-2.5">
+            {heading}
             <div>
               <h2 className="text-base font-semibold tracking-tight">
-                Mark attendance for today ({dateLabel})
+                Today&apos;s attendance · {dateLabel}
               </h2>
               <p className="mt-1 text-sm leading-snug text-muted-foreground">
-                Today&apos;s working hours:{" "}
-                <span className="font-medium text-foreground">
-                  {workingHoursLabel}
-                </span>
-                . {workflowHint(punchState, canUpdateCheckout)}
+                {workflowHint(punchState)}
               </p>
             </div>
 
@@ -389,11 +372,11 @@ export function AttendanceTodayPunchCard({
               )}
               <span className="inline-flex items-center gap-1.5 rounded-full border bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                 <LogIn className="size-3.5" />
-                Check in: {formatAttendanceTime(today.checkInAt)}
+                Check-in · {formatAttendanceTime(today.checkInAt)}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300">
                 <LogOut className="size-3.5" />
-                Check out: {formatAttendanceTime(today.checkOutAt)}
+                Check-out · {formatAttendanceTime(today.checkOutAt)}
               </span>
             </div>
           </div>
@@ -434,6 +417,7 @@ export function AttendanceTodayPunchCard({
                 Update Check Out
               </PunchActionButton>
             ) : null}
+            {extraActions}
           </div>
         </div>
       </section>

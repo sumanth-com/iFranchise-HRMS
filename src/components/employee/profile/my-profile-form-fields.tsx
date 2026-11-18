@@ -113,6 +113,115 @@ export function MyProfileFormFields({
 }: MyProfileFormFieldsProps) {
   const editingContact = isEditing && canEditContactDetails;
 
+  if (isEmployee && isEditing) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-muted-foreground">Gender</Label>
+          <Select
+            value={gender ?? ""}
+            onValueChange={(value) => {
+              if (!value) return;
+              setValue("gender", value as EmployeeSelfProfileInput["gender"], {
+                shouldValidate: true,
+              });
+            }}
+            disabled={isPending || !editingContact}
+          >
+            <SelectTrigger className="h-9 w-full">
+              <SelectValue placeholder="Select gender" />
+            </SelectTrigger>
+            <SelectContent className={PROFILE_SELECT_CONTENT_CLASS}>
+              {PROFILE_GENDER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <ProfileFieldError message={errors.gender?.message} />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-muted-foreground">Address</Label>
+          <div className="space-y-2">
+            <Input
+              placeholder="Street, building, area"
+              disabled={isPending || !editingContact}
+              className="h-9 w-full"
+              {...register("addressLine1")}
+            />
+            <Input
+              placeholder="Apartment, suite, landmark (optional)"
+              disabled={isPending || !editingContact}
+              className="h-9 w-full"
+              {...register("addressLine2")}
+            />
+          </div>
+          <ProfileFieldError message={errors.addressLine1?.message || errors.addressLine2?.message} />
+        </div>
+
+        <div className="space-y-1 sm:col-span-2">
+          <Label className="text-xs font-medium text-muted-foreground">City / State</Label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <SearchableSelect
+              options={(STATE_DISTRICTS[addressState] ?? []).map((district) => ({
+                value: district,
+                label: district,
+              }))}
+              value={addressCity || null}
+              onValueChange={(value) => setValue("city", value ?? "", { shouldValidate: true })}
+              placeholder="Select city"
+              allowNone={false}
+              disabled={isPending || !editingContact}
+              emptyMessage={addressState ? "No matches — type to search" : "Select a state first"}
+            />
+            <SearchableSelect
+              options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
+              value={addressState || null}
+              onValueChange={(value) => {
+                setValue("state", value ?? "", { shouldValidate: true });
+                setValue("city", "", { shouldValidate: true });
+              }}
+              placeholder="Select state"
+              allowNone={false}
+              disabled={isPending || !editingContact}
+            />
+          </div>
+          <ProfileFieldError message={errors.city?.message || errors.state?.message} />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-muted-foreground">Country</Label>
+          <SearchableSelect
+            options={COUNTRIES.map((country) => ({ value: country, label: country }))}
+            value={addressCountry || null}
+            onValueChange={(value) => setValue("country", value ?? "", { shouldValidate: true })}
+            placeholder="Select country"
+            allowNone={false}
+            disabled={isPending || !editingContact}
+          />
+          <ProfileFieldError message={errors.country?.message} />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-muted-foreground">Postal Code</Label>
+          <Input
+            placeholder="Postal code"
+            disabled={isPending || !editingContact}
+            className="h-9 w-full"
+            {...register("postalCode")}
+          />
+          <ProfileFieldError message={errors.postalCode?.message} />
+        </div>
+
+        <p className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground sm:col-span-2">
+          For changes to any other profile information, please contact HR.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {isEmployee ? (
@@ -373,22 +482,25 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Emergency email" required={editingContact}>
-        {editingContact ? (
-          <div className="space-y-1">
-            <Input
-              placeholder="Email"
-              type="email"
-              disabled={isPending}
-              className="h-9 w-full"
-              {...register("emergencyContactEmail")}
-            />
-            <ProfileFieldError message={errors.emergencyContactEmail?.message} />
-          </div>
-        ) : (
-          <ProfileReadonlyValue value={data.profileSettings.emergencyContact.email} />
-        )}
-      </ProfileFormField>
+      {!data.profileSettings.emergencyContact.email?.trim() ? (
+        <ProfileFormField label="Emergency email" required={editingContact}>
+          {editingContact ? (
+            <div className="space-y-1">
+              <Input
+                placeholder="Email"
+                type="email"
+                disabled={isPending}
+                className="h-9 w-full"
+                {...register("emergencyContactEmail")}
+              />
+              <ProfileFieldError message={errors.emergencyContactEmail?.message} />
+            </div>
+          ) : (
+            <ProfileReadonlyValue value={data.profileSettings.emergencyContact.email} />
+          )}
+        </ProfileFormField>
+      ) : null}
+
     </div>
   );
 }

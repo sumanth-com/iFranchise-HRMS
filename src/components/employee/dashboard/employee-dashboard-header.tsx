@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { employeeDateBadgeClass } from "@/components/employee/dashboard/employee-module-primitives";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
+import { getDailyBoostDisplayName } from "@/lib/employees/parse-employee-name";
 import { cn } from "@/lib/utils";
 import type { EmployeeGreeting } from "@/types/employee-dashboard";
 
@@ -27,7 +28,7 @@ function HeaderDateWidget({ now }: { now: Date | null }) {
   });
 
   return (
-    <div className="dashboard-surface flex w-full max-w-full shrink-0 items-center gap-3.5 rounded-xl border-0 bg-card px-4 py-2.5 sm:w-auto dark:shadow-none">
+    <div className="dashboard-surface flex w-full max-w-full shrink-0 items-center gap-3 rounded-xl border-0 bg-card px-3 py-2 sm:w-auto dark:shadow-none">
       <div className={employeeDateBadgeClass}>
         <div
           className="bg-gradient-to-br from-blue-600 to-violet-600 px-1 py-1 text-[10px] font-bold tracking-[0.14em] text-white uppercase"
@@ -71,6 +72,10 @@ export function EmployeeDashboardHeader({
   const { portalLabel } = useSidebarNavigation();
   // Always match the active portal (HR / Manager / Employee / Executive / Super Admin).
   const resolvedSubtitle = subtitle ?? portalLabel;
+  const displayName = getDailyBoostDisplayName(
+    greeting.firstName,
+    greeting.lastName,
+  );
 
   const [now, setNow] = useState<Date | null>(null);
 
@@ -86,12 +91,12 @@ export function EmployeeDashboardHeader({
   return (
     <section
       className={cn(
-        "dashboard-surface relative w-full shrink-0 overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-card via-card to-violet-500/[0.06] px-5 py-4 md:px-6 md:py-5 dark:shadow-none",
+        "dashboard-surface relative w-full shrink-0 overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-card via-card to-violet-500/[0.06] px-4 py-3 md:px-5 md:py-3.5 dark:shadow-none",
       )}
     >
       <div className="pointer-events-none absolute -top-12 -right-12 size-44 rounded-full bg-gradient-to-br from-blue-500/15 to-violet-500/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-16 left-1/4 size-32 rounded-full bg-violet-500/10 blur-2xl" />
-      <div className="relative flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="relative flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0 flex-1">
           <p className="mb-1.5 inline-flex items-center rounded-full bg-gradient-to-r from-blue-600/10 to-violet-600/10 px-2.5 py-0.5 text-[11px] font-medium tracking-wide text-violet-700 dark:text-violet-300">
             {resolvedSubtitle}
@@ -105,7 +110,7 @@ export function EmployeeDashboardHeader({
             ) : null}
             <span className="text-muted-foreground/40">,</span>{" "}
             <span className="bg-gradient-to-r from-blue-700 to-violet-700 bg-clip-text text-transparent dark:from-blue-400 dark:to-violet-400">
-              {greeting.firstName}
+              {displayName}
             </span>
           </h1>
         </div>

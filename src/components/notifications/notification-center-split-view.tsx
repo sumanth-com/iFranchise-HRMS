@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  deleteAllNotificationsAction,
   deleteNotificationAction,
   deleteSelectedNotificationsAction,
   markAllNotificationsReadAction,
@@ -94,6 +95,7 @@ export function NotificationCenterSplitView({
   const [deleteTarget, setDeleteTarget] = useState<NotificationListItem | null>(null);
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteAllSelected, setDeleteAllSelected] = useState(false);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [activeNotification, setActiveNotification] = useState<NotificationListItem | null>(
     null,
@@ -178,10 +180,12 @@ export function NotificationCenterSplitView({
   function exitBulkSelectMode() {
     setBulkSelectMode(false);
     setSelectedIds(new Set());
+    setDeleteAllSelected(false);
     setBulkDeleteConfirmOpen(false);
   }
 
   function toggleSelect(id: string, checked: boolean) {
+    setDeleteAllSelected(false);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
@@ -191,15 +195,8 @@ export function NotificationCenterSplitView({
   }
 
   function toggleSelectAllVisible(checked: boolean) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        visibleIds.forEach((id) => next.add(id));
-      } else {
-        visibleIds.forEach((id) => next.delete(id));
-      }
-      return next;
-    });
+    setDeleteAllSelected(checked);
+    setSelectedIds(checked ? new Set(visibleIds) : new Set());
   }
 
   function markAsRead(item: NotificationListItem) {
@@ -286,11 +283,13 @@ export function NotificationCenterSplitView({
 
   function confirmSelectedDelete() {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
+    if (!deleteAllSelected && ids.length === 0) return;
 
     startDeleteTransition(async () => {
       const res = await runServerActionSafely(() =>
-        deleteSelectedNotificationsAction(ids),
+        deleteAllSelected
+          ? deleteAllNotificationsAction()
+          : deleteSelectedNotificationsAction(ids),
       );
       if (res === null) return;
       if (res.success) {
@@ -300,7 +299,7 @@ export function NotificationCenterSplitView({
             ? `${count} notification${count === 1 ? "" : "s"} deleted`
             : "No notifications deleted",
         );
-        if (activeNotification && ids.includes(activeNotification.id)) {
+        if (activeNotification && (deleteAllSelected || ids.includes(activeNotification.id))) {
           localSelectionIdRef.current = null;
           setActiveNotification(null);
           syncSelectionInUrl(undefined);
@@ -389,7 +388,7 @@ export function NotificationCenterSplitView({
                     disabled={isDeleting || visibleIds.length === 0}
                     onClick={() => toggleSelectAllVisible(!allVisibleSelected)}
                   >
-                    {allVisibleSelected ? "Clear selection" : "Select all"}
+                    {allVisibleSelected ? "Clear selection" : "Select all notifications"}
                   </Button>
                   <Button
                     type="button"
@@ -400,7 +399,7 @@ export function NotificationCenterSplitView({
                     onClick={() => setBulkDeleteConfirmOpen(true)}
                   >
                     <Trash2 className="size-3.5" />
-                    Delete{selectedCount > 0 ? ` (${selectedCount})` : ""}
+                    {deleteAllSelected ? "Delete all" : `Delete${selectedCount > 0 ? ` (${selectedCount})` : ""}`}
                   </Button>
                   <Button
                     type="button"
@@ -422,6 +421,7 @@ export function NotificationCenterSplitView({
                   onClick={() => {
                     setBulkSelectMode(true);
                     setSelectedIds(new Set());
+                    setDeleteAllSelected(false);
                   }}
                 >
                   <Trash2 className="size-3.5" />
@@ -618,8 +618,8 @@ export function NotificationCenterSplitView({
         onOpenChange={(open) => {
           if (!open) setBulkDeleteConfirmOpen(false);
         }}
-        title="Delete selected notifications?"
-        description="Only the notifications you selected will be permanently removed."
+        title={deleteAllSelected ? "Delete all notifications?" : "Delete selected notifications?"}
+        description={deleteAllSelected ? "All notifications in your portal will be permanently removed." : "Only the notifications you selected will be permanently removed."}
         contentClassName="sm:max-w-md"
         showCancel={false}
         footer={
@@ -629,19 +629,20 @@ export function NotificationCenterSplitView({
             </Button>
             <Button
               variant="destructive"
-              disabled={isDeleting || selectedCount === 0}
+              disabled={isDeleting || (!deleteAllSelected && selectedCount === 0)}
               onClick={confirmSelectedDelete}
             >
               {isDeleting
                 ? "Deleting…"
-                : `Delete ${selectedCount} notification${selectedCount === 1 ? "" : "s"}`}
+                : deleteAllSelected ? "Delete all notifications" : `Delete ${selectedCount} notification${selectedCount === 1 ? "" : "s"}`}
             </Button>
           </>
         }
       >
         <p className="text-sm text-muted-foreground">
-          {selectedCount} selected notification{selectedCount === 1 ? "" : "s"} will be
-          deleted. This cannot be undone.
+          {deleteAllSelected
+            ? "Every notification in your portal will be deleted. This cannot be undone."
+            : `${selectedCount} selected notification${selectedCount === 1 ? "" : "s"} will be deleted. This cannot be undone.`}
         </p>
       </Modal>
     </div>

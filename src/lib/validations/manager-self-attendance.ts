@@ -16,6 +16,14 @@ export const managerUpdateCheckoutSchema = z.object({
   accuracy: z.number().finite().nonnegative().optional(),
 });
 
+export const selfAttendanceLocationSaveSchema = z.object({
+  attendanceId: z.string().uuid(),
+  type: z.enum(["in", "out"]),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  accuracy: z.number().finite().nonnegative().optional(),
+});
+
 export const managerProfilePageParamsSchema = z.object({
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
@@ -55,6 +63,9 @@ export type ManagerAttendancePunchInput = z.infer<
 >;
 export type ManagerUpdateCheckoutInput = z.infer<
   typeof managerUpdateCheckoutSchema
+>;
+export type SelfAttendanceLocationSaveInput = z.infer<
+  typeof selfAttendanceLocationSaveSchema
 >;
 export type ManagerProfilePageParams = z.infer<
   typeof managerProfilePageParamsSchema

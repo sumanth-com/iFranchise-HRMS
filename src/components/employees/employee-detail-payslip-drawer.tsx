@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Loader2, Mail } from "lucide-react";
+import { Download, Loader2, Mail, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
@@ -76,7 +76,7 @@ export function EmployeeDetailPayslipDrawer({
   onOpenChange,
   canEmail = false,
 }: EmployeeDetailPayslipDrawerProps) {
-  const { detail, loading } = useCachedModalDetail<PayslipDetail>({
+  const { detail, loading, error, refresh } = useCachedModalDetail<PayslipDetail>({
     id: payslipId,
     open,
     fetchDetail: fetchPayslipDetailAction,
@@ -114,8 +114,12 @@ export function EmployeeDetailPayslipDrawer({
       ) : detail ? (
         <PayslipView payslip={detail} canDownload canEmail={false} hideActions />
       ) : (
-        <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
-          This payslip could not be loaded.
+        <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
+          <p>{error || "This payslip could not be loaded."}</p>
+          <Button variant="outline" size="sm" onClick={() => void refresh()}>
+            <RefreshCw className="mr-2 size-4" />
+            Try again
+          </Button>
         </div>
       )}
     </Modal>

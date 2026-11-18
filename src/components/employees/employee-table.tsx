@@ -297,7 +297,7 @@ export function EmployeeTable({
 
   return (
     <div className="space-y-4">
-      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3">
+      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 2xl:flex-row 2xl:flex-nowrap 2xl:items-center">
         <EmploymentCategoryFilters
           value={employmentCategory ?? DEFAULT_EMPLOYMENT_CATEGORY_FILTER}
           onChange={(value) => {
@@ -308,7 +308,7 @@ export function EmployeeTable({
             });
           }}
         />
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 2xl:flex-nowrap">
           {employeePicker ? (
             <LabeledSelect
               items={employeeItems}
@@ -323,7 +323,7 @@ export function EmployeeTable({
             <Input
               placeholder="Search by name, email, or code..."
               value={searchInput}
-              className="h-10 min-w-[14rem] flex-1 border-border/80 bg-white font-semibold sm:max-w-sm dark:bg-input"
+              className="h-10 min-w-[14rem] flex-1 border-border/80 bg-white font-semibold 2xl:min-w-[12rem] 2xl:max-w-none dark:bg-input"
               onChange={(event) => setSearchInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -349,7 +349,7 @@ export function EmployeeTable({
               });
             }}
           >
-            <SelectTrigger className="h-10 w-[13.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input">
+            <SelectTrigger className="h-10 w-[12rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input">
               <SelectValue placeholder="All departments" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
@@ -364,7 +364,7 @@ export function EmployeeTable({
             </SelectContent>
           </Select>
           <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border/80 bg-white px-3 text-sm font-semibold dark:bg-input">
-            {peopleCount} {peopleCount === 1 ? "person" : "people"}
+            {peopleCount} {peopleCount === 1 ? "employee" : "employees"}
           </span>
         </div>
       </div>

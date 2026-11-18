@@ -118,7 +118,7 @@ export function ApplyLeaveDialog({
               applyContext?.approvalLevels ?? 2,
             )
       }
-      contentClassName="w-[min(96vw,48rem)] sm:max-w-3xl"
+      contentClassName={isTeam ? "w-[min(96vw,48rem)] sm:max-w-3xl" : "w-[min(96vw,42rem)] sm:max-w-2xl"}
       bodyClassName="overflow-y-auto py-3"
       showCancel={false}
     >

@@ -2,22 +2,18 @@ import { EmployeeSettingsView } from "@/components/employee/settings/employee-se
 import { NotificationPreferencesForm } from "@/components/notifications/notification-preferences-form";
 import { SettingsResignationLinkSection } from "@/components/settings/settings-resignation-link-section";
 import { SettingsResignationModalSection } from "@/components/settings/settings-resignation-modal-section";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { safeServerCall } from "@/lib/errors/safe-server";
 import { getExitSettings, mergeExitSettings } from "@/lib/exit/services/exit-settings";
 import { getEmployeeResignationSnapshot } from "@/lib/exit/services/exit-queries";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { DEFAULT_NOTIFICATION_SOUND } from "@/lib/notifications/constants";
 import { getNotificationUserPreferences } from "@/lib/notifications/services/notification-queries";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
+import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ManagerSettingsPage() {
-  const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.manager,
-    "employee_profile.view",
-  ]);
+  const profile = await requireSuperAdminProfile();
   const supabase = await createClient();
   const [notificationPreferences, snapshot, exitSettings] = await Promise.all([
     safeServerCall(

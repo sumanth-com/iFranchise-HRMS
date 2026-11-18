@@ -23,10 +23,8 @@ export const accountantNavItems: NavigationItem[] = [
     documents: ACCOUNTANT_ROUTES.documents,
     leave: ACCOUNTANT_ROUTES.leave,
     goals: ACCOUNTANT_ROUTES.goals,
-    assets: ACCOUNTANT_ROUTES.assets,
     announcements: ACCOUNTANT_ROUTES.announcements,
     notifications: ACCOUNTANT_ROUTES.notifications,
-    settings: ACCOUNTANT_ROUTES.settings,
   }),
 
   // ── Administration (org finance) ─────────────────────────────────

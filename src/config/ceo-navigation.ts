@@ -6,7 +6,6 @@ import {
   CalendarCheck,
   CheckSquare,
   LayoutDashboard,
-  Settings,
   Target,
   UserRound,
   UserRoundPlus,
@@ -83,10 +82,5 @@ export const ceoNavItems: NavigationItem[] = [
     href: CEO_ROUTES.notifications,
     icon: Bell,
     permissions: ["notifications.view", "notification.view"],
-  },
-  {
-    title: "Settings",
-    href: CEO_ROUTES.settings,
-    icon: Settings,
   },
 ];

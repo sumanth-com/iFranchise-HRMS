@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Trash2, Upload } from "lucide-react";
+import { Copy, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -41,6 +41,16 @@ type EmployeeIdCardProps = {
   className?: string;
   hideHeaderLabel?: boolean;
   stretchHeight?: boolean;
+  hideEmploymentType?: boolean;
+  showCopyEmployeeCode?: boolean;
+  /** Show only the employee name and ID in the card footer. */
+  nameAndIdOnly?: boolean;
+  /** Hide the employee ID row when it is shown elsewhere in the profile. */
+  hideEmployeeCode?: boolean;
+  /** Optional note shown beneath the identity details. */
+  footerNote?: string;
+  /** Compact identity footer used when matching directory-card proportions. */
+  compactFooter?: boolean;
 };
 
 export function EmployeeIdCard({
@@ -49,17 +59,20 @@ export function EmployeeIdCard({
   lastName,
   employeeCode,
   designation,
-  departmentName: _departmentName,
   employmentTypeName,
-  employmentStatus: _employmentStatus,
   accountStatus,
   profileImagePath,
   imageUrl: initialUrl,
-  profilePath: _profilePath,
   canEdit,
   className,
   hideHeaderLabel = false,
   stretchHeight = false,
+  hideEmploymentType = false,
+  showCopyEmployeeCode = false,
+  nameAndIdOnly = false,
+  hideEmployeeCode = false,
+  footerNote,
+  compactFooter = false,
 }: EmployeeIdCardProps) {
   const router = useRouter();
   const waveGradientId = useId().replace(/:/g, "");
@@ -122,7 +135,7 @@ export function EmployeeIdCard({
     return () => {
       cancelled = true;
     };
-  }, [profileImagePath, initialUrl]);
+  }, [employeeId, profileImagePath, initialUrl]);
 
   useEffect(() => {
     return () => {
@@ -142,6 +155,16 @@ export function EmployeeIdCard({
     if (!canEdit || isPending) return;
     openPicker();
   };
+
+  async function copyEmployeeCode(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(employeeCode);
+      toast.success("Employee ID copied");
+    } catch {
+      toast.error("Could not copy employee ID");
+    }
+  }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -258,18 +281,21 @@ export function EmployeeIdCard({
             onClick={canEdit ? handlePhotoAreaClick : undefined}
           >
             {imageUrl ? (
-              <img
+              <Image
                 src={imageUrl}
                 alt={fullName}
-                decoding="async"
+                fill
+                sizes="304px"
+                unoptimized
                 loading="eager"
+                decoding="async"
                 onError={() => {
                   if (previewUrlRef.current) return;
                   setImageUrl(null);
                   resolvedPathRef.current = null;
                   notifyProfilePhotoChanged({ employeeId, imageUrl: null });
                 }}
-                className="absolute inset-0 size-full object-cover object-top"
+                className="object-cover object-top"
               />
             ) : assetPhoto ? (
               <Image
@@ -361,24 +387,47 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative flex min-h-[10.5rem] flex-col items-center justify-center bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-6 pt-10 text-center">
+            <div className={cn(
+              "relative flex flex-col items-center justify-center bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] text-center",
+              compactFooter
+                ? "min-h-[6.5rem] px-4 pb-3 pt-7"
+                : "min-h-[10.5rem] px-5 pb-6 pt-10",
+            )}>
               <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
                 {fullName}
               </p>
-              <p className={cn("mt-2 w-full whitespace-normal break-words text-neutral-500", roleTitleClass)}>
-                {roleTitle}
-              </p>
-              <p className="mt-1 w-full font-mono text-[0.72rem] font-medium tracking-wide text-neutral-500">
-                ID · {employeeCode}
-              </p>
-              <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
-                <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5">
-                  {employmentTypeName}
+              {!nameAndIdOnly ? (
+                <p className={cn("mt-2 w-full whitespace-normal break-words text-neutral-500", roleTitleClass)}>
+                  {roleTitle}
                 </p>
+              ) : null}
+              {!hideEmployeeCode ? (
+                <div className="mt-1 flex w-full items-center justify-center gap-1 font-mono text-[0.72rem] font-medium tracking-wide text-neutral-500">
+                  <span>ID · {employeeCode}</span>
+                  {showCopyEmployeeCode ? (
+                    <button type="button" onClick={copyEmployeeCode} className="rounded p-1 hover:bg-black/5 hover:text-neutral-900" aria-label="Copy employee ID">
+                      <Copy className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {!nameAndIdOnly && (!hideEmploymentType || accountDeactivated) ? (
+                <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
+                  {!hideEmploymentType ? (
+                    <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5">
+                      {employmentTypeName}
+                    </p>
+                  ) : null}
                 {accountDeactivated ? (
                   <EmployeeDeactivatedBadge />
                 ) : null}
-              </div>
+                </div>
+              ) : null}
+              {footerNote ? (
+                <p className="mt-3 max-w-[16rem] text-xs leading-relaxed text-neutral-500">
+                  {footerNote}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -408,24 +457,47 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative flex min-h-[10.5rem] flex-col items-center justify-center bg-[#0b1224] px-5 pb-6 pt-10 text-center">
+            <div className={cn(
+              "relative flex flex-col items-center justify-center bg-[#0b1224] text-center",
+              compactFooter
+                ? "min-h-[6.5rem] px-4 pb-3 pt-7"
+                : "min-h-[10.5rem] px-5 pb-6 pt-10",
+            )}>
               <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
                 {fullName}
               </p>
-              <p className={cn("mt-2 w-full whitespace-normal break-words text-slate-200", roleTitleClass)}>
-                {roleTitle}
-              </p>
-              <p className="mt-1 w-full font-mono text-[0.72rem] font-medium tracking-wide text-slate-300">
-                ID · {employeeCode}
-              </p>
-              <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
-                <p className="inline-flex w-fit rounded-full bg-white/10 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-slate-100 ring-1 ring-white/20">
-                  {employmentTypeName}
+              {!nameAndIdOnly ? (
+                <p className={cn("mt-2 w-full whitespace-normal break-words text-slate-200", roleTitleClass)}>
+                  {roleTitle}
                 </p>
+              ) : null}
+              {!hideEmployeeCode ? (
+                <div className="mt-1 flex w-full items-center justify-center gap-1 font-mono text-[0.72rem] font-medium tracking-wide text-slate-300">
+                  <span>ID · {employeeCode}</span>
+                  {showCopyEmployeeCode ? (
+                    <button type="button" onClick={copyEmployeeCode} className="rounded p-1 hover:bg-white/10 hover:text-white" aria-label="Copy employee ID">
+                      <Copy className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {!nameAndIdOnly && (!hideEmploymentType || accountDeactivated) ? (
+                <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
+                  {!hideEmploymentType ? (
+                    <p className="inline-flex w-fit rounded-full bg-white/10 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-slate-100 ring-1 ring-white/20">
+                      {employmentTypeName}
+                    </p>
+                  ) : null}
                 {accountDeactivated ? (
                   <EmployeeDeactivatedBadge className="shadow-none" />
                 ) : null}
-              </div>
+                </div>
+              ) : null}
+              {footerNote ? (
+                <p className="mt-3 max-w-[16rem] text-xs leading-relaxed text-slate-300">
+                  {footerNote}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

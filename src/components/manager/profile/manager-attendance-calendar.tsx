@@ -27,11 +27,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { resolveAttendanceUiDisplay } from "@/lib/attendance/manual-status";
+import { buildLeaveCalendarMarks } from "@/lib/leave/leave-calendar-marks";
+import { leaveCalendarMarkLabel } from "@/lib/leave/leave-calendar-display";
+import { classifyCalendarDay, type LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
+import type { LeaveCalendarEntry, LeaveHolidayEntry } from "@/types/leave";
 import { getHrmsYears, HRMS_YEAR_MAX, HRMS_YEAR_MIN } from "@/lib/date/hrms-year";
 import type { ManagerAttendanceCalendarDay } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+type CalendarDisplayMark = {
+  label: string;
+};
 
 /** Number-only pills for attendance status (today / Sunday use full cell instead). */
 const PILL_STYLES: Record<string, string> = {
@@ -79,6 +87,12 @@ type Props = {
   onSelectDate: (date: string) => void;
   className?: string;
   disableFuture?: boolean;
+  /** Optional self-service leave overlays; attendance records remain the source of status/totals. */
+  leaveCalendar?: {
+    leaves: LeaveCalendarEntry[];
+    holidays: LeaveHolidayEntry[];
+    calendar: LeaveCalendarContext;
+  };
 };
 
 function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
@@ -129,12 +143,16 @@ export function ManagerAttendanceCalendar({
   onSelectDate,
   className,
   disableFuture = false,
+  leaveCalendar,
 }: Props) {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
   const yearOptions = useMemo(() => getHrmsYears(), []);
+  const leaveMarks = useMemo(() => leaveCalendar
+    ? buildLeaveCalendarMarks(leaveCalendar.leaves, leaveCalendar.holidays, leaveCalendar.calendar)
+    : null, [leaveCalendar]);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM yyyy");
 
@@ -205,7 +223,7 @@ export function ManagerAttendanceCalendar({
         className,
       )}
     >
-      <div className="flex shrink-0 items-center justify-between gap-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold tracking-tight">
             {monthLabel}
@@ -214,7 +232,7 @@ export function ManagerAttendanceCalendar({
             Monthly attendance overview
           </p>
         </div>
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
+        <div className="flex max-w-full flex-wrap items-center gap-1 sm:gap-1.5">
           <Button
             variant="outline"
             size="sm"
@@ -248,7 +266,7 @@ export function ManagerAttendanceCalendar({
               onMonthChange(Number.parseInt(value, 10), year);
             }}
           >
-            <SelectTrigger className="h-8 w-[6.75rem] shrink-0 text-xs">
+            <SelectTrigger className="h-8 w-24 shrink-0 text-xs sm:w-[6.75rem]">
               <SelectValue placeholder="Month">
                 {(value) =>
                   value
@@ -286,7 +304,7 @@ export function ManagerAttendanceCalendar({
           <Button
             variant="outline"
             size="icon"
-            className="size-9 shrink-0 border-border/80 bg-background text-foreground shadow-sm hover:bg-muted hover:text-foreground disabled:opacity-40"
+            className="size-8 shrink-0 border-border/80 bg-background text-foreground shadow-sm hover:bg-muted hover:text-foreground disabled:opacity-40 sm:size-9"
             onClick={() => shiftMonth(-1)}
             type="button"
             aria-label="Previous month"
@@ -296,7 +314,7 @@ export function ManagerAttendanceCalendar({
           <Button
             variant="outline"
             size="icon"
-            className="size-9 shrink-0 border-border/80 bg-background text-foreground shadow-sm hover:bg-muted hover:text-foreground disabled:opacity-40"
+            className="size-8 shrink-0 border-border/80 bg-background text-foreground shadow-sm hover:bg-muted hover:text-foreground disabled:opacity-40 sm:size-9"
             onClick={() => shiftMonth(1)}
             type="button"
             disabled={!canGoForward}
@@ -309,7 +327,7 @@ export function ManagerAttendanceCalendar({
       </div>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
-        <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-muted-foreground">
+        <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-semibold text-muted-foreground">
           {WEEKDAY_LABELS.map((label) => (
             <div key={label} className="py-1">
               {label}
@@ -329,51 +347,65 @@ export function ManagerAttendanceCalendar({
                     live.leaveTypeName,
                   )
                 : null;
-            const isHolidayOrWeekend =
-              uiStatus?.key === "holiday" ||
+            const holiday = live.inMonth ? leaveMarks?.holidayMap.get(live.date) : undefined;
+            const isWeeklyOff = live.status === "week_off";
+            const isHoliday =
               live.status === "holiday" ||
-              live.status === "week_off";
+              (uiStatus?.key === "holiday" && !isWeeklyOff) ||
+              (!live.status && Boolean(holiday));
             // Status pill for any in-month day with a punch/leave status — including today.
             // Do not force Present green on today; unmarked days stay neutral.
             const pillClass =
               live.inMonth && live.status === "on_request"
                 ? PILL_STYLES.on_request
-                : live.inMonth && uiStatus && !isHolidayOrWeekend
-                  ? PILL_STYLES[uiStatus.key]
-                  : null;
-            const tooltip = live.inMonth ? getCalendarDayTooltip(live) : null;
+                : live.inMonth && (isWeeklyOff || isHoliday)
+                  ? PILL_STYLES.holiday
+                  : live.inMonth && uiStatus && !isHoliday
+                    ? PILL_STYLES[uiStatus.key]
+                    : null;
+            const attendanceTooltip = live.inMonth ? getCalendarDayTooltip(live) : null;
+            const dayLeaves = live.inMonth ? leaveMarks?.leavesByDate.get(live.date) ?? [] : [];
+            const calendarDayClass = live.inMonth && leaveMarks
+              ? classifyCalendarDay(live.date, leaveMarks.calendarWithHolidays) : null;
+            const marks: CalendarDisplayMark[] = dayLeaves.map((leave) => {
+              const label = leaveCalendarMarkLabel(leave, live.date, { compact: true });
+              return {
+                label: `${label} · ${leave.leaveStatus.charAt(0).toUpperCase()}${leave.leaveStatus.slice(1)}`,
+              };
+            });
+            if (holiday) marks.push({
+              label: `${holiday.name}${holiday.isOptional ? " · Optional Holiday" : ""}`,
+            });
+            if (calendarDayClass === "weekly_off" && !holiday) marks.push({
+              label: "Weekly off",
+            });
+            if (live.inMonth && leaveMarks?.sandwichDates.has(live.date) && dayLeaves.length === 0) marks.push({
+              label: "Sandwich",
+            });
+            const tooltipLabels = [attendanceTooltip?.label, ...marks.map((mark) => mark.label)]
+              .filter((label): label is string => Boolean(label));
+            const visibleTooltipLabels = tooltipLabels.filter((label, index) =>
+              !tooltipLabels.some((other, otherIndex) =>
+                otherIndex !== index && other.startsWith(`${label} ·`),
+              ),
+            );
+            const tooltip = visibleTooltipLabels.length
+              ? {
+                  label: [...new Set(visibleTooltipLabels)].join(" · "),
+                  tone: attendanceTooltip?.tone ?? "today",
+                }
+              : null;
 
             const dayButton = (
               <button
                 type="button"
                 disabled={!live.inMonth}
+                aria-label={leaveCalendar ? `${format(parseISO(live.date), "d MMMM yyyy")}${tooltip ? ` · ${tooltip.label}` : ""}` : undefined}
                 onClick={() => onSelectDate(live.date)}
                 className={cn(
                   "attendance-day-cell flex min-h-0 w-full items-center justify-center rounded-xl text-sm font-medium transition-[background-color,box-shadow,color] duration-150",
+                  leaveCalendar && "min-w-0 flex-col gap-1 py-2 sm:px-0.5",
                   !live.inMonth && "pointer-events-none opacity-25",
-                  live.inMonth &&
-                    isHolidayOrWeekend &&
-                    "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
-                  // Today marker: ring only — fill comes from status pill when checked in.
-                  live.isToday &&
-                    "attendance-day-today shadow-sm ring-2 ring-offset-2 ring-offset-background dark:ring-offset-[#060914]",
-                  live.isToday &&
-                    uiStatus?.key === "present" &&
-                    "ring-emerald-700",
-                  live.isToday &&
-                    uiStatus?.key === "absent" &&
-                    "ring-red-600",
-                  live.isToday &&
-                    uiStatus?.key === "lop" &&
-                    "ring-zinc-900",
-                  live.isToday &&
-                    (uiStatus?.key === "casual_leave" ||
-                      uiStatus?.key === "earned_leave") &&
-                    "ring-violet-600",
-                  live.isToday &&
-                    !pillClass &&
-                    !isHolidayOrWeekend &&
-                    "ring-muted-foreground/40",
                   isSelected &&
                     !live.isToday &&
                     "ring-2 ring-primary/70 ring-offset-1 dark:ring-white/25 dark:ring-offset-[#060914]",
@@ -406,7 +438,7 @@ export function ManagerAttendanceCalendar({
                   sideOffset={6}
                   hideArrow
                   className={cn(
-                    "rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md",
+                    "max-w-xs rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md",
                     TOOLTIP_STYLES[tooltip.tone] ?? TOOLTIP_STYLES.present,
                   )}
                 >

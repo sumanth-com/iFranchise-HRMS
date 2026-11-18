@@ -5,7 +5,9 @@ import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hubListUrl } from "@/lib/dashboard/hub-paths";
+import { attendancePageParamsInput } from "@/lib/attendance/attendance-leave-navigation";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { getAttendanceLeaveData } from "@/lib/dashboard/self-service/attendance-leave-data";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -43,20 +45,25 @@ async function ManagerAttendanceContent({
   const legacy = teamRedirect(rawParams);
   if (legacy) redirect(legacy);
 
-  const selfParams = managerProfilePageParamsSchema.parse({
-    month: firstString(rawParams.month),
-    year: firstString(rawParams.year),
-    date: firstString(rawParams.date),
-    status: firstString(rawParams.status),
-    searchDate: firstString(rawParams.searchDate),
-    page: firstString(rawParams.page),
-  });
+  const selfParams = managerProfilePageParamsSchema.parse(
+    attendancePageParamsInput(rawParams),
+  );
 
-  const selfData = await getManagerProfilePageData(supabase, profile, selfParams);
+  const [selfData, leave] = await Promise.all([
+    getManagerProfilePageData(supabase, profile, selfParams),
+    getAttendanceLeaveData(
+      supabase,
+      profile,
+      "manager",
+      selfParams.month ?? new Date().getMonth() + 1,
+      selfParams.year ?? new Date().getFullYear(),
+    ),
+  ]);
 
   return (
     <EmployeeAttendanceView
       data={selfData}
+      leave={leave}
       status={selfParams.status}
       searchDate={selfParams.searchDate}
       basePath={MANAGER_ROUTES.attendance}

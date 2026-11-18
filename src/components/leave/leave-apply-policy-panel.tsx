@@ -59,14 +59,11 @@ export function LeavePolicyInfo({
   );
 
   return (
-    <div className={cn("rounded-xl border bg-muted/20", compact ? "px-3 py-2" : "px-4 py-3")}>
+    <div className={compact ? "shrink-0" : "rounded-xl border bg-muted/20 px-4 py-3"}>
       {compact ? (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">{approvalLine}</p>
-          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setOpen(true)}>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(true)}>
             Policy
           </Button>
-        </div>
       ) : (
         <div className="flex items-start justify-between gap-3">
           <div>

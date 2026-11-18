@@ -1,3 +1,4 @@
+import { canOpenSelfAttendance, leaveWorkspaceUrl } from "@/lib/attendance/attendance-leave-navigation";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -49,6 +50,9 @@ async function ManagerLeaveContent({ searchParams }: ManagerLeavePageProps) {
   const rawParams = await searchParams;
   const legacy = teamRedirect(rawParams);
   if (legacy) redirect(legacy);
+  if (canOpenSelfAttendance(profile.permissionCodes, "manager")) {
+    redirect(leaveWorkspaceUrl(MANAGER_ROUTES.attendance, rawParams));
+  }
 
   const employeeId = profile.employee.id;
   const now = new Date();

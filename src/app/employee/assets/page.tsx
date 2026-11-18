@@ -1,14 +1,10 @@
 import { EmployeeAssetsView } from "@/components/employee/assets/employee-assets-view";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getEmployeeAssetsData } from "@/lib/employee/services/employee-assets-queries";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function EmployeeAssetsPage() {
-  const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.employee,
-    "asset.view",
-  ]);
+  const profile = await requireSuperAdminProfile();
   const supabase = await createClient();
   const data = await getEmployeeAssetsData(supabase, profile);
 

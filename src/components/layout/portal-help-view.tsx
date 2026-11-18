@@ -1,7 +1,19 @@
 "use client";
 
 import { AppNavLink as Link } from "@/components/layout/app-nav-link";
-import { CircleHelp, KeyRound, Mail } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  ChevronDown,
+  CircleHelp,
+  Clock3,
+  FileText,
+  Headset,
+  KeyRound,
+  Mail,
+  Wallet,
+} from "lucide-react";
+import { useState } from "react";
 
 import { PortalManualCard } from "@/components/layout/portal-manual-card";
 import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
@@ -295,6 +307,10 @@ export function PortalHelpView({
   firstName: string;
   variant: PortalVariant;
 }) {
+  if (variant === "employee") {
+    return <EmployeeHelpSupport />;
+  }
+
   const config = PORTAL_HELP[variant];
 
   return (
@@ -387,6 +403,111 @@ export function PortalHelpView({
               <KeyRound className="size-3.5" />
               Account settings
             </Link>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+const EMPLOYEE_HELP_TOPICS = [
+  { name: "General", icon: CircleHelp },
+  { name: "Attendance & Leave", icon: CalendarDays },
+  { name: "Payroll", icon: Wallet },
+  { name: "Reimbursements", icon: FileText },
+  { name: "Documents", icon: BookOpen },
+  { name: "Account & Settings", icon: KeyRound },
+] as const;
+
+const EMPLOYEE_HELP_FAQS: Record<string, HelpFaq[]> = {
+  General: [
+    { q: "How do I mark my attendance?", a: "Open Attendance & Leave and use Check In when you start work. Use Check Out when your workday ends." },
+    { q: "How do I update my profile information?", a: "You can update your gender, address, city, state, country, and postal code from My Profile. Contact HR to change other information." },
+    { q: "Where can I see my notifications?", a: "Open Notifications from the sidebar to review, search, and manage messages for your account." },
+    { q: "Who do I contact for help?", a: `Email ${HR_EMAIL} during support hours, Monday to Friday, 10:00 AM to 7:00 PM.` },
+  ],
+  "Attendance & Leave": [
+    { q: "How do I mark my attendance?", a: "Open Attendance & Leave and use Check In when you start work. Use Check Out when your workday ends." },
+    { q: "How do I apply for leave?", a: "Open Attendance & Leave, choose Apply Leave, select the leave type and dates, add a reason, then submit your request for HR review." },
+    { q: "Where can I see my leave balance?", a: "Your Casual Leave, Earned Leave, and Optional Holiday balances appear at the top of Attendance & Leave." },
+    { q: "How do I check my attendance history?", a: "Use the month controls above the calendar, then open Attendance History below it to view daily check-in and working hour details." },
+    { q: "How can I track a leave request?", a: "Choose Leave History below the calendar to see your submitted requests and their approval status." },
+  ],
+  Payroll: [
+    { q: "How can I view my payroll details?", a: "Open Payroll to see your salary summary, payment timeline, payslip history, bonuses, and bank details." },
+    { q: "Where can I download a payslip?", a: "Open Payroll and select a published payslip from your history." },
+    { q: "Why can’t I see the latest payslip?", a: "A payslip appears after HR publishes it. Contact HR if a published payslip is missing." },
+    { q: "How can I update my bank details?", a: "Contact HR to request a bank detail update and provide any required supporting documents." },
+  ],
+  Reimbursements: [
+    { q: "How do I submit a reimbursement request?", a: "Open Reimbursements, complete the claim form, attach receipts, and submit it for HR review." },
+    { q: "How can I track my claim?", a: "Your reimbursement history shows each claim’s status and any HR remarks." },
+    { q: "What files can I attach?", a: "Attach receipt images or PDFs. The form shows file size and count limits before submission." },
+    { q: "How do I correct a submitted claim?", a: `Contact ${HR_EMAIL} and include the claim date and amount so HR can help.` },
+  ],
+  Documents: [
+    { q: "Where can I find my documents?", a: "Open Documents to view files shared with you. Select a document to preview or download it." },
+    { q: "How do I download a document?", a: "Open the document card and choose Download. Some files may open in a preview first." },
+    { q: "Why can’t I see a document I expected?", a: `Ask HR at ${HR_EMAIL} to confirm the document has been shared with your account.` },
+    { q: "Can I replace an uploaded document?", a: "If replacement is enabled for that document, open its actions menu and choose Replace. Otherwise contact HR." },
+  ],
+  "Account & Settings": [
+    { q: "How do I reset my password?", a: "Select Reset password on My Profile and confirm. A reset link will be sent to your company email." },
+    { q: "Who should I contact to change other profile details?", a: `Email ${HR_EMAIL} for help changing employment or other profile information.` },
+    { q: "How do I change notification preferences?", a: "Open Settings to manage notification delivery and appearance preferences." },
+    { q: "Why did I not receive a password reset link?", a: "Check your company inbox and spam folder. Password reset requests are limited to three per day." },
+  ],
+};
+
+function EmployeeHelpSupport() {
+  const [activeTopic, setActiveTopic] = useState<string>("General");
+  const [openQuestion, setOpenQuestion] = useState<string | null>(null);
+  const faqs = EMPLOYEE_HELP_FAQS[activeTopic] ?? [];
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 md:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-4">
+        <section id="help-topics" className="grid min-h-0 flex-1 overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[15rem_minmax(0,1fr)]">
+          <nav className="border-b bg-muted/10 p-4 md:border-b-0 md:border-r" aria-label="Help topics">
+            <h1 className="mb-3 text-lg font-semibold text-muted-foreground">Help Topics</h1>
+            <div className="space-y-1">
+              {EMPLOYEE_HELP_TOPICS.map(({ name, icon: Icon }) => (
+                <button key={name} type="button" onClick={() => { setActiveTopic(name); setOpenQuestion(null); }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${activeTopic === name ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white" : "text-foreground hover:bg-muted"}`}>
+                  <Icon className="size-4 shrink-0" aria-hidden />{name}
+                </button>
+              ))}
+            </div>
+          </nav>
+          <div className="flex min-h-0 min-w-0 flex-col p-4 md:p-5">
+            <h2 className="mb-4 shrink-0 text-lg font-semibold text-muted-foreground">Frequently Asked Questions</h2>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {faqs.map((faq, index) => {
+                const key = `${activeTopic}-${index}`;
+                const isOpen = openQuestion === key || (openQuestion === null && index === 0);
+                return (
+                  <article key={key} className="overflow-hidden rounded-xl border bg-background">
+                    <button type="button" aria-expanded={isOpen} onClick={() => setOpenQuestion(isOpen ? "" : key)} className="flex w-full min-h-12 items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold">
+                      <span>{faq.q}</span>
+                      <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden />
+                    </button>
+                    {isOpen ? <p className="mx-3 mb-3 rounded-lg bg-violet-500/[0.06] px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">{faq.a}</p> : null}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-8 gap-y-3 rounded-2xl border bg-card px-5 py-3 text-center shadow-sm">
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-700"><Headset className="size-5" aria-hidden /></span>
+            Still need help?
+          </div>
+          <a href={`mailto:${HR_EMAIL}`} className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium hover:bg-muted/50">
+            <Mail className="size-4 text-violet-700" aria-hidden />{HR_EMAIL}
+          </a>
+          <div className="inline-flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
+            <Clock3 className="size-4 text-violet-700" aria-hidden />Mon – Fri, 10:00 AM – 7:00 PM
           </div>
         </footer>
       </div>

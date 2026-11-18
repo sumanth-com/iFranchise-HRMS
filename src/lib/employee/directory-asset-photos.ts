@@ -8,11 +8,11 @@ import himaniBhargava from "@/assets/Himani.jpeg";
 import lohitKumar from "@/assets/lohit-kumar.png";
 import namanThapiyal from "@/assets/Naman.jpeg";
 import omRamtekkar from "@/assets/Om.jpeg";
-import prajwalPhoto from "@/assets/Prajwal Photo.jpeg";
+import prajwalPhoto from "@/assets/Prajjwal.webp";
 import samitAli from "@/assets/Samit Ali.jpg";
 import shakshayGupta from "@/assets/Shakshay Gupta.jpeg";
 import shiwaliSingh from "@/assets/Shiwali Singh.png";
-import snehaMahajan from "@/assets/Sneha Mahajan.png";
+import snehaMahajan from "@/assets/Sneha.webp";
 import sumanthReddy from "@/assets/whatsapp_img.png";
 import swethaChintada from "@/assets/swetha.jpeg";
 import vennapusaHemavathi from "@/assets/Vennapusa Hemavathi.png";
@@ -82,11 +82,23 @@ const DIRECTORY_ASSET_PHOTOS_BY_LAST_NAME: Record<string, StaticImageData> = {
 const DIRECTORY_ASSET_PHOTOS_BY_CODE: Record<string, StaticImageData> = {
   IF2025002: omRamtekkar,
   IF2026009: sumanthReddy,
+  IF2026014: snehaMahajan,
+  IF2026015: prajwalPhoto,
   "IF-PENDING-SA": sumanthReddy,
   IF2026010: swethaChintada,
   IF2026023: namanThapiyal,
   IF2026024: lohitKumar,
 };
+
+const PREFERRED_DIRECTORY_PHOTO_CODES = new Set(["IF2026014", "IF2026015"]);
+
+export function shouldPreferDirectoryAssetPhoto(person: {
+  employeeCode?: string | null;
+}): boolean {
+  return PREFERRED_DIRECTORY_PHOTO_CODES.has(
+    (person.employeeCode ?? "").trim().toUpperCase(),
+  );
+}
 
 function normalizePersonKey(value: string) {
   return value

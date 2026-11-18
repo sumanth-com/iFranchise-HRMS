@@ -39,5 +39,5 @@ export const ACCOUNTANT_DASHBOARD_KPI_LINKS = {
   attendance: ACCOUNTANT_ROUTES.attendance,
   workingHours: ACCOUNTANT_ROUTES.attendance,
   leaveBalance: ACCOUNTANT_ROUTES.leave,
-  pendingLeaveRequests: `${ACCOUNTANT_ROUTES.leave}?status=pending`,
+  pendingLeaveRequests: `${ACCOUNTANT_ROUTES.attendance}?history=leave`,
 } as const;

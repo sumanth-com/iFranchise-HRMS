@@ -1,19 +1,15 @@
 import { EmployeeSettingsView } from "@/components/employee/settings/employee-settings-view";
 import { NotificationPreferencesForm } from "@/components/notifications/notification-preferences-form";
 import { SettingsResignationModalSection } from "@/components/settings/settings-resignation-modal-section";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getExitSettings } from "@/lib/exit/services/exit-settings";
 import { getEmployeeResignationSnapshot } from "@/lib/exit/services/exit-queries";
 import { getNotificationUserPreferences } from "@/lib/notifications/services/notification-queries";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
+import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function CeoSettingsPage() {
-  const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.ceo,
-    "employee_profile.view",
-  ]);
+  const profile = await requireSuperAdminProfile();
   const supabase = await createClient();
   const [notificationPreferences, snapshot, exitSettings] = await Promise.all([
     getNotificationUserPreferences(supabase, profile),
