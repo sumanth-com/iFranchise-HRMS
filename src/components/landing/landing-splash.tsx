@@ -7,8 +7,8 @@ import brandLogo from "@/assets/brand/if-mark.png";
 import { BRAND_NAME } from "@/lib/brand/constants";
 import { cn } from "@/lib/utils";
 
-/** Session-scoped: splash once per browser tab/session, including return from login. */
-export const LANDING_SPLASH_SESSION_KEY = "ifranchise.landing.splash.v3";
+/** Persist across visits so the intro only plays on the first landing visit. */
+export const LANDING_SPLASH_STORAGE_KEY = "ifranchise.landing.splash.v4";
 
 /** Full experience is exactly 5s including the exit fade. */
 const FULL_EXIT_MS = 4450;
@@ -28,7 +28,11 @@ type SplashWindow = Window & {
 
 function hasSplashBeenShown(): boolean {
   try {
-    return sessionStorage.getItem(LANDING_SPLASH_SESSION_KEY) === "1";
+    return (
+      localStorage.getItem(LANDING_SPLASH_STORAGE_KEY) === "1" ||
+      sessionStorage.getItem(LANDING_SPLASH_STORAGE_KEY) === "1" ||
+      sessionStorage.getItem("ifranchise.landing.splash.v3") === "1"
+    );
   } catch {
     return false;
   }
@@ -36,9 +40,13 @@ function hasSplashBeenShown(): boolean {
 
 function markSplashShown(): void {
   try {
-    sessionStorage.setItem(LANDING_SPLASH_SESSION_KEY, "1");
+    localStorage.setItem(LANDING_SPLASH_STORAGE_KEY, "1");
   } catch {
-    // ignore — private mode / blocked storage
+    try {
+      sessionStorage.setItem(LANDING_SPLASH_STORAGE_KEY, "1");
+    } catch {
+      // ignore — private mode / blocked storage
+    }
   }
 }
 
@@ -78,7 +86,7 @@ function ConceptIconExpand() {
 }
 
 /**
- * Public landing splash — once per browser session.
+ * Public landing splash — once per browser.
  * Does not replay on route changes or landing → login → landing.
  */
 export function LandingSplash() {

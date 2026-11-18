@@ -277,7 +277,12 @@ export function MyProfileView({
           "mt-4 grid min-h-0 gap-x-4 gap-y-0 pb-6 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]",
           isEditing ? "xl:items-start" : "xl:items-stretch",
         )}>
-          <div className="mx-auto w-full max-w-[19rem] xl:mx-0 xl:h-full xl:max-w-none">
+          <div
+            className={cn(
+              "mx-auto w-full max-w-[19rem] xl:mx-0 xl:max-w-none",
+              !isEditing && "xl:h-full",
+            )}
+          >
             <EmployeeIdCard
               employeeId={data.employeeId}
               firstName={data.firstName}
@@ -297,7 +302,12 @@ export function MyProfileView({
               hideEmployeeCode
               stretchHeight={!isEditing}
               compactFooter
-              className="h-[27.5rem] w-full max-w-full xl:h-full"
+              className={cn(
+                "w-full max-w-full",
+                isEditing
+                  ? "h-[27.5rem]"
+                  : "h-[27.5rem] xl:h-full",
+              )}
             />
           </div>
 

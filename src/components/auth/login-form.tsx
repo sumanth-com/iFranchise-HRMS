@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,9 +51,14 @@ const PROFILE_ERROR_CODES: AuthErrorCode[] = [
 
 const SIGNED_OUT_TOAST_ID = "auth-signed-out";
 
-export function LoginForm() {
+type LoginQueryParams = {
+  email?: string;
+  error?: string;
+  redirectTo?: string;
+};
+
+export function LoginForm({ queryParams }: { queryParams: LoginQueryParams }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isInviteLinkPending, setInviteLinkPending] = useState(false);
@@ -68,14 +73,14 @@ export function LoginForm() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: searchParams.get("email") ?? "",
+      email: queryParams.email ?? "",
       password: "",
       rememberMe: Boolean(getRememberedEmail()),
     },
   });
 
   useEffect(() => {
-    const queryEmail = searchParams.get("email")?.trim();
+    const queryEmail = queryParams.email?.trim();
     if (queryEmail) {
       setValue("email", queryEmail);
       return;
@@ -86,7 +91,7 @@ export function LoginForm() {
       setValue("email", rememberedEmail);
       setValue("rememberMe", true);
     }
-  }, [searchParams, setValue]);
+  }, [queryParams.email, setValue]);
 
   const signedOutToastHandledRef = useRef(false);
 
@@ -166,7 +171,7 @@ export function LoginForm() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        const email = user?.email ?? searchParams.get("email") ?? "";
+        const email = user?.email ?? queryParams.email ?? "";
         const target =
           type === "invite" || type === "recovery"
             ? `${AUTH_ROUTES.resetPassword}?${new URLSearchParams({
@@ -183,7 +188,7 @@ export function LoginForm() {
         window.history.replaceState(null, "", window.location.pathname);
       })
       .finally(() => setInviteLinkPending(false));
-  }, [router, searchParams]);
+  }, [queryParams.email, router]);
 
   const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
@@ -228,7 +233,7 @@ export function LoginForm() {
         // Ignore storage failures
       }
 
-      const requestedRedirect = searchParams.get("redirectTo");
+      const requestedRedirect = queryParams.redirectTo;
       const redirectTo = requestedRedirect
         ? getSafeRedirectPath(requestedRedirect, result.redirectTo)
         : result.redirectTo;
@@ -248,7 +253,7 @@ export function LoginForm() {
     }
   });
 
-  const errorParam = searchParams.get("error");
+  const errorParam = queryParams.error;
   const profileError =
     errorParam && PROFILE_ERROR_CODES.includes(errorParam as AuthErrorCode)
       ? getAuthErrorMessage(errorParam as AuthErrorCode)
@@ -269,7 +274,7 @@ export function LoginForm() {
           className="mx-auto mb-4 flex w-fit rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/50"
           aria-label="Go to HRMS home"
         >
-          <BrandMarkTile size={40} priority />
+          <BrandMarkTile size={48} priority />
         </Link>
         <h1>Welcome to iFranchise</h1>
         <p>Access your workspace and continue</p>

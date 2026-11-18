@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { requireAccountantPortal } from "@/lib/accountant/permissions";
 
@@ -20,7 +20,7 @@ async function AccountantSelfServiceHomeContent() {
 
 export default function AccountantPortalPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Suspense fallback={<DashboardOpeningState />}>
       <AccountantSelfServiceHomeContent />
     </Suspense>
   );

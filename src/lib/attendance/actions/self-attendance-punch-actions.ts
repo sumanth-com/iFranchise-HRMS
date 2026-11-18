@@ -2,7 +2,6 @@
 
 import { after } from "next/server";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { isBirthdayOnDate } from "@/lib/employee/birthday-utils";
 import {
   punchManagerAttendance,
   saveSelfAttendanceLocation,
@@ -11,7 +10,6 @@ import {
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePersonalAttendanceDashboardPaths } from "@/lib/attendance/self-attendance-revalidate";
-import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { revalidateOpenPayrollPaths } from "@/lib/payroll/revalidate-open-payroll";
 import type { SelfAttendancePunchResult } from "@/lib/attendance/self-attendance-punch-types";
 import {
@@ -27,35 +25,6 @@ const SELF_ATTENDANCE_PUNCH_PERMISSIONS = [
   PORTAL_PERMISSIONS.manager,
   "attendance.view",
 ] as const;
-
-async function loadBirthdayCelebrationPayload(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  employeeId: string,
-  firstName: string,
-  attendanceDate: string,
-): Promise<{
-  employeeId: string;
-  firstName: string;
-  date: string;
-} | null> {
-  try {
-    const { data } = await supabase
-      .schema("hrms")
-      .from("employees")
-      .select("date_of_birth")
-      .eq("id", employeeId)
-      .maybeSingle();
-    const dob = (data as { date_of_birth?: string | null } | null)?.date_of_birth;
-    if (!dob || !isBirthdayOnDate(dob, attendanceDate)) return null;
-    return {
-      employeeId,
-      firstName,
-      date: attendanceDate.slice(0, 10),
-    };
-  } catch {
-    return null;
-  }
-}
 
 function schedulePayrollRefresh(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -84,24 +53,11 @@ export async function selfAttendancePunchAction(
     ]);
     const supabase = await createClient();
     const parsed = managerAttendancePunchSchema.parse(input);
-    const punchPromise = punchManagerAttendance(supabase, profile, parsed);
-    const birthdayPromise =
-      parsed.type === "in"
-        ? loadBirthdayCelebrationPayload(
-            supabase,
-            profile.employee.id,
-            profile.employee.firstName || "there",
-            getTodayDateString(),
-          )
-        : Promise.resolve(null);
-    const [today, birthdayCelebration] = await Promise.all([
-      punchPromise,
-      birthdayPromise,
-    ]);
+    const today = await punchManagerAttendance(supabase, profile, parsed);
     schedulePayrollRefresh(supabase, profile, "selfAttendancePunchAction");
     revalidatePersonalAttendanceDashboardPaths();
 
-    return { success: true, today, birthdayCelebration };
+    return { success: true, today };
   } catch (error) {
     return {
       success: false,

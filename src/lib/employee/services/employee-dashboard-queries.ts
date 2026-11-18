@@ -55,7 +55,7 @@ function buildFallbackToday(today: string): ManagerTodayAttendance {
   };
 }
 
-function greetingFromProfile(profile: UserProfile): EmployeeGreeting {
+export function greetingFromProfile(profile: UserProfile): EmployeeGreeting {
   const firstName = profile.employee.firstName || "there";
   const lastName = profile.employee.lastName ?? "";
   const fullName = `${firstName} ${lastName}`.trim();
@@ -319,16 +319,15 @@ export async function loadUpcomingCelebrations(
   ];
 }
 
-export async function getEmployeeDashboardData(
+export async function getEmployeeDashboardCoreData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-): Promise<EmployeeDashboardData> {
+): Promise<Omit<EmployeeDashboardData, "upcomingHolidays" | "companyAnnouncements">> {
   const today = getTodayDateString();
   const employeeId = profile.employee.id;
-  const organizationId = profile.employee.organizationId;
   const greeting = greetingFromProfile(profile);
 
-  const [todayPanel, leave, upcomingHolidays, companyAnnouncements] = await Promise.all([
+  const [todayPanel, leave] = await Promise.all([
     getSelfTodayAttendance(supabase, profile).catch((error) => {
       console.error("[employee-dashboard] today attendance failed", error);
       // Do not invent a fake "not checked in" state — empty panel without times
@@ -338,11 +337,6 @@ export async function getEmployeeDashboardData(
     safe(() => loadLeaveKpis(supabase, employeeId), {
       totalBalanceDays: 0,
       pendingCount: 0,
-    }),
-    safe(() => loadUpcomingCelebrations(supabase, organizationId, today), []),
-    loadEmployeeAnnouncementsForRequest(organizationId, employeeId).catch((error) => {
-      console.error("[employee-dashboard] company announcements failed", error);
-      return [];
     }),
   ]);
 
@@ -357,9 +351,36 @@ export async function getEmployeeDashboardData(
       pendingLeaveRequests: leave.pendingCount,
     },
     referenceDate: today,
-    upcomingHolidays,
-    companyAnnouncements,
     canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
     canUpdateCheckout: canUpdateOwnCheckout(profile),
   };
+}
+
+export async function getEmployeeDashboardEvents(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<Pick<EmployeeDashboardData, "upcomingHolidays" | "companyAnnouncements">> {
+  const today = getTodayDateString();
+  const employeeId = profile.employee.id;
+  const organizationId = profile.employee.organizationId;
+  const [upcomingHolidays, companyAnnouncements] = await Promise.all([
+    safe(() => loadUpcomingCelebrations(supabase, organizationId, today), []),
+    loadEmployeeAnnouncementsForRequest(organizationId, employeeId).catch((error) => {
+      console.error("[employee-dashboard] company announcements failed", error);
+      return [];
+    }),
+  ]);
+
+  return { upcomingHolidays, companyAnnouncements };
+}
+
+export async function getEmployeeDashboardData(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<EmployeeDashboardData> {
+  const [core, events] = await Promise.all([
+    getEmployeeDashboardCoreData(supabase, profile),
+    getEmployeeDashboardEvents(supabase, profile),
+  ]);
+  return { ...core, ...events };
 }

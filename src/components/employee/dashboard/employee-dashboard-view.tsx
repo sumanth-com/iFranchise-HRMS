@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { SelfAttendanceLiveProvider } from "@/components/attendance/self-attendance-live-context";
 import { SelfAttendanceTodayCard } from "@/components/attendance/self-attendance-today-card";
 import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
@@ -28,11 +30,54 @@ export function EmployeeDashboardView({
   canManageAnnouncements = false,
   pairHolidayBirthday = false,
   showImportantNotices = false,
+  eventsSlot,
+  embedded = false,
+  showHeader = true,
 }: EmployeeDashboardData & {
   subtitle?: string;
   pairHolidayBirthday?: boolean;
   showImportantNotices?: boolean;
+  eventsSlot?: ReactNode;
+  embedded?: boolean;
+  showHeader?: boolean;
 }) {
+  const content = (
+    <>
+      {showHeader ? <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} /> : null}
+      <EmployeeDashboardKpiCards kpis={kpis} today={today} />
+
+      <div className={DASHBOARD_HOME_MAIN_GRID}>
+        <div className={DASHBOARD_HOME_LEFT_STACK}>
+          <SelfAttendanceTodayCard
+            firstName={greeting.firstName}
+            today={today}
+            allowUpdateCheckout
+            compact
+          />
+          <DailyBoostCard
+            firstName={greeting.firstName}
+            lastName={greeting.lastName}
+            personKey={greeting.employeeId}
+            referenceDate={referenceDate}
+            compact
+            className={DASHBOARD_HOME_BOOST}
+          />
+        </div>
+        {eventsSlot ?? (
+          <EmployeeUpcomingEvents
+            events={upcomingHolidays}
+            referenceDate={referenceDate}
+            canManageAnnouncements={canManageAnnouncements}
+            pairHolidayBirthday={pairHolidayBirthday}
+            showImportantNotices={showImportantNotices}
+            companyAnnouncements={companyAnnouncements}
+            className={DASHBOARD_HOME_EVENTS}
+          />
+        )}
+      </div>
+    </>
+  );
+
   return (
     <ClientSectionBoundary
       title="Dashboard unavailable"
@@ -40,40 +85,13 @@ export function EmployeeDashboardView({
       contentClassName="contents"
     >
       <SelfAttendanceLiveProvider today={today}>
-        <div className={DASHBOARD_HOME_SHELL}>
-          <div className={DASHBOARD_HOME_INNER}>
-            <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
-            <EmployeeDashboardKpiCards kpis={kpis} today={today} />
-
-            <div className={DASHBOARD_HOME_MAIN_GRID}>
-              <div className={DASHBOARD_HOME_LEFT_STACK}>
-                <SelfAttendanceTodayCard
-                  firstName={greeting.firstName}
-                  today={today}
-                  allowUpdateCheckout
-                  compact
-                />
-                <DailyBoostCard
-                  firstName={greeting.firstName}
-                  lastName={greeting.lastName}
-                  personKey={greeting.employeeId}
-                  referenceDate={referenceDate}
-                  compact
-                  className={DASHBOARD_HOME_BOOST}
-                />
-              </div>
-              <EmployeeUpcomingEvents
-                events={upcomingHolidays}
-                referenceDate={referenceDate}
-                canManageAnnouncements={canManageAnnouncements}
-                pairHolidayBirthday={pairHolidayBirthday}
-                showImportantNotices={showImportantNotices}
-                companyAnnouncements={companyAnnouncements}
-                className={DASHBOARD_HOME_EVENTS}
-              />
-            </div>
+        {embedded ? (
+          content
+        ) : (
+          <div className={DASHBOARD_HOME_SHELL}>
+            <div className={DASHBOARD_HOME_INNER}>{content}</div>
           </div>
-        </div>
+        )}
       </SelfAttendanceLiveProvider>
     </ClientSectionBoundary>
   );

@@ -1257,11 +1257,12 @@ export async function saveSelfAttendanceLocation(
   });
 }
 
-async function loadTodayAfterPunch(
-  supabase: AuthSupabaseClient,
-  profile: UserProfile,
+function buildTodayAfterPunch(
   result: SelfPunchRpcResult,
+  attendanceDate: string,
   rules: AttendanceRules,
+  priorWorkSeconds: number,
+  notes: string | null,
   geo: {
     type: "in" | "out";
     latitude?: number;
@@ -1269,72 +1270,30 @@ async function loadTodayAfterPunch(
     accuracy?: number | null;
     expectedSaved: boolean;
   },
-): Promise<ManagerTodayAttendance> {
-  // Always re-read the employee+day row that the UI uses (profile.employee.id).
-  try {
-    const today = await getSelfTodayAttendance(supabase, profile);
-    if (geo.type === "in" && result.check_in_at && !today.checkInAt) {
-      // Defensive: never return a panel that hides Check Out after a successful in punch.
-      // Keep any multi-session prior already loaded on `today`.
-      return buildTodayPanel(
-        {
-          id: result.id,
-          attendance_date: String(result.attendance_date),
-          check_in_at: result.check_in_at,
-          check_out_at: result.check_out_at,
-          attendance_status: result.attendance_status,
-          work_hours: result.work_hours,
-          overtime_hours: result.overtime_hours,
-          prior_work_seconds: today.priorCompletedSeconds ?? 0,
-          notes: null,
-          check_in_latitude: geo.expectedSaved ? geo.latitude : null,
-          check_in_longitude: geo.expectedSaved ? geo.longitude : null,
-          check_out_latitude: null,
-          check_out_longitude: null,
-        },
-        getTodayDateString(),
-        rules,
-      );
-    }
-    return today;
-  } catch (error) {
-    console.error("[loadTodayAfterPunch] fallback to RPC payload", error);
-    // Best-effort prior from the pre-punch row when the re-read fails.
-    let priorWorkSeconds = 0;
-    try {
-      const row = await getAttendanceForDate(
-        supabase,
-        profile.employee.id,
-        getTodayDateString(),
-      );
-      priorWorkSeconds = Math.max(0, Math.floor(Number(row?.prior_work_seconds ?? 0)));
-    } catch {
-      priorWorkSeconds = 0;
-    }
-    return buildTodayPanel(
-      {
-        id: result.id,
-        attendance_date: String(result.attendance_date),
-        check_in_at: result.check_in_at,
-        check_out_at: result.check_out_at,
-        attendance_status: result.attendance_status,
-        work_hours: result.work_hours,
-        overtime_hours: result.overtime_hours,
-        prior_work_seconds: priorWorkSeconds,
-        notes: null,
-        check_in_latitude:
-          geo.type === "in" && geo.expectedSaved ? geo.latitude : null,
-        check_in_longitude:
-          geo.type === "in" && geo.expectedSaved ? geo.longitude : null,
-        check_out_latitude:
-          geo.type === "out" && geo.expectedSaved ? geo.latitude : null,
-        check_out_longitude:
-          geo.type === "out" && geo.expectedSaved ? geo.longitude : null,
-      },
-      getTodayDateString(),
-      rules,
-    );
-  }
+): ManagerTodayAttendance {
+  return buildTodayPanel(
+    {
+      id: result.id,
+      attendance_date: String(result.attendance_date || attendanceDate),
+      check_in_at: result.check_in_at,
+      check_out_at: result.check_out_at,
+      attendance_status: result.attendance_status,
+      work_hours: result.work_hours,
+      overtime_hours: result.overtime_hours,
+      prior_work_seconds: priorWorkSeconds,
+      notes,
+      check_in_latitude:
+        geo.type === "in" && geo.expectedSaved ? geo.latitude : null,
+      check_in_longitude:
+        geo.type === "in" && geo.expectedSaved ? geo.longitude : null,
+      check_out_latitude:
+        geo.type === "out" && geo.expectedSaved ? geo.latitude : null,
+      check_out_longitude:
+        geo.type === "out" && geo.expectedSaved ? geo.longitude : null,
+    },
+    attendanceDate,
+    rules,
+  );
 }
 
 /**
@@ -1349,7 +1308,7 @@ export async function punchManagerAttendance(
 ) {
   const today = getTodayDateString();
   const employeeId = profile.employee.id;
-  const { data: employmentRow, error: employmentError } = await supabase
+  const employmentPromise = supabase
     .schema("hrms")
     .from("employees")
     .select("employment_status")
@@ -1357,23 +1316,32 @@ export async function punchManagerAttendance(
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null)
     .maybeSingle();
-  if (employmentError) throw new Error(employmentError.message);
-  if (!isActiveEmploymentStatus(employmentRow?.employment_status)) {
-    throw new Error("This employee is not in the active workforce.");
-  }
-  // These reads are independent. Capture the row error while policy loads so
-  // policy failures retain their original precedence and never reject unhandled.
+  // Attendance, policy, and employment reads are independent. Fetch them
+  // together so a check-in does not pay for an extra database round trip.
   const existingPromise = getAttendanceForDate(supabase, employeeId, today).then(
     (value) => ({ value }),
     (error: unknown) => ({ error }),
   );
-  const rules = await getOrganizationAttendanceRules(
+  const rulesPromise = getOrganizationAttendanceRules(
     supabase,
     profile.employee.organizationId,
+  ).then(
+    (value) => ({ value }),
+    (error: unknown) => ({ error }),
   );
-
-  const existingResult = await existingPromise;
+  const [employmentResult, existingResult, rulesResult] = await Promise.all([
+    employmentPromise,
+    existingPromise,
+    rulesPromise,
+  ]);
+  const { data: employmentRow, error: employmentError } = employmentResult;
+  if (employmentError) throw new Error(employmentError.message);
+  if (!isActiveEmploymentStatus(employmentRow?.employment_status)) {
+    throw new Error("This employee is not in the active workforce.");
+  }
   if ("error" in existingResult) throw existingResult.error;
+  if ("error" in rulesResult) throw rulesResult.error;
+  const rules = rulesResult.value;
   const existing = existingResult.value;
   const nowIso = new Date().toISOString();
   const hasGeo =
@@ -1403,6 +1371,10 @@ export async function punchManagerAttendance(
   let status: AttendanceStatus;
   let workHours = 0;
   let overtimeHours = 0;
+  let priorWorkSeconds = Math.max(
+    0,
+    Math.floor(Number(existing?.prior_work_seconds ?? 0)),
+  );
 
   if (input.type === "in") {
     if (existing?.check_in_at && !existing.check_out_at) {
@@ -1422,6 +1394,7 @@ export async function punchManagerAttendance(
         fromHours,
         sessionWorkingSeconds(existing.check_in_at, existing.check_out_at),
       );
+      priorWorkSeconds = priorTotal;
       const { error: priorError } = await supabase
         .schema("hrms")
         .from("attendance")
@@ -1449,6 +1422,7 @@ export async function punchManagerAttendance(
       priorWorkSeconds: existing.prior_work_seconds,
       previousCheckOutAt: existing.check_out_at,
     });
+    priorWorkSeconds = totalSeconds;
     workHours = Math.round((totalSeconds / 3600) * 100) / 100;
     overtimeHours = computeOvertimeHours(workHours, rules);
     const outcome = resolvePunchAttendanceResult(
@@ -1517,6 +1491,7 @@ export async function punchManagerAttendance(
       })
       .eq("id", result.id)
       .eq("employee_id", employeeId);
+    priorWorkSeconds = totalSeconds;
   }
 
   // RPC always resolves the employee from auth.uid() — reject mismatches.
@@ -1583,7 +1558,14 @@ export async function punchManagerAttendance(
   if (input.type === "in") {
     if (result.action === "already_checked_in") {
       // Concurrent / double-submit on the same personal row — treat as success.
-      return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
+      return buildTodayAfterPunch(
+        result,
+        today,
+        rules,
+        priorWorkSeconds,
+        existing?.notes ?? null,
+        geoMeta,
+      );
     }
 
     if (isQualifyingLateAttendance(result.attendance_status, punchNotes)) {
@@ -1615,7 +1597,14 @@ export async function punchManagerAttendance(
         notifyAttendanceCheckedIn(supabase, profile, today),
       ]);
     });
-    return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
+    return buildTodayAfterPunch(
+      result,
+      today,
+      rules,
+      priorWorkSeconds,
+      punchNotes ?? existing?.notes ?? null,
+      geoMeta,
+    );
   }
 
   const punchedWorkHours = Number(result.work_hours ?? workHours);
@@ -1686,7 +1675,14 @@ export async function punchManagerAttendance(
     ]);
   });
 
-  return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
+  return buildTodayAfterPunch(
+    result,
+    today,
+    rules,
+    priorWorkSeconds,
+    punchNotes ?? existing?.notes ?? null,
+    geoMeta,
+  );
 }
 
 export async function updateManagerCheckout(

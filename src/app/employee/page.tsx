@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -24,7 +24,7 @@ async function EmployeeDashboardContent() {
 
 export default function EmployeeDashboardPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Suspense fallback={<DashboardOpeningState />}>
       <EmployeeDashboardContent />
     </Suspense>
   );

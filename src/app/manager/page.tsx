@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerPermission } from "@/lib/permissions/server";
@@ -21,7 +21,7 @@ async function ManagerSelfServiceHomeContent() {
 
 export default function ManagerPortalPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Suspense fallback={<DashboardOpeningState />}>
       <ManagerSelfServiceHomeContent />
     </Suspense>
   );

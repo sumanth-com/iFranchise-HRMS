@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 
@@ -19,7 +19,7 @@ async function SelfServiceHomeContent() {
 
 export default function HrSelfServiceHomePage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Suspense fallback={<DashboardOpeningState />}>
       <SelfServiceHomeContent />
     </Suspense>
   );

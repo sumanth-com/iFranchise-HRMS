@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 
@@ -21,7 +21,7 @@ async function SuperAdminSelfServiceHomeContent() {
 
 export default function SuperAdminPortalPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Suspense fallback={<DashboardOpeningState />}>
       <SuperAdminSelfServiceHomeContent />
     </Suspense>
   );

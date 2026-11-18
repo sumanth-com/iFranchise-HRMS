@@ -1,21 +1,30 @@
-import { Suspense } from "react";
-
 import { LoginForm } from "@/components/auth/login-form";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{
+    email?: string | string[];
+    error?: string | string[];
+    redirectTo?: string | string[];
+  }>;
+};
+
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+
   return (
     <DesktopOnlyGate>
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-8">
-            <LoadingSpinner />
-          </div>
-        }
-      >
-        <LoginForm />
-      </Suspense>
+      <LoginForm
+        queryParams={{
+          email: firstParam(params.email),
+          error: firstParam(params.error),
+          redirectTo: firstParam(params.redirectTo),
+        }}
+      />
     </DesktopOnlyGate>
   );
 }
