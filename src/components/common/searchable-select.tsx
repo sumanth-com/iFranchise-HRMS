@@ -50,8 +50,11 @@ export function SearchableSelect({
     if (createdLabel?.trim()) {
       return { value: value ?? "", label: createdLabel.trim() };
     }
+    if (allowCreate && value?.trim()) {
+      return { value, label: value.trim() };
+    }
     return null;
-  }, [options, value, createdLabel]);
+  }, [options, value, createdLabel, allowCreate]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -217,7 +220,7 @@ export function SearchableSelect({
               >
                 <Check className="size-3.5 opacity-0" />
                 <span className="whitespace-normal break-words">
-                  Save “{createCandidate}”
+                  Use “{createCandidate}”
                 </span>
               </button>
             </li>

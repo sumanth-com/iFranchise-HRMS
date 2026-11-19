@@ -1,11 +1,8 @@
-import { Suspense } from "react";
-
-import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 
-async function EmployeeDashboardContent() {
+export default async function EmployeeDashboardPage() {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
     "employee_profile.view",
@@ -19,13 +16,5 @@ async function EmployeeDashboardContent() {
       pairHolidayBirthday
       showImportantNotices
     />
-  );
-}
-
-export default function EmployeeDashboardPage() {
-  return (
-    <Suspense fallback={<DashboardOpeningState />}>
-      <EmployeeDashboardContent />
-    </Suspense>
   );
 }

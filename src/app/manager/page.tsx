@@ -1,11 +1,8 @@
-import { Suspense } from "react";
-
-import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerPermission } from "@/lib/permissions/server";
 
-async function ManagerSelfServiceHomeContent() {
+export default async function ManagerPortalPage() {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.manager);
 
   return (
@@ -16,13 +13,5 @@ async function ManagerSelfServiceHomeContent() {
       pairHolidayBirthday
       showImportantNotices
     />
-  );
-}
-
-export default function ManagerPortalPage() {
-  return (
-    <Suspense fallback={<DashboardOpeningState />}>
-      <ManagerSelfServiceHomeContent />
-    </Suspense>
   );
 }

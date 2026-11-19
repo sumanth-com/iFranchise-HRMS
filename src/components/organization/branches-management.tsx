@@ -410,9 +410,11 @@ export function BranchesManagement({
                 options={(STATE_DISTRICTS[form.watch("state") || ""] ?? []).map((d: string) => ({ value: d, label: d }))}
                 value={form.watch("city") || null}
                 onValueChange={(v) => form.setValue("city", v ?? "", { shouldValidate: true })}
+                onCreate={(label) => form.setValue("city", label, { shouldValidate: true, shouldDirty: true })}
                 placeholder="Search city…"
                 allowNone={false}
-                emptyMessage={form.watch("state") ? "No districts found" : "Select a state first"}
+                allowCreate={Boolean(form.watch("state"))}
+                emptyMessage={form.watch("state") ? "No match — use the typed city" : "Select a state first"}
               />
             </div>
             <div className="space-y-2">

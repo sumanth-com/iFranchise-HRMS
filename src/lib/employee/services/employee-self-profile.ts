@@ -1,8 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { updateReportingManager } from "@/lib/organization/services/org-mutations";
+import { capitalizeFirstLetter } from "@/lib/employee/profile-contact";
 import type {
   EmployeeSelfPreferencesInput,
+  EmployeeSelfProfileEditInput,
   EmployeeSelfProfileInput,
 } from "@/lib/validations/employee";
 
@@ -34,7 +36,6 @@ export type EmployeeSelfProfileSettings = {
     name: string;
     relationship: string;
     phone: string;
-    email: string;
   };
 };
 
@@ -85,7 +86,7 @@ export async function getEmployeeSelfProfileSettings(
       supabase
         .schema("hrms")
         .from("emergency_contacts")
-        .select("id, name, relationship, phone, email")
+        .select("id, name, relationship, phone")
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
         .order("is_primary", { ascending: false })
@@ -137,7 +138,6 @@ export async function getEmployeeSelfProfileSettings(
       name: contactResult.data?.name ?? "",
       relationship: contactResult.data?.relationship ?? "",
       phone: contactResult.data?.phone ?? "",
-      email: contactResult.data?.email ?? "",
     },
   };
 }
@@ -188,8 +188,8 @@ async function upsertEmployeeProfileRow(
   supabase: AuthSupabaseClient,
   employeeId: string,
   profile: UserProfile,
-  personalEmail: string | null,
-  personalPhone: string | null,
+  personalEmail: string | null | undefined,
+  personalPhone: string | null | undefined,
   gender?: string | null,
 ) {
   const { data: existing } = await supabase
@@ -201,8 +201,8 @@ async function upsertEmployeeProfileRow(
     .maybeSingle();
 
   const payload = {
-    personal_email: personalEmail,
-    personal_phone: personalPhone,
+    ...(personalEmail !== undefined ? { personal_email: personalEmail } : {}),
+    ...(personalPhone !== undefined ? { personal_phone: personalPhone } : {}),
     ...(gender !== undefined ? { gender } : {}),
     updated_by: profile.userId,
   };
@@ -230,7 +230,7 @@ async function upsertCurrentAddress(
   supabase: AuthSupabaseClient,
   employeeId: string,
   profile: UserProfile,
-  input: EmployeeSelfProfileInput,
+  input: EmployeeSelfProfileInput | EmployeeSelfProfileEditInput,
   existingId: string | null,
 ) {
   const hasAddress =
@@ -290,9 +290,8 @@ async function upsertEmergencyContact(
 
   const payload = {
     name,
-    relationship,
+    relationship: capitalizeFirstLetter(relationship),
     phone,
-    email: emptyToNull(input.emergencyContactEmail)?.toLowerCase() ?? null,
     is_primary: true,
     updated_by: profile.userId,
   };
@@ -331,7 +330,7 @@ export async function updateEmployeeSelfPreferences(
 export async function updateEmployeeSelfProfileWithContact(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  input: EmployeeSelfProfileInput,
+  input: EmployeeSelfProfileInput | EmployeeSelfProfileEditInput,
   existing: Pick<EmployeeSelfProfileSettings, "employeeId" | "address" | "emergencyContact">,
   options?: { allowReportingManagerUpdate?: boolean },
 ) {
@@ -339,15 +338,26 @@ export async function updateEmployeeSelfProfileWithContact(
     throw new Error("You can only update your own profile");
   }
 
-  await upsertEmployeeProfileRow(
-    supabase,
-    existing.employeeId,
-    profile,
-    emptyToNull(input.personalEmail)?.toLowerCase() ?? null,
-    emptyToNull(input.personalPhone),
-    input.gender,
-  );
-  await upsertUserPreferences(supabase, profile, input.language, input.timezone);
+  if ("personalPhone" in input) {
+    await upsertEmployeeProfileRow(
+      supabase,
+      existing.employeeId,
+      profile,
+      emptyToNull(input.personalEmail)?.toLowerCase() ?? null,
+      emptyToNull(input.personalPhone),
+      input.gender,
+    );
+    await upsertUserPreferences(supabase, profile, input.language, input.timezone);
+  } else {
+    await upsertEmployeeProfileRow(
+      supabase,
+      existing.employeeId,
+      profile,
+      undefined,
+      undefined,
+      input.gender,
+    );
+  }
   await upsertCurrentAddress(
     supabase,
     existing.employeeId,
@@ -355,15 +365,21 @@ export async function updateEmployeeSelfProfileWithContact(
     input,
     existing.address.id,
   );
-  await upsertEmergencyContact(
-    supabase,
-    existing.employeeId,
-    profile,
-    input,
-    existing.emergencyContact.id,
-  );
+  if ("personalPhone" in input) {
+    await upsertEmergencyContact(
+      supabase,
+      existing.employeeId,
+      profile,
+      input,
+      existing.emergencyContact.id,
+    );
+  }
 
-  if (options?.allowReportingManagerUpdate && input.reportingManagerId !== undefined) {
+  if (
+    "personalPhone" in input &&
+    options?.allowReportingManagerUpdate &&
+    input.reportingManagerId !== undefined
+  ) {
     await updateReportingManager(
       supabase,
       profile,

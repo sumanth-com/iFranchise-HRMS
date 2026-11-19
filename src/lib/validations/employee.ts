@@ -129,7 +129,7 @@ export const employeeSelfProfileSchema = z.object({
   addressLine2: z
     .string()
     .trim()
-    .min(1, "Address line 2 is required")
+    .min(1, "Address is required")
     .max(200),
   city: z.string().trim().min(1, "City is required").max(100),
   state: z.string().trim().min(1, "State is required").max(100),
@@ -146,15 +146,23 @@ export const employeeSelfProfileSchema = z.object({
     .min(1, "Emergency relationship is required")
     .max(100),
   emergencyContactPhone: requiredPhoneSchema,
-  emergencyContactEmail: z
-    .string()
-    .trim()
-    .min(1, "Emergency email is required")
-    .email("Enter a valid emergency email"),
   reportingManagerId: z.string().uuid().optional().or(z.literal("")),
 });
 
 export type EmployeeSelfProfileInput = z.infer<typeof employeeSelfProfileSchema>;
+
+/** Fields employees may revise after their initial profile submission. */
+export const employeeSelfProfileEditSchema = z.object({
+  gender: genderTypeSchema,
+  addressLine1: z.string().trim().min(1, "Address is required").max(200),
+  addressLine2: z.string().trim().min(1, "Address is required").max(200),
+  city: z.string().trim().min(1, "City is required").max(100),
+  state: z.string().trim().min(1, "State is required").max(100),
+  postalCode: z.string().trim().min(1, "Postal code is required").max(20),
+  country: z.string().trim().min(1, "Country is required").max(100),
+});
+
+export type EmployeeSelfProfileEditInput = z.infer<typeof employeeSelfProfileEditSchema>;
 
 /** Validates only language/timezone when contact self-edit is disabled. */
 export const employeeSelfProfilePreferencesOnlySchema = employeeSelfProfileSchema
@@ -226,7 +234,6 @@ export const employeeEmergencyContactStepSchema = z.object({
   name: z.string().min(1, "Contact name is required"),
   relationship: z.string().min(1, "Relationship is required"),
   phone: requiredPhoneSchema,
-  email: z.string().email().optional().or(z.literal("")),
   isPrimary: z.boolean().default(true),
 });
 
@@ -288,7 +295,6 @@ export const employeeUpdateSchema = z
     emergencyContactName: z.string().max(100).optional().or(z.literal("")),
     emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
     emergencyContactPhone: optionalPhoneSchema,
-    emergencyContactEmail: z.string().email().optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {
     if (

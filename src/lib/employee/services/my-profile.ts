@@ -88,7 +88,7 @@ export async function getMyProfileBundle(
       supabase
         .schema("hrms")
         .from("emergency_contacts")
-        .select("id, name, relationship, phone, email")
+        .select("id, name, relationship, phone")
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
         .order("is_primary", { ascending: false })
@@ -169,7 +169,6 @@ export async function getMyProfileBundle(
       name: contactResult.data?.name ?? "",
       relationship: contactResult.data?.relationship ?? "",
       phone: contactResult.data?.phone ?? "",
-      email: contactResult.data?.email ?? "",
     },
   };
 

@@ -1463,9 +1463,14 @@ export async function punchManagerAttendance(
     throw new Error("Failed to update attendance");
   }
 
-  // Persist multi-session day total after checkout (RPC may only store work_hours).
+  // The punch RPC already persists ordinary checkout totals. Only the
+  // multi-session carry needs a second write for the next punch to reuse.
   if (input.type === "out" && existing?.check_in_at) {
     const checkOutAt = result.check_out_at ?? nowIso;
+    const priorSessions = Math.max(
+      0,
+      Math.floor(Number(existing.prior_work_seconds ?? 0)),
+    );
     const totalSeconds = dayTotalSecondsAfterCheckout({
       checkInAt: existing.check_in_at,
       checkOutAt,
@@ -1478,19 +1483,21 @@ export async function punchManagerAttendance(
       today,
       rules,
     );
-    await supabase
-      .schema("hrms")
-      .from("attendance")
-      .update({
-        prior_work_seconds: totalSeconds,
-        work_hours: Math.round((totalSeconds / 3600) * 100) / 100,
-        attendance_status: outcome.status,
-        notes: mergeAttendancePolicyNotes(existing.notes, outcome.policyNoteTags),
-        updated_at: nowIso,
-        updated_by: profile.userId,
-      })
-      .eq("id", result.id)
-      .eq("employee_id", employeeId);
+    if (priorSessions > 0) {
+      await supabase
+        .schema("hrms")
+        .from("attendance")
+        .update({
+          prior_work_seconds: totalSeconds,
+          work_hours: Math.round((totalSeconds / 3600) * 100) / 100,
+          attendance_status: outcome.status,
+          notes: mergeAttendancePolicyNotes(existing.notes, outcome.policyNoteTags),
+          updated_at: nowIso,
+          updated_by: profile.userId,
+        })
+        .eq("id", result.id)
+        .eq("employee_id", employeeId);
+    }
     priorWorkSeconds = totalSeconds;
   }
 

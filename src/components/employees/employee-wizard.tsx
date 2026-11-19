@@ -30,6 +30,7 @@ import {
 } from "@/lib/employees/constants";
 import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
+import { capitalizeFirstLetter } from "@/lib/employee/profile-contact";
 import { todayIsoDateLocal } from "@/lib/validations/date";
 import {
   employeeAddressStepSchema,
@@ -122,7 +123,6 @@ export function EmployeeWizard({ lookups, routesBasePath }: EmployeeWizardProps)
       name: "",
       relationship: "",
       phone: "",
-      email: "",
       isPrimary: true,
     },
   });
@@ -478,10 +478,14 @@ export function EmployeeWizard({ lookups, routesBasePath }: EmployeeWizardProps)
               onValueChange={(value) =>
                 addressForm.setValue("city", value ?? "", { shouldValidate: true })
               }
+              onCreate={(label) =>
+                addressForm.setValue("city", label, { shouldValidate: true, shouldDirty: true })
+              }
               placeholder="Search city…"
               allowNone={false}
+              allowCreate={Boolean(addressForm.watch("state"))}
               emptyMessage={
-                addressForm.watch("state") ? "No districts found" : "Select a state first"
+                addressForm.watch("state") ? "No match — use the typed city" : "Select a state first"
               }
             />
           </div>
@@ -512,7 +516,11 @@ export function EmployeeWizard({ lookups, routesBasePath }: EmployeeWizardProps)
           </div>
           <div className="space-y-2">
             <Label htmlFor="relationship">Relationship</Label>
-            <Input id="relationship" {...emergencyForm.register("relationship")} />
+            <Input
+              id="relationship"
+              className="capitalize"
+              {...emergencyForm.register("relationship")}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="contactPhone">Phone</Label>
@@ -525,10 +533,6 @@ export function EmployeeWizard({ lookups, routesBasePath }: EmployeeWizardProps)
               required
               error={emergencyForm.formState.errors.phone?.message}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contactEmail">Email</Label>
-            <Input id="contactEmail" type="email" {...emergencyForm.register("email")} />
           </div>
         </div>
       ) : null}
@@ -595,8 +599,9 @@ export function EmployeeWizard({ lookups, routesBasePath }: EmployeeWizardProps)
             [review.address.state || "—", review.address.country || "—"],
           ]} />
           <ReviewCard title="Emergency contact" items={[
-            [review.emergencyContact.name, review.emergencyContact.relationship],
-            [review.emergencyContact.phone, review.emergencyContact.email || "—"],
+            ["Name", review.emergencyContact.name],
+            ["Relationship", capitalizeFirstLetter(review.emergencyContact.relationship)],
+            ["Phone", review.emergencyContact.phone],
           ]} />
           <ReviewCard title="Documents" items={[
             [`${documents.length} file(s) attached`, ""],

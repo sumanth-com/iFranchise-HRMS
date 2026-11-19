@@ -1,5 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
+import { capitalizeFirstLetter } from "@/lib/employee/profile-contact";
 import type { EmployeeUpdateInput, EmployeeWizardInputValidated } from "@/lib/validations/employee";
 import {
   EMPLOYEE_STORAGE_BUCKETS,
@@ -211,9 +212,8 @@ export async function createEmployeeFromWizard(
     .insert({
       employee_id: employeeId,
       name: emergencyContact.name.trim(),
-      relationship: emergencyContact.relationship.trim(),
+      relationship: capitalizeFirstLetter(emergencyContact.relationship),
       phone: emergencyContact.phone.trim(),
-      email: emptyToNull(emergencyContact.email)?.toLowerCase() ?? null,
       is_primary: emergencyContact.isPrimary,
       status: "active",
       created_by: userId,
@@ -641,9 +641,8 @@ async function upsertEmergencyContactForUpdate(
 
   const payload = {
     name,
-    relationship,
+    relationship: capitalizeFirstLetter(relationship),
     phone,
-    email: emptyToNull(input.emergencyContactEmail)?.toLowerCase() ?? null,
     is_primary: true,
     updated_by: userId,
   };

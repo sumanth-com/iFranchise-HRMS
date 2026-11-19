@@ -2,19 +2,24 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hasPermission } from "@/lib/permissions/utils";
 
 export const EMERGENCY_RELATIONSHIP_OPTIONS = [
-  { value: "father", label: "Father" },
-  { value: "mother", label: "Mother" },
-  { value: "brother", label: "Brother" },
-  { value: "sister", label: "Sister" },
-  { value: "cousin", label: "Cousin" },
-  { value: "friend", label: "Friend" },
-  { value: "spouse", label: "Spouse" },
-  { value: "family", label: "Family" },
-  { value: "other", label: "Other" },
+  { value: "Father", label: "Father" },
+  { value: "Mother", label: "Mother" },
+  { value: "Brother", label: "Brother" },
+  { value: "Sister", label: "Sister" },
+  { value: "Cousin", label: "Cousin" },
+  { value: "Friend", label: "Friend" },
+  { value: "Spouse", label: "Spouse" },
+  { value: "Family", label: "Family" },
+  { value: "Other", label: "Other" },
 ] as const;
 
 export type EmergencyRelationshipValue =
   (typeof EMERGENCY_RELATIONSHIP_OPTIONS)[number]["value"];
+
+export function capitalizeFirstLetter(value: string): string {
+  const trimmed = value.trim();
+  return trimmed ? trimmed.charAt(0).toLocaleUpperCase() + trimmed.slice(1) : "";
+}
 
 export type ProfileAddressParts = {
   addressLine1: string;
@@ -122,9 +127,9 @@ export function formatRelationshipLabel(value: string | null | undefined): strin
   const normalized = value.trim().toLowerCase();
   const match = EMERGENCY_RELATIONSHIP_OPTIONS.find(
     (option) =>
-      option.value === normalized || option.label.toLowerCase() === normalized,
+      option.value.toLowerCase() === normalized || option.label.toLowerCase() === normalized,
   );
-  return match?.label ?? value;
+  return match?.label ?? capitalizeFirstLetter(value);
 }
 
 export function normalizeRelationshipValue(
@@ -134,9 +139,9 @@ export function normalizeRelationshipValue(
   const normalized = value.trim().toLowerCase();
   const match = EMERGENCY_RELATIONSHIP_OPTIONS.find(
     (option) =>
-      option.value === normalized || option.label.toLowerCase() === normalized,
+      option.value.toLowerCase() === normalized || option.label.toLowerCase() === normalized,
   );
-  return match?.value ?? "other";
+  return match?.value ?? "Other";
 }
 
 /** Self-service may update own contact/address/emergency fields. */

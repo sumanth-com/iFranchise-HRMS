@@ -1,5 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
+import { capitalizeFirstLetter } from "@/lib/employee/profile-contact";
 import { DOCUMENTS_STORAGE_BUCKET } from "@/lib/documents/constants";
 import { getDocumentSettings, nextDocumentNumber } from "@/lib/documents/services/document-settings";
 import { getDocumentTypeIdByCode } from "@/lib/documents/services/document-queries";
@@ -235,7 +236,7 @@ async function syncProfileSections(
 
     const contactPayload = {
       name: emergency.name,
-      relationship: emergency.relationship,
+      relationship: capitalizeFirstLetter(emergency.relationship),
       phone: emergency.phone,
       is_primary: true,
       status: "active",

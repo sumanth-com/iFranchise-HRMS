@@ -36,6 +36,7 @@ import type { MyProfileBundle } from "@/types/my-profile";
 import type { ExitResignationItem } from "@/types/exit";
 import {
   employeeSelfProfilePreferencesOnlySchema,
+  employeeSelfProfileEditSchema,
   employeeSelfProfileSchema,
   type EmployeeSelfProfileInput,
 } from "@/lib/validations/employee";
@@ -108,9 +109,11 @@ export function MyProfileView({
   const validationSchema = useMemo(
     () =>
       canEditContactDetails
-        ? employeeSelfProfileSchema
+        ? data.selfProfileSubmittedAt
+          ? employeeSelfProfileEditSchema
+          : employeeSelfProfileSchema
         : employeeSelfProfilePreferencesOnlySchema,
-    [canEditContactDetails],
+    [canEditContactDetails, data.selfProfileSubmittedAt],
   );
 
   const {
@@ -139,7 +142,6 @@ export function MyProfileView({
         data.profileSettings.emergencyContact.relationship,
       ),
       emergencyContactPhone: data.profileSettings.emergencyContact.phone,
-      emergencyContactEmail: data.profileSettings.emergencyContact.email,
       reportingManagerId: data.reportingManagerId ?? "",
     },
   });
@@ -174,7 +176,6 @@ export function MyProfileView({
         data.profileSettings.emergencyContact.relationship,
       ),
       emergencyContactPhone: data.profileSettings.emergencyContact.phone,
-      emergencyContactEmail: data.profileSettings.emergencyContact.email,
       reportingManagerId: data.reportingManagerId ?? "",
     });
   }
@@ -191,14 +192,24 @@ export function MyProfileView({
 
   function onSubmit(formData: EmployeeSelfProfileInput) {
     startTransition(async () => {
-      const payload: EmployeeSelfProfileInput = canEditContactDetails
+      const payload = canEditContactDetails && data.selfProfileSubmittedAt
+        ? {
+            gender: formData.gender,
+            addressLine1: formData.addressLine1,
+            addressLine2: formData.addressLine2,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.postalCode,
+            country: formData.country,
+          }
+        : canEditContactDetails
         ? {
             ...formData,
             emergencyContactRelationship:
               formData.emergencyContactRelationship?.trim() || "",
             reportingManagerId: data.reportingManagerId ?? "",
           }
-        : formData;
+          : formData;
 
       const result = await updateEmployeeSelfProfileAction(payload);
       if (!result.success) {
@@ -267,9 +278,6 @@ export function MyProfileView({
         </div>
 
         <input type="hidden" {...register("personalEmail")} />
-        {data.profileSettings.emergencyContact.email?.trim() ? (
-          <input type="hidden" {...register("emergencyContactEmail")} />
-        ) : null}
         <input type="hidden" {...register("timezone")} />
         <input type="hidden" {...register("language")} />
 

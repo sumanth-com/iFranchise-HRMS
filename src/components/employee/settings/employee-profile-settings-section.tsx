@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
 import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
+import { formatRelationshipLabel } from "@/lib/employee/profile-contact";
 import {
   employeeSelfPreferencesSchema,
   type EmployeeSelfPreferencesInput,
@@ -170,7 +171,7 @@ export function EmployeeProfileSettingsSection({
             <div className="space-y-2">
               <Label>Relationship</Label>
               <Input
-                value={settings.emergencyContact.relationship || "—"}
+                value={formatRelationshipLabel(settings.emergencyContact.relationship)}
                 disabled
                 readOnly
               />
@@ -178,10 +179,6 @@ export function EmployeeProfileSettingsSection({
             <div className="space-y-2">
               <Label>Emergency phone</Label>
               <Input value={settings.emergencyContact.phone || "—"} disabled readOnly />
-            </div>
-            <div className="space-y-2">
-              <Label>Emergency email</Label>
-              <Input value={settings.emergencyContact.email || "—"} disabled readOnly />
             </div>
           </div>
         </div>

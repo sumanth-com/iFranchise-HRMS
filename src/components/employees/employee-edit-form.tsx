@@ -29,6 +29,7 @@ import {
 } from "@/lib/employees/constants";
 import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
+import { capitalizeFirstLetter } from "@/lib/employee/profile-contact";
 import {
   employeeUpdateSchema,
   type EmployeeUpdateInput,
@@ -158,9 +159,8 @@ export function EmployeeEditForm({
       postalCode: primaryAddress?.postalCode ?? "",
       country: primaryAddress?.country ?? "",
       emergencyContactName: primaryEmergency?.name ?? "",
-      emergencyContactRelationship: primaryEmergency?.relationship ?? "",
+      emergencyContactRelationship: capitalizeFirstLetter(primaryEmergency?.relationship ?? ""),
       emergencyContactPhone: primaryEmergency?.phone ?? "",
-      emergencyContactEmail: primaryEmergency?.email ?? "",
     },
   });
 
@@ -518,9 +518,13 @@ export function EmployeeEditForm({
               onValueChange={(value) =>
                 form.setValue("city", value ?? "", { shouldValidate: true })
               }
+              onCreate={(label) =>
+                form.setValue("city", label, { shouldValidate: true, shouldDirty: true })
+              }
               placeholder="Search city…"
               allowNone={false}
-              emptyMessage={form.watch("state") ? "No districts found" : "Select a state first"}
+              allowCreate={Boolean(form.watch("state"))}
+              emptyMessage={form.watch("state") ? "No match — use the typed city" : "Select a state first"}
             />
           </div>
           <div className="space-y-2">
@@ -553,6 +557,7 @@ export function EmployeeEditForm({
             <Label htmlFor="emergencyContactRelationship">Relationship</Label>
             <Input
               id="emergencyContactRelationship"
+              className="capitalize"
               {...form.register("emergencyContactRelationship")}
             />
           </div>
@@ -566,14 +571,6 @@ export function EmployeeEditForm({
               }
               disabled={isPending}
               error={form.formState.errors.emergencyContactPhone?.message}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="emergencyContactEmail">Email</Label>
-            <Input
-              id="emergencyContactEmail"
-              type="email"
-              {...form.register("emergencyContactEmail")}
             />
           </div>
         </div>

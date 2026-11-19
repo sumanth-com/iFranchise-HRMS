@@ -253,9 +253,6 @@ export function EmployeeDetailView({
   const employeePhone = formatIndianPhone(employee.phone);
   const primaryAddress =
     employee.addresses.find((item) => item.isPrimary) ?? employee.addresses[0];
-  const emergencyContactEmail = primaryEmergencyContact?.email
-    ? primaryEmergencyContact.email
-    : "—";
   const [previewEmploymentTypeName, setPreviewEmploymentTypeName] = useState(
     employee.employmentTypeName,
   );
@@ -362,16 +359,6 @@ export function EmployeeDetailView({
                 value={emergencyContactPhone}
                 valueClassName="tabular-nums tracking-wide"
               />
-              <OverviewInfoRow
-                label="Email"
-                value={emergencyContactEmail}
-                href={
-                  emergencyContactEmail !== "—"
-                    ? `mailto:${emergencyContactEmail}`
-                    : undefined
-                }
-              />
-
               <OverviewSectionTitle>Profile details</OverviewSectionTitle>
               <OverviewInfoRow
                 label="Date of birth"

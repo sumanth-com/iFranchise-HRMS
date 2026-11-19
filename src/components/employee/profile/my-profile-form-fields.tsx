@@ -113,11 +113,10 @@ export function MyProfileFormFields({
 }: MyProfileFormFieldsProps) {
   const editingContact = isEditing && canEditContactDetails;
 
-  if (isEmployee && isEditing) {
+  if (isEditing && canEditContactDetails && data.selfProfileSubmittedAt) {
     return (
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-muted-foreground">Gender</Label>
+        <ProfileFormField label="Gender" required>
           <Select
             value={gender ?? ""}
             onValueChange={(value) => {
@@ -140,30 +139,30 @@ export function MyProfileFormFields({
             </SelectContent>
           </Select>
           <ProfileFieldError message={errors.gender?.message} />
-        </div>
+        </ProfileFormField>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-muted-foreground">Address</Label>
+        <ProfileFormField label="Address" required className="sm:col-span-2">
           <div className="space-y-2">
             <Input
               placeholder="Street, building, area"
-              disabled={isPending || !editingContact}
+              disabled={isPending}
               className="h-9 w-full"
               {...register("addressLine1")}
             />
             <Input
-              placeholder="Apartment, suite, landmark (optional)"
-              disabled={isPending || !editingContact}
+              placeholder="Apartment, suite, landmark"
+              disabled={isPending}
               className="h-9 w-full"
               {...register("addressLine2")}
             />
           </div>
-          <ProfileFieldError message={errors.addressLine1?.message || errors.addressLine2?.message} />
-        </div>
+          <ProfileFieldError
+            message={errors.addressLine1?.message || errors.addressLine2?.message}
+          />
+        </ProfileFormField>
 
-        <div className="space-y-1 sm:col-span-2">
-          <Label className="text-xs font-medium text-muted-foreground">City / State</Label>
-          <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+          <ProfileFormField label="City" required>
             <SearchableSelect
               options={(STATE_DISTRICTS[addressState] ?? []).map((district) => ({
                 value: district,
@@ -171,11 +170,18 @@ export function MyProfileFormFields({
               }))}
               value={addressCity || null}
               onValueChange={(value) => setValue("city", value ?? "", { shouldValidate: true })}
+              onCreate={(label) =>
+                setValue("city", label, { shouldValidate: true, shouldDirty: true })
+              }
               placeholder="Select city"
               allowNone={false}
-              disabled={isPending || !editingContact}
-              emptyMessage={addressState ? "No matches — type to search" : "Select a state first"}
+              allowCreate={Boolean(addressState)}
+              disabled={isPending}
+              emptyMessage={addressState ? "No match — use the typed city" : "Select a state first"}
             />
+            <ProfileFieldError message={errors.city?.message} />
+          </ProfileFormField>
+          <ProfileFormField label="State" required>
             <SearchableSelect
               options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
               value={addressState || null}
@@ -185,35 +191,33 @@ export function MyProfileFormFields({
               }}
               placeholder="Select state"
               allowNone={false}
-              disabled={isPending || !editingContact}
+              disabled={isPending}
             />
-          </div>
-          <ProfileFieldError message={errors.city?.message || errors.state?.message} />
+            <ProfileFieldError message={errors.state?.message} />
+          </ProfileFormField>
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-muted-foreground">Country</Label>
+        <ProfileFormField label="Country" required>
           <SearchableSelect
             options={COUNTRIES.map((country) => ({ value: country, label: country }))}
             value={addressCountry || null}
             onValueChange={(value) => setValue("country", value ?? "", { shouldValidate: true })}
             placeholder="Select country"
             allowNone={false}
-            disabled={isPending || !editingContact}
+            disabled={isPending}
           />
           <ProfileFieldError message={errors.country?.message} />
-        </div>
+        </ProfileFormField>
 
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-muted-foreground">Postal Code</Label>
+        <ProfileFormField label="Postal Code" required>
           <Input
             placeholder="Postal code"
-            disabled={isPending || !editingContact}
+            disabled={isPending}
             className="h-9 w-full"
             {...register("postalCode")}
           />
           <ProfileFieldError message={errors.postalCode?.message} />
-        </div>
+        </ProfileFormField>
 
         <p className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground sm:col-span-2">
           For changes to any other profile information, please contact HR.
@@ -365,11 +369,15 @@ export function MyProfileFormFields({
               }))}
               value={addressCity || null}
               onValueChange={(value) => setValue("city", value ?? "", { shouldValidate: true })}
+              onCreate={(label) =>
+                setValue("city", label, { shouldValidate: true, shouldDirty: true })
+              }
               placeholder="Search city…"
               allowNone={false}
+              allowCreate={Boolean(addressState)}
               disabled={isPending}
               emptyMessage={
-                addressState ? "No matches — type to search" : "Select a state first"
+                addressState ? "No match — use the typed city" : "Select a state first"
               }
             />
             <ProfileFieldError message={errors.city?.message} />
@@ -481,25 +489,6 @@ export function MyProfileFormFields({
           <ProfileReadonlyValue value={data.profileSettings.emergencyContact.phone} />
         )}
       </ProfileFormField>
-
-      {!data.profileSettings.emergencyContact.email?.trim() ? (
-        <ProfileFormField label="Emergency email" required={editingContact}>
-          {editingContact ? (
-            <div className="space-y-1">
-              <Input
-                placeholder="Email"
-                type="email"
-                disabled={isPending}
-                className="h-9 w-full"
-                {...register("emergencyContactEmail")}
-              />
-              <ProfileFieldError message={errors.emergencyContactEmail?.message} />
-            </div>
-          ) : (
-            <ProfileReadonlyValue value={data.profileSettings.emergencyContact.email} />
-          )}
-        </ProfileFormField>
-      ) : null}
 
     </div>
   );

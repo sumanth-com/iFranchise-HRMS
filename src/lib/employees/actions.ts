@@ -16,7 +16,6 @@ import {
   requireAuthenticatedProfile,
   requireServerPermission,
 } from "@/lib/permissions/server";
-import { hasPermission } from "@/lib/permissions/utils";
 import { canEditSelfProfileContactDetails, canEditSelfReportingManager } from "@/lib/employee/profile-contact";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import {
@@ -93,6 +92,7 @@ import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import {
   employeeInviteSchema,
   employeeSelfPreferencesSchema,
+  employeeSelfProfileEditSchema,
   employeeSelfProfileSchema,
 } from "@/lib/validations/employee";
 import {
@@ -900,23 +900,6 @@ export async function updateEmployeeSelfProfileAction(
 
     const supabase = await getAuthenticatedSupabase();
 
-    if (canEditContact) {
-      const parsed = employeeSelfProfileSchema.parse(input);
-      const existing = await getEmployeeSelfProfileSettings(supabase, profile);
-
-      if (!existing) {
-        return { success: false, message: "Employee profile not found" };
-      }
-
-      await updateEmployeeSelfProfileWithContact(supabase, profile, parsed, existing, {
-        allowReportingManagerUpdate: canEditReportingManager,
-      });
-      await initializeEmployeeLeaveBalances(supabase, profile, profile.employee.id);
-    } else {
-      const parsed = employeeSelfPreferencesSchema.parse(input);
-      await updateEmployeeSelfPreferences(supabase, profile, parsed);
-    }
-
     const { data: profileRow, error: profileRowError } = await supabase
       .schema("hrms")
       .from("employee_profiles")
@@ -929,20 +912,41 @@ export async function updateEmployeeSelfProfileAction(
       throw new Error(profileRowError.message);
     }
 
-    const submittedAt = profileRow?.self_profile_submitted_at ?? new Date().toISOString();
+    if (canEditContact) {
+      const parsed = profileRow?.self_profile_submitted_at
+        ? employeeSelfProfileEditSchema.parse(input)
+        : employeeSelfProfileSchema.parse(input);
+      const existing = await getEmployeeSelfProfileSettings(supabase, profile);
 
-    const { error: submitError } = await supabase
-      .schema("hrms")
-      .from("employee_profiles")
-      .update({
-        self_profile_submitted_at: submittedAt,
-        updated_by: profile.userId,
-      })
-      .eq("employee_id", profile.employee.id)
-      .is("deleted_at", null);
+      if (!existing) {
+        return { success: false, message: "Employee profile not found" };
+      }
 
-    if (submitError) {
-      throw new Error(submitError.message);
+      await updateEmployeeSelfProfileWithContact(supabase, profile, parsed, existing, {
+        allowReportingManagerUpdate: canEditReportingManager,
+      });
+      if (!profileRow?.self_profile_submitted_at) {
+        await initializeEmployeeLeaveBalances(supabase, profile, profile.employee.id);
+      }
+    } else {
+      const parsed = employeeSelfPreferencesSchema.parse(input);
+      await updateEmployeeSelfPreferences(supabase, profile, parsed);
+    }
+
+    if (!profileRow?.self_profile_submitted_at) {
+      const { error: submitError } = await supabase
+        .schema("hrms")
+        .from("employee_profiles")
+        .update({
+          self_profile_submitted_at: new Date().toISOString(),
+          updated_by: profile.userId,
+        })
+        .eq("employee_id", profile.employee.id)
+        .is("deleted_at", null);
+
+      if (submitError) {
+        throw new Error(submitError.message);
+      }
     }
 
     revalidateSelfProfilePaths();

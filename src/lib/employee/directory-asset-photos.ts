@@ -1,22 +1,22 @@
 import type { StaticImageData } from "next/image";
 
-import akshitaPotnuru from "@/assets/Akshita Potnuru.png";
-import anmolPrasad from "@/assets/Anmol Prasad.png";
-import dikshaChoudhary from "@/assets/Dikhsha Choudhary.png";
-import ektaPattanaik from "@/assets/Ekta.jpeg";
-import himaniBhargava from "@/assets/Himani.jpeg";
-import lohitKumar from "@/assets/lohit-kumar.png";
-import namanThapiyal from "@/assets/Naman.jpeg";
-import omRamtekkar from "@/assets/Om.jpeg";
+import akshitaPotnuru from "@/assets/Akshita Potnuru.webp";
+import anmolPrasad from "@/assets/Anmol Prasad.webp";
+import dikshaChoudhary from "@/assets/Dikhsha Choudhary.webp";
+import ektaPattanaik from "@/assets/Ekta.webp";
+import himaniBhargava from "@/assets/Himani.webp";
+import lohitKumar from "@/assets/lohit-kumar.webp";
+import namanThapiyal from "@/assets/Naman.webp";
+import omRamtekkar from "@/assets/Om.webp";
 import prajwalPhoto from "@/assets/Prajjwal.webp";
-import samitAli from "@/assets/Samit Ali.jpg";
-import shakshayGupta from "@/assets/Shakshay Gupta.jpeg";
-import shiwaliSingh from "@/assets/Shiwali Singh.png";
+import samitAli from "@/assets/Samit Ali.webp";
+import shakshayGupta from "@/assets/Shakshay Gupta.webp";
+import shiwaliSingh from "@/assets/Shiwali Singh.webp";
 import snehaMahajan from "@/assets/Sneha.webp";
-import sumanthReddy from "@/assets/whatsapp_img.png";
-import swethaChintada from "@/assets/swetha.jpeg";
-import vennapusaHemavathi from "@/assets/Vennapusa Hemavathi.png";
-import vivekPhoto from "@/assets/vivek.png";
+import sumanthReddy from "@/assets/whatsapp_img.webp";
+import swethaChintada from "@/assets/swetha.webp";
+import vennapusaHemavathi from "@/assets/Vennapusa Hemavathi.webp";
+import vivekPhoto from "@/assets/vivek.webp";
 
 const DIRECTORY_ASSET_PHOTOS: Record<string, StaticImageData> = {
   "akshita potnuru": akshitaPotnuru,

@@ -1,10 +1,7 @@
-import { Suspense } from "react";
-
-import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 
-async function SelfServiceHomeContent() {
+export default async function HrSelfServiceHomePage() {
   const profile = await requireAuthenticatedProfile();
 
   return (
@@ -14,13 +11,5 @@ async function SelfServiceHomeContent() {
       pairHolidayBirthday
       showImportantNotices
     />
-  );
-}
-
-export default function HrSelfServiceHomePage() {
-  return (
-    <Suspense fallback={<DashboardOpeningState />}>
-      <SelfServiceHomeContent />
-    </Suspense>
   );
 }

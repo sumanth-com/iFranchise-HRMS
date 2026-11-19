@@ -1,10 +1,7 @@
-import { Suspense } from "react";
-
-import { DashboardOpeningState } from "@/components/dashboard/dashboard-opening-state";
 import { EmployeeDashboardPageBody } from "@/components/employee/dashboard/employee-dashboard-page-body";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 
-async function SuperAdminSelfServiceHomeContent() {
+export default async function SuperAdminPortalPage() {
   const profile = await requireSuperAdminProfile();
 
   return (
@@ -16,13 +13,5 @@ async function SuperAdminSelfServiceHomeContent() {
       // Team Updates editing is CEO/HR only — Super Admin can view, not edit.
       canManageAnnouncements={false}
     />
-  );
-}
-
-export default function SuperAdminPortalPage() {
-  return (
-    <Suspense fallback={<DashboardOpeningState />}>
-      <SuperAdminSelfServiceHomeContent />
-    </Suspense>
   );
 }
